@@ -9,6 +9,8 @@ import (
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 
+	"members/api"
+	"members/bot"
 	_ "members/migrations"
 )
 
@@ -23,6 +25,14 @@ func main() {
 	app := pocketbase.New()
 
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
+		// Start Telegram bot
+		if err := bot.StartTelegramBot(); err != nil {
+			log.Printf("Failed to start Telegram bot: %v", err)
+		}
+
+		// API routes
+		se.Router.POST("/api/telegram/link", api.LinkTelegramHandler(app)).Bind(apis.RequireAuth())
+
 		// Serve frontend
 		se.Router.GET("/{path...}", apis.Static(os.DirFS("./pb_public"), false))
 

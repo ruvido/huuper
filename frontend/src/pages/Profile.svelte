@@ -1,8 +1,61 @@
 <script>
+	import { onMount } from 'svelte';
 	import { pb } from '../lib/pocketbase';
 	import { navigate } from '../lib/router';
 
-	const user = pb.authStore.record;
+	let user = pb.authStore.record;
+	let telegramData = user?.telegram;
+	let loading = false;
+	let error = '';
+
+	const BOT_NAME = import.meta.env.VITE_TELEGRAM_BOT_NAME || '@branco_realmen_bot';
+
+	onMount(() => {
+		// Load Telegram Widget script
+		const script = document.createElement('script');
+		script.src = 'https://telegram.org/js/telegram-widget.js?22';
+		script.async = true;
+		document.body.appendChild(script);
+
+		// Define global callback for Telegram widget
+		window.onTelegramAuth = onTelegramAuth;
+
+		return () => {
+			delete window.onTelegramAuth;
+		};
+	});
+
+	async function onTelegramAuth(telegramUser) {
+		loading = true;
+		error = '';
+
+		try {
+			const response = await fetch('/api/telegram/link', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': pb.authStore.token,
+				},
+				body: JSON.stringify(telegramUser),
+			});
+
+			if (!response.ok) {
+				const data = await response.text();
+				throw new Error(data || 'Failed to link Telegram account');
+			}
+
+			const data = await response.json();
+			telegramData = data.telegram;
+
+			// Reload user data from PocketBase
+			user = await pb.collection('_superusers').getOne(user.id);
+		} catch (err) {
+			error = err.message || 'Failed to link Telegram account';
+			console.error('Telegram link error:', err);
+		} finally {
+			loading = false;
+		}
+	}
 
 	function goToGroups() {
 		navigate('groups');
@@ -19,6 +72,48 @@
 			</div>
 			<h2>{user?.email}</h2>
 			<p class="status">Admin</p>
+		</div>
+
+		<!-- Telegram Connection Section -->
+		<div class="card">
+			<h3>Telegram Account</h3>
+
+			{#if telegramData}
+				<!-- Show Telegram info when connected -->
+				<div class="telegram-connected">
+					<p class="telegram-info">
+						{#if telegramData.username}
+							<strong>@{telegramData.username}</strong>
+						{:else}
+							<strong>{telegramData.first_name} {telegramData.last_name || ''}</strong>
+						{/if}
+					</p>
+					<p class="telegram-status">✓ Connected</p>
+				</div>
+			{:else}
+				<!-- Show Telegram Login Widget when not connected -->
+				<div class="telegram-login">
+					{#if loading}
+						<p>Connecting...</p>
+					{:else}
+						<p>Connect your Telegram account to access private groups</p>
+						<div id="telegram-login-container">
+							<script
+								async
+								src="https://telegram.org/js/telegram-widget.js?22"
+								data-telegram-login={BOT_NAME.replace('@', '')}
+								data-size="large"
+								data-onauth="onTelegramAuth(user)"
+								data-request-access="write"
+							></script>
+						</div>
+					{/if}
+
+					{#if error}
+						<div class="error">{error}</div>
+					{/if}
+				</div>
+			{/if}
 		</div>
 
 		<button class="btn-primary" on:click={goToGroups}>
@@ -102,5 +197,46 @@
 	.btn-primary:hover {
 		background: #fff;
 		color: #000;
+	}
+
+	/* Telegram Section */
+	h3 {
+		margin: 0 0 clamp(1rem, 3vw, 1.5rem) 0;
+		font-size: clamp(1.125rem, 3.5vw, 1.25rem);
+		color: #000;
+		font-weight: bold;
+	}
+
+	.telegram-connected {
+		text-align: center;
+	}
+
+	.telegram-info {
+		margin: 0 0 clamp(0.5rem, 2vw, 0.75rem) 0;
+		font-size: clamp(1rem, 3vw, 1.125rem);
+		color: #000;
+	}
+
+	.telegram-status {
+		margin: 0;
+		font-size: clamp(0.875rem, 2.5vw, 0.9rem);
+		color: #000;
+		font-weight: 600;
+	}
+
+	.telegram-login {
+		text-align: center;
+	}
+
+	.telegram-login p {
+		margin: 0 0 clamp(1rem, 3vw, 1.5rem) 0;
+		font-size: clamp(0.875rem, 2.5vw, 1rem);
+		color: #000;
+	}
+
+	#telegram-login-container {
+		display: flex;
+		justify-content: center;
+		margin: clamp(1rem, 3vw, 1.5rem) 0;
 	}
 </style>
