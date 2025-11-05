@@ -17,7 +17,7 @@
 		error = '';
 
 		try {
-			await pb.collection('_superusers').authWithPassword(email, password);
+			await pb.collection('users').authWithPassword(email, password);
 			navigate('profile');
 		} catch (err) {
 			error = err.message || 'Login failed';

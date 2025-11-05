@@ -32,6 +32,7 @@ func main() {
 
 		// API routes
 		se.Router.POST("/api/telegram/link", api.LinkTelegramHandler(app)).Bind(apis.RequireAuth())
+		se.Router.GET("/api/telegram/callback", api.TelegramCallbackHandler(app))
 
 		// Serve frontend
 		se.Router.GET("/{path...}", apis.Static(os.DirFS("./pb_public"), false))

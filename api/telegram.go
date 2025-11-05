@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"sort"
@@ -67,6 +68,72 @@ func VerifyTelegramAuth(data TelegramAuthData, botToken string) bool {
 	calculatedHash := hex.EncodeToString(mac.Sum(nil))
 
 	return calculatedHash == data.Hash
+}
+
+// TelegramCallbackHandler handles the redirect callback from Telegram Login Widget
+func TelegramCallbackHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		log.Println("=== TELEGRAM CALLBACK CALLED ===")
+		log.Printf("Full URL: %s", e.Request.URL.String())
+
+		// Parse query parameters
+		query := e.Request.URL.Query()
+		log.Printf("Query params: %v", query)
+
+		id, _ := strconv.ParseInt(query.Get("id"), 10, 64)
+		authDate, _ := strconv.ParseInt(query.Get("auth_date"), 10, 64)
+
+		telegramData := TelegramAuthData{
+			ID:        id,
+			FirstName: query.Get("first_name"),
+			LastName:  query.Get("last_name"),
+			Username:  query.Get("username"),
+			PhotoURL:  query.Get("photo_url"),
+			AuthDate:  authDate,
+			Hash:      query.Get("hash"),
+		}
+
+		// Verify Telegram signature
+		botToken := os.Getenv("TELEGRAM_BOT_TOKEN")
+		if botToken == "" {
+			return e.HTML(http.StatusInternalServerError, "<html><body><h1>Error</h1><p>Bot token not configured</p></body></html>")
+		}
+
+		if !VerifyTelegramAuth(telegramData, botToken) {
+			return e.HTML(http.StatusForbidden, "<html><body><h1>Error</h1><p>Invalid Telegram signature</p></body></html>")
+		}
+
+		// Get user ID from query parameter (passed from frontend)
+		userID := query.Get("user_id")
+		if userID == "" {
+			return e.HTML(http.StatusBadRequest, "<html><body><h1>Error</h1><p>User ID missing</p></body></html>")
+		}
+
+		// Get user record
+		user, err := app.FindRecordById("users", userID)
+		if err != nil {
+			return e.HTML(http.StatusNotFound, "<html><body><h1>Error</h1><p>User not found</p></body></html>")
+		}
+
+		// Prepare telegram data to save
+		telegramJSON := map[string]interface{}{
+			"id":         strconv.FormatInt(telegramData.ID, 10),
+			"first_name": telegramData.FirstName,
+			"last_name":  telegramData.LastName,
+			"username":   telegramData.Username,
+			"photo_url":  telegramData.PhotoURL,
+			"auth_date":  telegramData.AuthDate,
+		}
+
+		// Update user record
+		user.Set("telegram", telegramJSON)
+		if err := app.Save(user); err != nil {
+			return e.HTML(http.StatusInternalServerError, "<html><body><h1>Error</h1><p>Failed to save telegram data</p></body></html>")
+		}
+
+		// Redirect back to profile with success
+		return e.Redirect(http.StatusFound, "/#profile?telegram_linked=true")
+	}
 }
 
 // LinkTelegramHandler handles linking a Telegram account to a user

@@ -7,55 +7,38 @@
 	let telegramData = user?.telegram;
 	let loading = false;
 	let error = '';
+	let successMessage = '';
 
 	const BOT_NAME = import.meta.env.VITE_TELEGRAM_BOT_NAME || '@branco_realmen_bot';
 
-	onMount(() => {
-		// Load Telegram Widget script
-		const script = document.createElement('script');
-		script.src = 'https://telegram.org/js/telegram-widget.js?22';
-		script.async = true;
-		document.body.appendChild(script);
-
-		// Define global callback for Telegram widget
-		window.onTelegramAuth = onTelegramAuth;
-
-		return () => {
-			delete window.onTelegramAuth;
-		};
-	});
-
-	async function onTelegramAuth(telegramUser) {
-		loading = true;
-		error = '';
-
-		try {
-			const response = await fetch('/api/telegram/link', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'Authorization': pb.authStore.token,
-				},
-				body: JSON.stringify(telegramUser),
-			});
-
-			if (!response.ok) {
-				const data = await response.text();
-				throw new Error(data || 'Failed to link Telegram account');
-			}
-
-			const data = await response.json();
-			telegramData = data.telegram;
-
-			// Reload user data from PocketBase
-			user = await pb.collection('_superusers').getOne(user.id);
-		} catch (err) {
-			error = err.message || 'Failed to link Telegram account';
-			console.error('Telegram link error:', err);
-		} finally {
-			loading = false;
-		}
+	// Log auth URL for debugging
+	$: if (user?.id) {
+		const authUrl = `${window.location.origin}/api/telegram/callback?user_id=${user.id}`;
+		console.log('=== TELEGRAM AUTH URL ===', authUrl);
 	}
+
+	onMount(async () => {
+		// Check if returning from Telegram callback
+		const urlParams = new URLSearchParams(window.location.hash.split('?')[1]);
+		if (urlParams.get('telegram_linked') === 'true') {
+			// Reload user data
+			try {
+				user = await pb.collection('users').getOne(user.id);
+				telegramData = user?.telegram;
+				successMessage = 'Telegram account linked successfully!';
+
+				// Clean URL
+				window.history.replaceState({}, '', '/#profile');
+
+				// Clear success message after 3 seconds
+				setTimeout(() => {
+					successMessage = '';
+				}, 3000);
+			} catch (err) {
+				error = 'Failed to load updated user data';
+			}
+		}
+	});
 
 	function goToGroups() {
 		navigate('groups');
@@ -93,24 +76,24 @@
 			{:else}
 				<!-- Show Telegram Login Widget when not connected -->
 				<div class="telegram-login">
-					{#if loading}
-						<p>Connecting...</p>
-					{:else}
-						<p>Connect your Telegram account to access private groups</p>
-						<div id="telegram-login-container">
-							<script
-								async
-								src="https://telegram.org/js/telegram-widget.js?22"
-								data-telegram-login={BOT_NAME.replace('@', '')}
-								data-size="large"
-								data-onauth="onTelegramAuth(user)"
-								data-request-access="write"
-							></script>
-						</div>
-					{/if}
+					<p>Connect your Telegram account to access private groups</p>
+					<div id="telegram-login-container">
+						<script
+							async
+							src="https://telegram.org/js/telegram-widget.js?22"
+							data-telegram-login={BOT_NAME.replace('@', '')}
+							data-size="large"
+							data-auth-url={`${window.location.origin}/api/telegram/callback?user_id=${user.id}`}
+							data-request-access="write"
+						></script>
+					</div>
 
 					{#if error}
 						<div class="error">{error}</div>
+					{/if}
+
+					{#if successMessage}
+						<div class="success">{successMessage}</div>
 					{/if}
 				</div>
 			{/if}
@@ -238,5 +221,18 @@
 		display: flex;
 		justify-content: center;
 		margin: clamp(1rem, 3vw, 1.5rem) 0;
+	}
+
+	.error {
+		color: #d00;
+		font-size: clamp(0.875rem, 2.5vw, 1rem);
+		margin-top: clamp(1rem, 3vw, 1.5rem);
+	}
+
+	.success {
+		color: #070;
+		font-size: clamp(0.875rem, 2.5vw, 1rem);
+		margin-top: clamp(1rem, 3vw, 1.5rem);
+		font-weight: 600;
 	}
 </style>
