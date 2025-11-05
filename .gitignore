@@ -1,0 +1,97 @@
+# PocketBase
+pb_data/
+pocketbase
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Frontend (Svelte)
+frontend/node_modules/
+frontend/dist/
+frontend/.svelte-kit/
+frontend/build/
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+# Build outputs
+pb_public/assets/
+pb_public/index.html
+
+# Dependencies
+node_modules/
+vendor/
+
+# Testing
+coverage/
+*.cover
+*.coverage
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+dist-ssr/
+*.local
