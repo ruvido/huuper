@@ -31,7 +31,7 @@
 	}
 </script>
 
-<div class="page">
+<div class="auth-page">
 	<div class="card">
 		<h1>Login</h1>
 

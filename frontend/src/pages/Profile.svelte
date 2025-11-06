@@ -80,11 +80,11 @@
 	}
 </script>
 
-<div class="page">
-	<div class="container">
-		<h1 class="page-title">Profile</h1>
+<div class="dashboard-page">
+	<div class="dashboard-container">
+		<h1 class="dashboard-title">Profile</h1>
 
-		<div class="card">
+		<div class="dashboard-card">
 			<div class="avatar">
 				{user?.email?.charAt(0).toUpperCase()}
 			</div>
@@ -93,8 +93,8 @@
 		</div>
 
 		<!-- Telegram Connection Section -->
-		<div class="card">
-			<h3>Telegram Account</h3>
+		<div class="dashboard-card">
+			<h3 class="section-title">Telegram Account</h3>
 
 			{#if telegramData}
 				<!-- Show Telegram info when connected -->
@@ -135,35 +135,7 @@
 </div>
 
 <style>
-	.page {
-		min-height: 100vh;
-		background: #fff;
-		padding: 5rem clamp(1rem, 4vw, 2rem) clamp(1rem, 4vw, 2rem);
-	}
-
-	.container {
-		max-width: 50rem;
-		margin: 0 auto;
-		display: flex;
-		flex-direction: column;
-		gap: clamp(1.5rem, 4vw, 2rem);
-	}
-
-	.page-title {
-		margin: 0 0 clamp(1rem, 3vw, 1.5rem) 0;
-		font-size: 2rem;
-		font-weight: bold;
-		color: #000;
-	}
-
-	/* Card profilo */
-	.card {
-		background: #fff;
-		border: 2px solid #000;
-		padding: clamp(2rem, 5vw, 3rem) clamp(1.5rem, 4vw, 2rem);
-		text-align: center;
-	}
-
+	/* Component-specific styles only */
 	.avatar {
 		width: clamp(5rem, 15vw, 6.25rem);
 		height: clamp(5rem, 15vw, 6.25rem);
@@ -192,33 +164,7 @@
 		font-size: clamp(0.875rem, 2.5vw, 1rem);
 	}
 
-	/* Button - touch target 48px */
-	.btn-primary {
-		width: 100%;
-		padding: clamp(0.875rem, 3vw, 1rem);
-		background: #000;
-		color: #fff;
-		border: 2px solid #000;
-		font-size: clamp(1rem, 3vw, 1.125rem);
-		font-weight: 600;
-		cursor: pointer;
-		touch-action: manipulation;
-		transition: background 0.2s, color 0.2s;
-	}
-
-	.btn-primary:hover {
-		background: #fff;
-		color: #000;
-	}
-
 	/* Telegram Section */
-	h3 {
-		margin: 0 0 clamp(1rem, 3vw, 1.5rem) 0;
-		font-size: clamp(1.125rem, 3.5vw, 1.25rem);
-		color: #000;
-		font-weight: bold;
-	}
-
 	.telegram-connected {
 		text-align: center;
 	}

@@ -1,6 +1,8 @@
 <script>
 	import { onMount } from 'svelte';
 	import { pb } from '../lib/pocketbase';
+	import { navigate } from '../lib/router';
+
 
 	let groups = [];
 	let loading = true;
@@ -19,18 +21,22 @@
 			loading = false;
 		}
 	});
+
+	function goToProfile() {
+		navigate('profile');
+	}
 </script>
 
-<div class="page">
-	<div class="container">
-		<h1 class="page-title">Groups</h1>
+<div class="dashboard-page">
+	<div class="dashboard-container">
+		<h1 class="dashboard-title">Groups</h1>
 
 		{#if loading}
-			<div class="loading">Loading groups...</div>
+			<div class="state-card">Loading groups...</div>
 		{:else if error}
-			<div class="error">{error}</div>
+			<div class="state-card">{error}</div>
 		{:else if groups.length === 0}
-			<div class="empty">
+			<div class="state-card">
 				<p>No groups found</p>
 			</div>
 		{:else}
@@ -38,11 +44,7 @@
 				{#each groups as group}
 					<div class="group-card">
 						<div class="group-icon">
-							{#if group.type === 'telegram'}
-								<span class="icon">📱</span>
-							{:else}
-								<span class="icon">💬</span>
-							{/if}
+						{group.name.charAt(0).toUpperCase()}
 						</div>
 						<div class="group-info">
 							<h3>{group.name}</h3>
@@ -65,38 +67,14 @@
 				{/each}
 			</div>
 		{/if}
+		<button class="btn-primary" on:click={goToProfile}>
+			Profile
+		</button>
 	</div>
 </div>
 
 <style>
-	.page {
-		min-height: 100vh;
-		background: #fff;
-		padding: 5rem clamp(1rem, 4vw, 2rem) clamp(1rem, 4vw, 2rem);
-	}
-
-	.container {
-		max-width: 50rem;
-		margin: 0 auto;
-	}
-
-	.page-title {
-		margin: 0 0 clamp(1rem, 3vw, 1.5rem) 0;
-		font-size: 2rem;
-		font-weight: bold;
-		color: #000;
-	}
-
-	/* Stati: loading, error, empty */
-	.loading, .error, .empty {
-		background: #fff;
-		border: 2px solid #000;
-		padding: clamp(2rem, 5vw, 3rem) clamp(1.5rem, 4vw, 2rem);
-		text-align: center;
-		color: #000;
-		font-size: clamp(1rem, 3vw, 1.125rem);
-	}
-
+	/* Component-specific styles only */
 	/* Grid list - responsive automatico */
 	.groups-list {
 		display: grid;
@@ -108,34 +86,31 @@
 	.group-card {
 		background: #fff;
 		border: 2px solid #000;
-		padding: clamp(1rem, 3vw, 1.5rem);
-		display: grid;
-		grid-template-columns: auto 1fr;
-		grid-template-rows: auto auto;
+		padding: clamp(0.75rem, 2.5vw, 1rem);
+		display: flex;
+		align-items: center;
 		gap: clamp(0.75rem, 2vw, 1rem);
-		align-items: start;
 	}
 
 	.group-icon {
-		grid-row: 1 / 2;
 		width: clamp(3.5rem, 10vw, 4rem);
 		height: clamp(3.5rem, 10vw, 4rem);
 		border: 2px solid #000;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-	}
-
-	.icon {
+		flex-shrink: 0;
 		font-size: clamp(1.75rem, 5vw, 2rem);
+		font-weight: bold;
+		color: #000;
 	}
 
 	.group-info {
-		grid-row: 1 / 2;
+		flex: 1;
 		min-width: 0;
 		display: flex;
 		flex-direction: column;
-		gap: clamp(0.25rem, 1vw, 0.375rem);
+		gap: clamp(0.125rem, 0.5vw, 0.25rem);
 	}
 
 	h3 {
@@ -165,10 +140,8 @@
 		-webkit-box-orient: vertical;
 	}
 
-	/* Join button - full width su mobile, touch target 48px */
+	/* Join button */
 	.btn-join {
-		grid-column: 1 / -1;
-		grid-row: 2 / 3;
 		background: #000;
 		color: #fff;
 		border: 2px solid #000;
@@ -176,36 +149,14 @@
 		text-decoration: none;
 		font-weight: 600;
 		text-align: center;
-		display: inline-block;
+		white-space: nowrap;
 		touch-action: manipulation;
 		transition: background 0.2s, color 0.2s;
+		flex-shrink: 0;
 	}
 
 	.btn-join:hover {
 		background: #fff;
 		color: #000;
-	}
-
-	/* Tablet e desktop: card più complessa */
-	@media (min-width: 48em) {
-		.group-card {
-			grid-template-columns: auto 1fr auto;
-			grid-template-rows: 1fr;
-		}
-
-		.group-icon {
-			grid-row: 1 / 2;
-		}
-
-		.group-info {
-			grid-row: 1 / 2;
-		}
-
-		.btn-join {
-			grid-column: 3 / 4;
-			grid-row: 1 / 2;
-			white-space: nowrap;
-			padding-inline: clamp(1.25rem, 3vw, 1.5rem);
-		}
 	}
 </style>

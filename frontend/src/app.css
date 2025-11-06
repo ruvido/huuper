@@ -12,8 +12,8 @@ body {
 	color: #000;
 }
 
-/* Layout fullscreen center (Login/Signup) */
-.page {
+/* Auth pages: centered fullscreen layout (Login/Signup) */
+.auth-page {
 	height: 100vh;
 	display: flex;
 	align-items: center;
@@ -30,6 +30,71 @@ body {
 	width: 100%;
 	max-width: 28rem;
 	margin: auto;
+}
+
+/* Dashboard pages: scrollable layout (Profile, Groups, etc) */
+.dashboard-page {
+	min-height: 100vh;
+	background: #fff;
+	padding: 5rem clamp(1rem, 4vw, 2rem) clamp(1rem, 4vw, 2rem);
+}
+
+.dashboard-container {
+	max-width: 50rem;
+	margin: 0 auto;
+	display: flex;
+	flex-direction: column;
+	gap: clamp(1.5rem, 4vw, 2rem);
+}
+
+.dashboard-title {
+	margin: 0 0 clamp(1rem, 3vw, 1.5rem) 0;
+	font-size: 2rem;
+	font-weight: bold;
+	color: #000;
+}
+
+.dashboard-card {
+	background: #fff;
+	border: 2px solid #000;
+	padding: clamp(2rem, 5vw, 3rem) clamp(1.5rem, 4vw, 2rem);
+	text-align: center;
+	width: 100%;
+}
+
+.section-title {
+	margin: 0 0 clamp(1rem, 3vw, 1.5rem) 0;
+	font-size: clamp(1.125rem, 3.5vw, 1.25rem);
+	color: #000;
+	font-weight: bold;
+}
+
+.state-card {
+	background: #fff;
+	border: 2px solid #000;
+	padding: clamp(2rem, 5vw, 3rem) clamp(1.5rem, 4vw, 2rem);
+	text-align: center;
+	color: #000;
+	font-size: clamp(1rem, 3vw, 1.125rem);
+	width: 100%;
+}
+
+.btn-primary {
+	width: 100%;
+	padding: clamp(0.875rem, 3vw, 1rem);
+	background: #000;
+	color: #fff;
+	border: 2px solid #000;
+	font-size: clamp(1rem, 3vw, 1.125rem);
+	font-weight: 600;
+	cursor: pointer;
+	touch-action: manipulation;
+	transition: background 0.2s, color 0.2s;
+}
+
+.btn-primary:hover {
+	background: #fff;
+	color: #000;
 }
 
 /* Form elements */

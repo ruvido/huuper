@@ -7,6 +7,7 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/pocketbase/pocketbase"
+	"github.com/pocketbase/pocketbase/core"
 )
 
 var bot *tgbotapi.BotAPI
@@ -55,10 +56,17 @@ func StartTelegramBot(pbApp *pocketbase.PocketBase) error {
 func listenForUpdates() {
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
+	u.AllowedUpdates = []string{"message", "my_chat_member"}
 
 	updates := bot.GetUpdatesChan(u)
 
 	for update := range updates {
+		// Handle bot added/removed from groups
+		if update.MyChatMember != nil {
+			handleChatMemberUpdate(update.MyChatMember)
+			continue
+		}
+
 		if update.Message == nil {
 			continue
 		}
@@ -161,4 +169,71 @@ func handleStartCommand(message *tgbotapi.Message, token string) {
 	bot.Send(reply)
 
 	log.Printf("Successfully connected user %s with Telegram %s", email, username)
+}
+
+func handleChatMemberUpdate(update *tgbotapi.ChatMemberUpdated) {
+	// Only handle groups/supergroups, not private chats
+	if update.Chat.Type != "group" && update.Chat.Type != "supergroup" {
+		return
+	}
+
+	newStatus := update.NewChatMember.Status
+	chatID := update.Chat.ID
+
+	log.Printf("Bot status changed in group '%s' (ID: %d): %s -> %s",
+		update.Chat.Title, chatID, update.OldChatMember.Status, newStatus)
+
+	// Bot became admin
+	if newStatus == "administrator" {
+		// Find existing group or create new
+		chatIDStr := fmt.Sprintf("%d", chatID)
+		group, err := app.FindFirstRecordByFilter(
+			"groups",
+			"telegram.chat_id = {:id}",
+			map[string]any{"id": chatIDStr},
+		)
+
+		if err != nil {
+			// Create new group
+			collection, err := app.FindCollectionByNameOrId("groups")
+			if err != nil {
+				log.Printf("Failed to find groups collection: %v", err)
+				return
+			}
+			group = core.NewRecord(collection)
+		}
+
+		// Update group data
+		group.Set("name", update.Chat.Title)
+		group.Set("type", "telegram")
+		group.Set("telegram", map[string]any{
+			"chat_id": chatIDStr,
+			"type":    update.Chat.Type,
+		})
+
+		if err := app.Save(group); err != nil {
+			log.Printf("Failed to save group: %v", err)
+			return
+		}
+
+		log.Printf("Group '%s' saved successfully", update.Chat.Title)
+	}
+
+	// Bot lost admin or was removed (member -> not admin, or kicked/left)
+	if newStatus == "member" || newStatus == "left" || newStatus == "kicked" {
+		chatIDStr := fmt.Sprintf("%d", chatID)
+		group, err := app.FindFirstRecordByFilter(
+			"groups",
+			"telegram.chat_id = {:id}",
+			map[string]any{"id": chatIDStr},
+		)
+
+		if err == nil && group != nil {
+			if err := app.Delete(group); err != nil {
+				log.Printf("Failed to delete group: %v", err)
+				return
+			}
+			log.Printf("Group '%s' removed from database", update.Chat.Title)
+		}
+	}
 }
