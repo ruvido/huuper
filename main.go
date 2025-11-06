@@ -26,13 +26,13 @@ func main() {
 
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
 		// Start Telegram bot
-		if err := bot.StartTelegramBot(); err != nil {
+		if err := bot.StartTelegramBot(app); err != nil {
 			log.Printf("Failed to start Telegram bot: %v", err)
 		}
 
 		// API routes
-		se.Router.POST("/api/telegram/link", api.LinkTelegramHandler(app)).Bind(apis.RequireAuth())
-		se.Router.GET("/api/telegram/callback", api.TelegramCallbackHandler(app))
+		se.Router.GET("/api/settings/{name}", api.GetSettingsHandler(app))
+		se.Router.POST("/api/telegram/generate-token", api.GenerateTelegramTokenHandler(app)).Bind(apis.RequireAuth())
 
 		// Serve frontend
 		se.Router.GET("/{path...}", apis.Static(os.DirFS("./pb_public"), false))

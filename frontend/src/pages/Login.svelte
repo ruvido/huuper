@@ -33,7 +33,7 @@
 
 <div class="page">
 	<div class="card">
-		<h1>Members Login</h1>
+		<h1>Login</h1>
 
 		<form on:submit|preventDefault={handleLogin}>
 			<div class="form-group">

@@ -1,44 +1,79 @@
 <script>
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { pb } from '../lib/pocketbase';
 	import { navigate } from '../lib/router';
 
 	let user = pb.authStore.record;
 	let telegramData = user?.telegram;
-	let loading = false;
+	let connecting = false;
 	let error = '';
-	let successMessage = '';
+	let botName = '';
 
-	const BOT_NAME = import.meta.env.VITE_TELEGRAM_BOT_NAME || '@branco_realmen_bot';
-
-	// Log auth URL for debugging
-	$: if (user?.id) {
-		const authUrl = `${window.location.origin}/api/telegram/callback?user_id=${user.id}`;
-		console.log('=== TELEGRAM AUTH URL ===', authUrl);
-	}
+	let unsubscribe;
 
 	onMount(async () => {
-		// Check if returning from Telegram callback
-		const urlParams = new URLSearchParams(window.location.hash.split('?')[1]);
-		if (urlParams.get('telegram_linked') === 'true') {
-			// Reload user data
-			try {
-				user = await pb.collection('users').getOne(user.id);
-				telegramData = user?.telegram;
-				successMessage = 'Telegram account linked successfully!';
-
-				// Clean URL
-				window.history.replaceState({}, '', '/#profile');
-
-				// Clear success message after 3 seconds
-				setTimeout(() => {
-					successMessage = '';
-				}, 3000);
-			} catch (err) {
-				error = 'Failed to load updated user data';
+		// Fetch bot name from settings
+		try {
+			const response = await fetch('/api/settings/telegram');
+			if (response.ok) {
+				const data = await response.json();
+				botName = data.data.name;
 			}
+		} catch (err) {
+			console.error('Failed to fetch telegram settings:', err);
+		}
+
+		// Subscribe to user record changes for realtime updates
+		try {
+			unsubscribe = await pb.collection('users').subscribe(user.id, (e) => {
+				console.log('Realtime update received:', e);
+				user = e.record;
+				telegramData = e.record.telegram;
+				connecting = false;
+			});
+			console.log('Subscribed to user updates');
+		} catch (err) {
+			console.error('Failed to subscribe to user updates:', err);
 		}
 	});
+
+	onDestroy(() => {
+		if (unsubscribe) {
+			unsubscribe();
+		}
+	});
+
+	async function connectTelegram() {
+		connecting = true;
+		error = '';
+
+		try {
+			// Generate token
+			const response = await fetch('/api/telegram/generate-token', {
+				method: 'POST',
+				headers: {
+					'Authorization': pb.authStore.token,
+				},
+			});
+
+			if (!response.ok) {
+				throw new Error('Failed to generate connection token');
+			}
+
+			const data = await response.json();
+			const token = data.token;
+
+			// Open Telegram bot with deep link
+			const cleanBotName = botName.replace('@', '');
+			const deepLink = `https://t.me/${cleanBotName}?start=${token}`;
+			window.open(deepLink, '_blank');
+
+		} catch (err) {
+			error = err.message || 'Failed to connect Telegram';
+			connecting = false;
+			console.error('Telegram connection error:', err);
+		}
+	}
 
 	function goToGroups() {
 		navigate('groups');
@@ -74,26 +109,20 @@
 					<p class="telegram-status">✓ Connected</p>
 				</div>
 			{:else}
-				<!-- Show Telegram Login Widget when not connected -->
-				<div class="telegram-login">
-					<p>Connect your Telegram account to access private groups</p>
-					<div id="telegram-login-container">
-						<script
-							async
-							src="https://telegram.org/js/telegram-widget.js?22"
-							data-telegram-login={BOT_NAME.replace('@', '')}
-							data-size="large"
-							data-auth-url={`${window.location.origin}/api/telegram/callback?user_id=${user.id}`}
-							data-request-access="write"
-						></script>
-					</div>
-
-					{#if error}
-						<div class="error">{error}</div>
+				<!-- Telegram not connected -->
+				<div class="telegram-connect">
+					{#if connecting}
+						<p class="connecting-message">Waiting for connection...</p>
+						<p class="help-text">Complete the connection in Telegram</p>
+					{:else}
+						<p>Connect your Telegram account to access private groups</p>
+						<button class="btn-telegram" on:click={connectTelegram}>
+							Connect Telegram
+						</button>
 					{/if}
 
-					{#if successMessage}
-						<div class="success">{successMessage}</div>
+					{#if error}
+						<p class="error-message">{error}</p>
 					{/if}
 				</div>
 			{/if}
@@ -207,32 +236,48 @@
 		font-weight: 600;
 	}
 
-	.telegram-login {
+	.telegram-connect {
 		text-align: center;
 	}
 
-	.telegram-login p {
+	.telegram-connect p {
 		margin: 0 0 clamp(1rem, 3vw, 1.5rem) 0;
 		font-size: clamp(0.875rem, 2.5vw, 1rem);
 		color: #000;
 	}
 
-	#telegram-login-container {
-		display: flex;
-		justify-content: center;
-		margin: clamp(1rem, 3vw, 1.5rem) 0;
+	.btn-telegram {
+		width: 100%;
+		padding: clamp(0.875rem, 3vw, 1rem);
+		background: #0088cc;
+		color: #fff;
+		border: 2px solid #0088cc;
+		font-size: clamp(1rem, 3vw, 1.125rem);
+		font-weight: 600;
+		cursor: pointer;
+		touch-action: manipulation;
+		transition: background 0.2s, color 0.2s;
 	}
 
-	.error {
+	.btn-telegram:hover {
+		background: #006699;
+		border-color: #006699;
+	}
+
+	.connecting-message {
+		font-weight: 600;
+		color: #0088cc;
+	}
+
+	.help-text {
+		font-size: clamp(0.75rem, 2vw, 0.875rem) !important;
+		color: #666 !important;
+	}
+
+	.error-message {
 		color: #d00;
 		font-size: clamp(0.875rem, 2.5vw, 1rem);
-		margin-top: clamp(1rem, 3vw, 1.5rem);
+		margin-top: clamp(1rem, 3vw, 1.5rem) !important;
 	}
 
-	.success {
-		color: #070;
-		font-size: clamp(0.875rem, 2.5vw, 1rem);
-		margin-top: clamp(1rem, 3vw, 1.5rem);
-		font-weight: 600;
-	}
 </style>
