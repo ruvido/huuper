@@ -13,6 +13,11 @@ import (
 var bot *tgbotapi.BotAPI
 var app *pocketbase.PocketBase
 
+// GetBot returns the bot instance
+func GetBot() *tgbotapi.BotAPI {
+	return bot
+}
+
 // StartTelegramBot initializes and starts the Telegram bot
 func StartTelegramBot(pbApp *pocketbase.PocketBase) error {
 	app = pbApp
@@ -56,7 +61,7 @@ func StartTelegramBot(pbApp *pocketbase.PocketBase) error {
 func listenForUpdates() {
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
-	u.AllowedUpdates = []string{"message", "my_chat_member"}
+	u.AllowedUpdates = []string{"message", "my_chat_member", "chat_member"}
 
 	updates := bot.GetUpdatesChan(u)
 
@@ -64,6 +69,12 @@ func listenForUpdates() {
 		// Handle bot added/removed from groups
 		if update.MyChatMember != nil {
 			handleChatMemberUpdate(update.MyChatMember)
+			continue
+		}
+
+		// Handle user added/removed from groups
+		if update.ChatMember != nil {
+			handleUserChatMemberUpdate(update.ChatMember)
 			continue
 		}
 
@@ -129,6 +140,9 @@ func handleStartCommand(message *tgbotapi.Message, token string) {
 	if err := app.Delete(tokenRecord); err != nil {
 		log.Printf("Failed to delete token: %v", err)
 	}
+
+	// Sync user group memberships
+	go syncUserGroupMemberships(user)
 
 	// Build success message
 	email := user.GetString("email")
@@ -234,6 +248,186 @@ func handleChatMemberUpdate(update *tgbotapi.ChatMemberUpdated) {
 				return
 			}
 			log.Printf("Group '%s' removed from database", update.Chat.Title)
+		}
+	}
+}
+
+func handleUserChatMemberUpdate(update *tgbotapi.ChatMemberUpdated) {
+	// Only handle groups/supergroups
+	if update.Chat.Type != "group" && update.Chat.Type != "supergroup" {
+		return
+	}
+
+	userTelegramID := update.NewChatMember.User.ID
+	newStatus := update.NewChatMember.Status
+	chatID := update.Chat.ID
+
+	// Find user by telegram ID
+	user, err := app.FindFirstRecordByFilter(
+		"users",
+		"telegram.id = {:id}",
+		map[string]any{"id": userTelegramID},
+	)
+
+	if err != nil {
+		log.Printf("User with Telegram ID %d not found in DB", userTelegramID)
+		return
+	}
+
+	// Find group by chat_id
+	chatIDStr := fmt.Sprintf("%d", chatID)
+	group, err := app.FindFirstRecordByFilter(
+		"groups",
+		"telegram.chat_id = {:id}",
+		map[string]any{"id": chatIDStr},
+	)
+
+	if err != nil {
+		log.Printf("Group with chat_id %d not found in DB", chatID)
+		return
+	}
+
+	// User joined or became admin/creator
+	if newStatus == "member" || newStatus == "administrator" || newStatus == "creator" {
+		role := "member"
+		if newStatus == "administrator" || newStatus == "creator" {
+			role = "admin"
+		}
+
+		// Check if user_groups record exists
+		existingRecord, _ := app.FindFirstRecordByFilter(
+			"user_groups",
+			"user = {:user} && group = {:group}",
+			map[string]any{
+				"user":  user.Id,
+				"group": group.Id,
+			},
+		)
+
+		if existingRecord != nil {
+			// Update role if changed
+			if existingRecord.GetString("role") != role {
+				existingRecord.Set("role", role)
+				if err := app.Save(existingRecord); err != nil {
+					log.Printf("Failed to update user_groups role: %v", err)
+				} else {
+					log.Printf("✓ Updated user %s role to '%s' in group '%s'", user.GetString("email"), role, group.GetString("name"))
+				}
+			}
+		} else {
+			// Create new user_groups record
+			userGroupsCollection, err := app.FindCollectionByNameOrId("user_groups")
+			if err != nil {
+				log.Printf("Failed to find user_groups collection: %v", err)
+				return
+			}
+
+			userGroupRecord := core.NewRecord(userGroupsCollection)
+			userGroupRecord.Set("user", user.Id)
+			userGroupRecord.Set("group", group.Id)
+			userGroupRecord.Set("role", role)
+
+			if err := app.Save(userGroupRecord); err != nil {
+				log.Printf("Failed to create user_groups record: %v", err)
+			} else {
+				log.Printf("✓ Added user %s to group '%s' with role '%s'", user.GetString("email"), group.GetString("name"), role)
+			}
+		}
+	}
+
+	// User left or was kicked
+	if newStatus == "left" || newStatus == "kicked" {
+		existingRecord, err := app.FindFirstRecordByFilter(
+			"user_groups",
+			"user = {:user} && group = {:group}",
+			map[string]any{
+				"user":  user.Id,
+				"group": group.Id,
+			},
+		)
+
+		if err == nil && existingRecord != nil {
+			if err := app.Delete(existingRecord); err != nil {
+				log.Printf("Failed to delete user_groups record: %v", err)
+			} else {
+				log.Printf("✓ Removed user %s from group '%s'", user.GetString("email"), group.GetString("name"))
+			}
+		}
+	}
+}
+
+func syncUserGroupMemberships(user *core.Record) {
+	// Get user's telegram data
+	var telegramData struct {
+		ID int64 `json:"id"`
+	}
+
+	if err := user.UnmarshalJSONField("telegram", &telegramData); err != nil {
+		return
+	}
+
+	if telegramData.ID == 0 {
+		return
+	}
+
+	// Get all telegram groups
+	groups, err := app.FindRecordsByFilter("groups", "type = 'telegram'", "-created", 0, 0)
+	if err != nil {
+		return
+	}
+
+	for _, group := range groups {
+		var telegramGroupData struct {
+			ChatID string `json:"chat_id"`
+		}
+
+		if err := group.UnmarshalJSONField("telegram", &telegramGroupData); err != nil {
+			continue
+		}
+
+		if telegramGroupData.ChatID == "" {
+			continue
+		}
+
+		var chatID int64
+		fmt.Sscanf(telegramGroupData.ChatID, "%d", &chatID)
+
+		chatMember, err := bot.GetChatMember(tgbotapi.GetChatMemberConfig{
+			ChatConfigWithUser: tgbotapi.ChatConfigWithUser{
+				ChatID: chatID,
+				UserID: telegramData.ID,
+			},
+		})
+
+		if err != nil {
+			continue
+		}
+
+		if chatMember.Status == "member" || chatMember.Status == "administrator" || chatMember.Status == "creator" {
+			role := "member"
+			if chatMember.Status == "administrator" || chatMember.Status == "creator" {
+				role = "admin"
+			}
+
+			existingRecord, _ := app.FindFirstRecordByFilter(
+				"user_groups",
+				"user = {:user} && group = {:group}",
+				map[string]any{
+					"user":  user.Id,
+					"group": group.Id,
+				},
+			)
+
+			if existingRecord == nil {
+				userGroupsCollection, _ := app.FindCollectionByNameOrId("user_groups")
+				if userGroupsCollection != nil {
+					userGroupRecord := core.NewRecord(userGroupsCollection)
+					userGroupRecord.Set("user", user.Id)
+					userGroupRecord.Set("group", group.Id)
+					userGroupRecord.Set("role", role)
+					app.Save(userGroupRecord)
+				}
+			}
 		}
 	}
 }

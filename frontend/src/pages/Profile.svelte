@@ -20,20 +20,18 @@
 				botName = data.data.name;
 			}
 		} catch (err) {
-			console.error('Failed to fetch telegram settings:', err);
+			// Silently fail - bot name is optional
 		}
 
 		// Subscribe to user record changes for realtime updates
 		try {
 			unsubscribe = await pb.collection('users').subscribe(user.id, (e) => {
-				console.log('Realtime update received:', e);
 				user = e.record;
 				telegramData = e.record.telegram;
 				connecting = false;
 			});
-			console.log('Subscribed to user updates');
 		} catch (err) {
-			console.error('Failed to subscribe to user updates:', err);
+			// Silently fail - subscription is optional enhancement
 		}
 	});
 
@@ -71,7 +69,6 @@
 		} catch (err) {
 			error = err.message || 'Failed to connect Telegram';
 			connecting = false;
-			console.error('Telegram connection error:', err);
 		}
 	}
 

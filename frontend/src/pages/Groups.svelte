@@ -1,24 +1,55 @@
 <script>
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { pb } from '../lib/pocketbase';
 	import { navigate } from '../lib/router';
-
 
 	let groups = [];
 	let loading = true;
 	let error = '';
+	let memberGroups = [];
+	let unsubscribe;
 
 	onMount(async () => {
+		const currentUser = pb.authStore.record;
+
 		try {
+			// Load groups
 			const result = await pb.collection('groups').getList(1, 500, {
 				sort: '-created',
 			});
 			groups = result.items;
+
+			// Load user_groups for current user
+			const userGroupsResult = await pb.collection('user_groups').getList(1, 500, {
+				filter: `user = "${currentUser.id}"`,
+			});
+			memberGroups = userGroupsResult.items.map(ug => ug.group);
+
+			// Subscribe to user_groups changes
+			unsubscribe = await pb.collection('user_groups').subscribe('*', (e) => {
+				// Only update if it's for current user
+				if (e.record.user !== currentUser.id) return;
+
+				if (e.action === 'create') {
+					// Add group to memberGroups
+					if (!memberGroups.includes(e.record.group)) {
+						memberGroups = [...memberGroups, e.record.group];
+					}
+				} else if (e.action === 'delete') {
+					// Remove group from memberGroups
+					memberGroups = memberGroups.filter(g => g !== e.record.group);
+				}
+			});
 		} catch (err) {
-			console.error('Error loading groups:', err);
 			error = err.message || err.toString() || 'Failed to load groups';
 		} finally {
 			loading = false;
+		}
+	});
+
+	onDestroy(() => {
+		if (unsubscribe) {
+			unsubscribe();
 		}
 	});
 
@@ -47,8 +78,12 @@
 						{group.name.charAt(0).toUpperCase()}
 						</div>
 						<div class="group-info">
-							<h3>{group.name}</h3>
-							<p class="type">{group.type}</p>
+							<h3>
+								{group.name}
+								{#if memberGroups.includes(group.id)}
+									<span class="member-badge">✓ Member</span>
+								{/if}
+							</h3>
 							{#if group.description}
 								<p class="description">{group.description}</p>
 							{/if}
@@ -121,18 +156,11 @@
 		word-break: break-word;
 	}
 
-	.type {
+	.description {
 		margin: 0;
 		color: #000;
 		font-weight: 600;
 		font-size: clamp(0.8125rem, 2.5vw, 0.875rem);
-		text-transform: capitalize;
-	}
-
-	.description {
-		margin: 0;
-		color: #000;
-		font-size: clamp(0.875rem, 2.5vw, 0.9rem);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		display: -webkit-box;
@@ -158,5 +186,14 @@
 	.btn-join:hover {
 		background: #fff;
 		color: #000;
+	}
+
+	/* Member badge */
+	.member-badge {
+		display: inline-block;
+		margin-left: clamp(0.5rem, 2vw, 0.75rem);
+		font-size: clamp(0.75rem, 2vw, 0.875rem);
+		color: #0a0;
+		font-weight: 600;
 	}
 </style>
