@@ -231,6 +231,9 @@ func handleChatMemberUpdate(update *tgbotapi.ChatMemberUpdated) {
 		}
 
 		log.Printf("Group '%s' saved successfully", update.Chat.Title)
+
+		// Sync all connected users with new group
+		go syncAllUsersWithNewGroup()
 	}
 
 	// Bot lost admin or was removed (member -> not admin, or kicked/left)
@@ -243,6 +246,22 @@ func handleChatMemberUpdate(update *tgbotapi.ChatMemberUpdated) {
 		)
 
 		if err == nil && group != nil {
+			// Delete all user_groups records first
+			userGroupRecords, err := app.FindRecordsByFilter(
+				"user_groups",
+				"group = {:group}",
+				"",
+				0,
+				0,
+				map[string]any{"group": group.Id},
+			)
+			if err == nil {
+				for _, ug := range userGroupRecords {
+					app.Delete(ug)
+				}
+			}
+
+			// Now delete the group
 			if err := app.Delete(group); err != nil {
 				log.Printf("Failed to delete group: %v", err)
 				return
@@ -353,6 +372,23 @@ func handleUserChatMemberUpdate(update *tgbotapi.ChatMemberUpdated) {
 				log.Printf("✓ Removed user %s from group '%s'", user.GetString("email"), group.GetString("name"))
 			}
 		}
+	}
+}
+
+func syncAllUsersWithNewGroup() {
+	users, err := app.FindRecordsByFilter(
+		"users",
+		"telegram.id != null && telegram.id != ''",
+		"",
+		0,
+		0,
+	)
+	if err != nil {
+		return
+	}
+
+	for _, user := range users {
+		syncUserGroupMemberships(user)
 	}
 }
 

@@ -2,42 +2,50 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { pb } from '../lib/pocketbase';
 	import { navigate } from '../lib/router';
+	import DashboardLayout from '../components/DashboardLayout.svelte';
+	import StateCard from '../components/StateCard.svelte';
+	import Button from '../components/Button.svelte';
 
 	let groups = [];
 	let loading = true;
 	let error = '';
 	let memberGroups = [];
-	let unsubscribe;
+	let unsubscribeUserGroups;
+	let unsubscribeGroups;
 
 	onMount(async () => {
 		const currentUser = pb.authStore.record;
 
 		try {
-			// Load groups
 			const result = await pb.collection('groups').getList(1, 500, {
 				sort: '-created',
 			});
 			groups = result.items;
 
-			// Load user_groups for current user
 			const userGroupsResult = await pb.collection('user_groups').getList(1, 500, {
 				filter: `user = "${currentUser.id}"`,
 			});
 			memberGroups = userGroupsResult.items.map(ug => ug.group);
 
-			// Subscribe to user_groups changes
-			unsubscribe = await pb.collection('user_groups').subscribe('*', (e) => {
-				// Only update if it's for current user
+			unsubscribeUserGroups = await pb.collection('user_groups').subscribe('*', (e) => {
 				if (e.record.user !== currentUser.id) return;
 
 				if (e.action === 'create') {
-					// Add group to memberGroups
 					if (!memberGroups.includes(e.record.group)) {
 						memberGroups = [...memberGroups, e.record.group];
 					}
 				} else if (e.action === 'delete') {
-					// Remove group from memberGroups
 					memberGroups = memberGroups.filter(g => g !== e.record.group);
+				}
+			});
+
+			unsubscribeGroups = await pb.collection('groups').subscribe('*', (e) => {
+				if (e.action === 'create') {
+					groups = [...groups, e.record];
+				} else if (e.action === 'update') {
+					groups = groups.map(g => g.id === e.record.id ? e.record : g);
+				} else if (e.action === 'delete') {
+					groups = groups.filter(g => g.id !== e.record.id);
 				}
 			});
 		} catch (err) {
@@ -48,8 +56,11 @@
 	});
 
 	onDestroy(() => {
-		if (unsubscribe) {
-			unsubscribe();
+		if (unsubscribeUserGroups) {
+			unsubscribeUserGroups();
+		}
+		if (unsubscribeGroups) {
+			unsubscribeGroups();
 		}
 	});
 
@@ -58,66 +69,59 @@
 	}
 </script>
 
-<div class="dashboard-page">
-	<div class="dashboard-container">
-		<h1 class="dashboard-title">Groups</h1>
-
-		{#if loading}
-			<div class="state-card">Loading groups...</div>
-		{:else if error}
-			<div class="state-card">{error}</div>
-		{:else if groups.length === 0}
-			<div class="state-card">
-				<p>No groups found</p>
-			</div>
-		{:else}
-			<div class="groups-list">
-				{#each groups as group}
-					<div class="group-card">
-						<div class="group-icon">
-						{group.name.charAt(0).toUpperCase()}
-						</div>
-						<div class="group-info">
-							<h3>
-								{group.name}
-								{#if memberGroups.includes(group.id)}
-									<span class="member-badge">✓ Member</span>
-								{/if}
-							</h3>
-							{#if group.description}
-								<p class="description">{group.description}</p>
+<DashboardLayout title="Groups">
+	{#if loading}
+		<StateCard>Loading groups...</StateCard>
+	{:else if error}
+		<StateCard>{error}</StateCard>
+	{:else if groups.length === 0}
+		<StateCard>
+			<p>No groups found</p>
+		</StateCard>
+	{:else}
+		<div class="groups-list">
+			{#each groups as group}
+				<div class="group-card">
+					<div class="group-icon">
+					{group.name.charAt(0).toUpperCase()}
+					</div>
+					<div class="group-info">
+						<h3>
+							{group.name}
+							{#if memberGroups.includes(group.id)}
+								<span class="member-badge">✓ Member</span>
 							{/if}
-						</div>
-						{#if group.invite_link}
-							<a
-								href={group.invite_link}
-								target="_blank"
-								rel="noopener noreferrer"
-								class="btn-join"
-							>
-								Join
-							</a>
+						</h3>
+						{#if group.description}
+							<p class="description">{group.description}</p>
 						{/if}
 					</div>
-				{/each}
-			</div>
-		{/if}
-		<button class="btn-primary" on:click={goToProfile}>
-			Profile
-		</button>
-	</div>
-</div>
+					{#if group.invite_link}
+						<a
+							href={group.invite_link}
+							target="_blank"
+							rel="noopener noreferrer"
+							class="join-link"
+						>
+							Join
+						</a>
+					{/if}
+				</div>
+			{/each}
+		</div>
+	{/if}
+	<Button variant="primary" on:click={goToProfile}>
+		Profile
+	</Button>
+</DashboardLayout>
 
 <style>
-	/* Component-specific styles only */
-	/* Grid list - responsive automatico */
 	.groups-list {
 		display: grid;
 		gap: clamp(1rem, 3vw, 1.5rem);
 		grid-template-columns: 1fr;
 	}
 
-	/* Single group card - Grid layout */
 	.group-card {
 		background: #fff;
 		border: 2px solid #000;
@@ -168,8 +172,7 @@
 		-webkit-box-orient: vertical;
 	}
 
-	/* Join button */
-	.btn-join {
+	.join-link {
 		background: #000;
 		color: #fff;
 		border: 2px solid #000;
@@ -178,17 +181,15 @@
 		font-weight: 600;
 		text-align: center;
 		white-space: nowrap;
-		touch-action: manipulation;
 		transition: background 0.2s, color 0.2s;
 		flex-shrink: 0;
 	}
 
-	.btn-join:hover {
+	.join-link:hover {
 		background: #fff;
 		color: #000;
 	}
 
-	/* Member badge */
 	.member-badge {
 		display: inline-block;
 		margin-left: clamp(0.5rem, 2vw, 0.75rem);

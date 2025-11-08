@@ -1,6 +1,10 @@
 <script>
 	import { pb } from '../lib/pocketbase';
 	import { navigate } from '../lib/router';
+	import AuthLayout from '../components/AuthLayout.svelte';
+	import FormGroup from '../components/FormGroup.svelte';
+	import Button from '../components/Button.svelte';
+	import ErrorMessage from '../components/ErrorMessage.svelte';
 
 	let email = '';
 	let password = '';
@@ -28,14 +32,12 @@
 		error = '';
 
 		try {
-			// Create user account
 			await pb.collection('users').create({
 				email,
 				password,
 				passwordConfirm,
 			});
 
-			// Auto login after signup
 			await pb.collection('users').authWithPassword(email, password);
 
 			navigate('profile');
@@ -51,61 +53,63 @@
 	}
 </script>
 
-<div class="auth-page">
-	<div class="card">
-		<h1>Create Account</h1>
+<AuthLayout>
+	<h1>Create Account</h1>
 
-		<form on:submit|preventDefault={handleSignup}>
-			<div class="form-group">
-				<label for="email">Email</label>
-				<input
-					id="email"
-					type="email"
-					bind:value={email}
-					placeholder="your@email.com"
-					disabled={loading}
-					required
-				/>
-			</div>
+	<form on:submit|preventDefault={handleSignup}>
+		<FormGroup
+			id="email"
+			type="email"
+			label="Email"
+			name="email"
+			bind:value={email}
+			disabled={loading}
+		/>
 
-			<div class="form-group">
-				<label for="password">Password</label>
-				<input
-					id="password"
-					type="password"
-					bind:value={password}
-					placeholder="••••••••"
-					disabled={loading}
-					required
-				/>
-			</div>
+		<FormGroup
+			id="password"
+			type="password"
+			label="Password"
+			name="password"
+			bind:value={password}
+			disabled={loading}
+		/>
 
-			<div class="form-group">
-				<label for="passwordConfirm">Confirm Password</label>
-				<input
-					id="passwordConfirm"
-					type="password"
-					bind:value={passwordConfirm}
-					placeholder="••••••••"
-					disabled={loading}
-					required
-				/>
-			</div>
+		<FormGroup
+			id="passwordConfirm"
+			type="password"
+			label="Confirm Password"
+			name="passwordConfirm"
+			bind:value={passwordConfirm}
+			disabled={loading}
+		/>
 
-			{#if error}
-				<div class="error">{error}</div>
-			{/if}
+		<ErrorMessage {error} />
 
-			<button type="submit" disabled={loading}>
-				{loading ? 'Creating account...' : 'Sign Up'}
-			</button>
-		</form>
+		<Button variant="submit" type="submit" disabled={loading}>
+			{loading ? 'Creating account...' : 'Sign Up'}
+		</Button>
+	</form>
 
-		<div class="footer">
-			Already have an account?
-			<button class="link-btn" on:click={goToLogin} disabled={loading}>
-				Login
-			</button>
-		</div>
+	<div class="footer">
+		Already have an account?
+		<Button variant="link" on:click={goToLogin} disabled={loading}>
+			Login
+		</Button>
 	</div>
-</div>
+</AuthLayout>
+
+<style>
+	h1 {
+		margin: 0 0 1.5rem 0;
+		font-size: 1.5rem;
+		text-align: center;
+		font-weight: bold;
+	}
+
+	.footer {
+		margin-top: 1rem;
+		text-align: center;
+		font-size: 0.9rem;
+	}
+</style>
