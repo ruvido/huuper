@@ -7,7 +7,7 @@
 	import Button from '../components/Button.svelte';
 
 	let groups = [];
-	let loading = true;
+	let loaded = false;
 	let error = '';
 	let memberGroups = [];
 	let unsubscribeUserGroups;
@@ -51,7 +51,7 @@
 		} catch (err) {
 			error = err.message || err.toString() || 'Failed to load groups';
 		} finally {
-			loading = false;
+			loaded = true;
 		}
 	});
 
@@ -70,11 +70,9 @@
 </script>
 
 <DashboardLayout title="Groups">
-	{#if loading}
-		<StateCard>Loading groups...</StateCard>
-	{:else if error}
+	{#if error}
 		<StateCard>{error}</StateCard>
-	{:else if groups.length === 0}
+	{:else if loaded && groups.length === 0}
 		<StateCard>
 			<p>No groups found</p>
 		</StateCard>

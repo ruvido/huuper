@@ -92,8 +92,49 @@ func init() {
 			return err
 		}
 
+		// Seed URL from .env (required)
+		urlEnv := os.Getenv("URL")
+		if urlEnv == "" {
+			return fmt.Errorf("URL must be set in .env")
+		}
+
+		// Delete existing url record if it exists
+		existingURLRecord, err := app.FindFirstRecordByFilter(
+			"settings",
+			"name = 'url'",
+			map[string]any{},
+		)
+		if err == nil && existingURLRecord != nil {
+			if err := app.Delete(existingURLRecord); err != nil {
+				return err
+			}
+		}
+
+		// Create new url record
+		urlData := map[string]string{
+			"address": urlEnv,
+		}
+		urlJSON, _ := json.Marshal(urlData)
+
+		urlRecord := core.NewRecord(settings)
+		urlRecord.Set("name", "url")
+		urlRecord.Set("data", string(urlJSON))
+		if err := app.Save(urlRecord); err != nil {
+			return err
+		}
+
 		return nil
 	}, func(app core.App) error {
+		// Downgrade: delete url record from settings
+		urlRecord, err := app.FindFirstRecordByFilter(
+			"settings",
+			"name = 'url'",
+			map[string]any{},
+		)
+		if err == nil && urlRecord != nil {
+			app.Delete(urlRecord)
+		}
+
 		// Downgrade: delete bot_messages record from settings
 		botMessagesRecord, err := app.FindFirstRecordByFilter(
 			"settings",
