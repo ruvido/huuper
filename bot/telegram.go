@@ -88,6 +88,12 @@ func listenForUpdates() {
 			if args != "" {
 				handleStartCommand(update.Message, args)
 			}
+			continue
+		}
+
+		// Handle private messages (non-commands)
+		if update.Message.Chat.IsPrivate() && !update.Message.IsCommand() {
+			handlePrivateMessage(update.Message)
 		}
 	}
 }
@@ -231,6 +237,9 @@ func handleChatMemberUpdate(update *tgbotapi.ChatMemberUpdated) {
 		}
 
 		log.Printf("Group '%s' saved successfully", update.Chat.Title)
+
+		// Send welcome message
+		go sendWelcomeMessage(chatID)
 
 		// Sync all connected users with new group
 		go syncAllUsersWithNewGroup()
@@ -465,5 +474,117 @@ func syncUserGroupMemberships(user *core.Record) {
 				}
 			}
 		}
+	}
+}
+
+func sendWelcomeMessage(chatID int64) {
+	// Get URL from settings
+	urlRecord, err := app.FindFirstRecordByFilter(
+		"settings",
+		"name = 'url'",
+		map[string]any{},
+	)
+	if err != nil {
+		log.Printf("Failed to get URL settings: %v", err)
+		return
+	}
+
+	var urlData struct {
+		Address string `json:"address"`
+	}
+	if err := urlRecord.UnmarshalJSONField("data", &urlData); err != nil {
+		log.Printf("Failed to parse URL settings: %v", err)
+		return
+	}
+
+	// Get welcome message from settings
+	messagesRecord, err := app.FindFirstRecordByFilter(
+		"settings",
+		"name = 'bot_messages'",
+		map[string]any{},
+	)
+	if err != nil {
+		log.Printf("Failed to get bot messages settings: %v", err)
+		return
+	}
+
+	var messagesData struct {
+		Welcome string `json:"welcome"`
+	}
+	if err := messagesRecord.UnmarshalJSONField("data", &messagesData); err != nil {
+		log.Printf("Failed to parse bot messages settings: %v", err)
+		return
+	}
+
+	// Replace {url} placeholder
+	message := strings.ReplaceAll(messagesData.Welcome, "{url}", urlData.Address)
+
+	msg := tgbotapi.NewMessage(chatID, message)
+	if _, err := bot.Send(msg); err != nil {
+		log.Printf("Failed to send welcome message: %v", err)
+	} else {
+		log.Printf("Sent welcome message to chat %d", chatID)
+	}
+}
+
+func handlePrivateMessage(message *tgbotapi.Message) {
+	// Check if user's telegram ID is in database
+	user, err := app.FindFirstRecordByFilter(
+		"users",
+		"telegram.id = {:id}",
+		map[string]any{"id": message.From.ID},
+	)
+
+	// Get URL from settings
+	urlRecord, err2 := app.FindFirstRecordByFilter(
+		"settings",
+		"name = 'url'",
+		map[string]any{},
+	)
+	if err2 != nil {
+		log.Printf("Failed to get URL settings: %v", err2)
+		return
+	}
+
+	var urlData struct {
+		Address string `json:"address"`
+	}
+	if err2 := urlRecord.UnmarshalJSONField("data", &urlData); err2 != nil {
+		log.Printf("Failed to parse URL settings: %v", err2)
+		return
+	}
+
+	// Get bot messages from settings
+	messagesRecord, err3 := app.FindFirstRecordByFilter(
+		"settings",
+		"name = 'bot_messages'",
+		map[string]any{},
+	)
+	if err3 != nil {
+		log.Printf("Failed to get bot messages settings: %v", err3)
+		return
+	}
+
+	var messagesData struct {
+		NotRegistered string `json:"not_registered"`
+		Registered    string `json:"registered"`
+	}
+	if err3 := messagesRecord.UnmarshalJSONField("data", &messagesData); err3 != nil {
+		log.Printf("Failed to parse bot messages settings: %v", err3)
+		return
+	}
+
+	var responseMsg string
+	if err != nil || user == nil {
+		// User not found
+		responseMsg = strings.ReplaceAll(messagesData.NotRegistered, "{url}", urlData.Address)
+	} else {
+		// User found
+		responseMsg = strings.ReplaceAll(messagesData.Registered, "{url}", urlData.Address)
+	}
+
+	msg := tgbotapi.NewMessage(message.Chat.ID, responseMsg)
+	if _, err := bot.Send(msg); err != nil {
+		log.Printf("Failed to send private message reply: %v", err)
 	}
 }

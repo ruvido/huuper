@@ -8,6 +8,7 @@
 
 	let user = pb.authStore.record;
 	let telegramData = user?.telegram;
+	let userStatus = user?.status;
 	let connecting = false;
 	let error = '';
 	let botName = '';
@@ -15,6 +16,16 @@
 	let unsubscribe;
 
 	onMount(async () => {
+		// Refresh auth to get latest user data
+		try {
+			await pb.collection('users').authRefresh();
+			user = pb.authStore.record;
+			telegramData = user?.telegram;
+			userStatus = user?.status;
+		} catch (err) {
+			// Silently fail - auth refresh is optional enhancement
+		}
+
 		try {
 			const response = await fetch('/api/settings/telegram');
 			if (response.ok) {
@@ -29,6 +40,7 @@
 			unsubscribe = await pb.collection('users').subscribe(user.id, (e) => {
 				user = e.record;
 				telegramData = e.record.telegram;
+				userStatus = e.record.status;
 				connecting = false;
 			});
 		} catch (err) {
@@ -82,41 +94,60 @@
 			{user?.email?.charAt(0).toUpperCase()}
 		</div>
 		<h2>{user?.email}</h2>
-		<p class="status">Admin</p>
+		{#if user?.admin}
+			<p class="status">Admin</p>
+		{/if}
 	</Card>
 
 	<Card>
-		<h3 class="section-title">Telegram Account</h3>
+		<h3 class="section-title">Account Status</h3>
 
-		{#if telegramData}
-			<div class="telegram-connected">
-				<p class="telegram-info">
-					{#if telegramData.username}
-						<strong>@{telegramData.username}</strong>
-					{:else}
-						<strong>{telegramData.first_name} {telegramData.last_name || ''}</strong>
-					{/if}
-				</p>
-				<p class="telegram-status">✓ Connected</p>
+		{#if userStatus === 'pending'}
+			<div class="status-pending">
+				<p class="pending-message">⏳ In attesa di approvazione</p>
+				<p class="help-text">Il tuo account è in attesa di essere approvato da un amministratore.</p>
 			</div>
 		{:else}
-			<div class="telegram-connect">
-				{#if connecting}
-					<p class="connecting-message">Waiting for connection...</p>
-					<p class="help-text">Complete the connection in Telegram</p>
-				{:else}
-					<p>Connect your Telegram account to access private groups</p>
-					<button class="btn-telegram" on:click={connectTelegram}>
-						Connect Telegram
-					</button>
-				{/if}
-
-				{#if error}
-					<p class="error-message">{error}</p>
-				{/if}
+			<div class="status-active">
+				<p class="active-message">✓ Account attivo</p>
 			</div>
 		{/if}
 	</Card>
+
+	{#if userStatus === 'active'}
+		<Card>
+			<h3 class="section-title">Telegram Account</h3>
+
+			{#if telegramData}
+				<div class="telegram-connected">
+					<p class="telegram-info">
+						{#if telegramData.username}
+							<strong>@{telegramData.username}</strong>
+						{:else}
+							<strong>{telegramData.first_name} {telegramData.last_name || ''}</strong>
+						{/if}
+					</p>
+					<p class="telegram-status">✓ Connected</p>
+				</div>
+			{:else}
+				<div class="telegram-connect">
+					{#if connecting}
+						<p class="connecting-message">Waiting for connection...</p>
+						<p class="help-text">Complete the connection in Telegram</p>
+					{:else}
+						<p>Connect your Telegram account to access private groups</p>
+						<button class="btn-telegram" on:click={connectTelegram}>
+							Connect Telegram
+						</button>
+					{/if}
+
+					{#if error}
+						<p class="error-message">{error}</p>
+					{/if}
+				</div>
+			{/if}
+		</Card>
+	{/if}
 
 	<Button variant="primary" on:click={goToGroups}>
 		View Groups
@@ -217,5 +248,24 @@
 		color: #d00;
 		font-size: clamp(0.875rem, 2.5vw, 1rem);
 		margin-top: clamp(1rem, 3vw, 1.5rem) !important;
+	}
+
+	.status-pending,
+	.status-active {
+		text-align: center;
+	}
+
+	.pending-message {
+		font-weight: 600;
+		color: #ff8c00;
+		font-size: clamp(1rem, 3vw, 1.125rem);
+		margin: 0 0 clamp(0.5rem, 2vw, 0.75rem) 0;
+	}
+
+	.active-message {
+		font-weight: 600;
+		color: #008000;
+		font-size: clamp(1rem, 3vw, 1.125rem);
+		margin: 0;
 	}
 </style>

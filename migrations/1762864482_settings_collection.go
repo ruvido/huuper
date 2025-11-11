@@ -1,0 +1,115 @@
+package migrations
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"strings"
+
+	"github.com/pocketbase/pocketbase/core"
+	m "github.com/pocketbase/pocketbase/migrations"
+)
+
+func init() {
+	m.Register(func(app core.App) error {
+		// Add status field to users collection
+		users, err := app.FindCollectionByNameOrId("users")
+		if err != nil {
+			return err
+		}
+
+		users.Fields.Add(&core.SelectField{
+			Name:     "status",
+			Required: true,
+			Values:   []string{"active", "pending"},
+		})
+
+		if err := app.Save(users); err != nil {
+			return err
+		}
+
+		// Set default status to "active" for all existing users
+		records, err := app.FindRecordsByFilter("users", "", "", 0, 0)
+		if err != nil {
+			return err
+		}
+		for _, record := range records {
+			record.Set("status", "active")
+			if err := app.Save(record); err != nil {
+				return err
+			}
+		}
+
+		// Get existing settings collection
+		settings, err := app.FindCollectionByNameOrId("settings")
+		if err != nil {
+			return err
+		}
+
+		// Seed bot messages from .env (required)
+		msgWelcomeRaw := os.Getenv("MESSAGE_WELCOME")
+		msgNotRegisteredRaw := os.Getenv("MESSAGE_NOT_REGISTERED")
+		msgRegisteredRaw := os.Getenv("MESSAGE_REGISTERED")
+
+		if msgWelcomeRaw == "" || msgNotRegisteredRaw == "" || msgRegisteredRaw == "" {
+			return fmt.Errorf("MESSAGE_WELCOME, MESSAGE_NOT_REGISTERED, and MESSAGE_REGISTERED must be set in .env")
+		}
+
+		// Remove surrounding quotes and parse escape sequences
+		msgWelcome := strings.Trim(msgWelcomeRaw, `"`)
+		msgWelcome = strings.ReplaceAll(msgWelcome, `\n`, "\n")
+
+		msgNotRegistered := strings.Trim(msgNotRegisteredRaw, `"`)
+		msgNotRegistered = strings.ReplaceAll(msgNotRegistered, `\n`, "\n")
+
+		msgRegistered := strings.Trim(msgRegisteredRaw, `"`)
+		msgRegistered = strings.ReplaceAll(msgRegistered, `\n`, "\n")
+
+		// Delete existing bot_messages record if it exists
+		existingRecord, err := app.FindFirstRecordByFilter(
+			"settings",
+			"name = 'bot_messages'",
+			map[string]any{},
+		)
+		if err == nil && existingRecord != nil {
+			if err := app.Delete(existingRecord); err != nil {
+				return err
+			}
+		}
+
+		// Create new bot_messages record with correct newlines
+		botMessagesData := map[string]string{
+			"welcome":        msgWelcome,
+			"not_registered": msgNotRegistered,
+			"registered":     msgRegistered,
+		}
+		botMessagesJSON, _ := json.Marshal(botMessagesData)
+
+		botMessagesRecord := core.NewRecord(settings)
+		botMessagesRecord.Set("name", "bot_messages")
+		botMessagesRecord.Set("data", string(botMessagesJSON))
+		if err := app.Save(botMessagesRecord); err != nil {
+			return err
+		}
+
+		return nil
+	}, func(app core.App) error {
+		// Downgrade: delete bot_messages record from settings
+		botMessagesRecord, err := app.FindFirstRecordByFilter(
+			"settings",
+			"name = 'bot_messages'",
+			map[string]any{},
+		)
+		if err == nil && botMessagesRecord != nil {
+			app.Delete(botMessagesRecord)
+		}
+
+		// Remove status field from users collection
+		users, err := app.FindCollectionByNameOrId("users")
+		if err != nil {
+			return err
+		}
+		users.Fields.RemoveById("status")
+		return app.Save(users)
+	})
+}

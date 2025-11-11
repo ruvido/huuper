@@ -29,6 +29,10 @@ func init() {
 				Name:     "data",
 				Required: false,
 			},
+			&core.BoolField{
+				Name:     "admin",
+				Required: false,
+			},
 		)
 
 		if err := app.Save(users); err != nil {

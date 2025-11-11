@@ -12,6 +12,11 @@
 	let error = '';
 	let loading = false;
 
+	// Parse URL parameters from hash
+	const urlParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
+	const directParam = urlParams.get('direct');
+	const isDirect = directParam === 'true';
+
 	async function handleSignup() {
 		if (!email || !password || !passwordConfirm) {
 			error = 'All fields are required';
@@ -32,10 +37,12 @@
 		error = '';
 
 		try {
+			// Create user with status based on direct parameter
 			await pb.collection('users').create({
 				email,
 				password,
 				passwordConfirm,
+				status: isDirect ? 'active' : 'pending',
 			});
 
 			await pb.collection('users').authWithPassword(email, password);
