@@ -5,10 +5,20 @@
 	import Menu from './components/Menu.svelte';
 	import Login from './pages/Login.svelte';
 	import Signup from './pages/Signup.svelte';
+	import SignupMultistep from './pages/SignupMultistep.svelte';
 	import Profile from './pages/Profile.svelte';
 	import Groups from './pages/Groups.svelte';
 
 	let menuOpen = false;
+
+	// Check if signup should be multistep - reactive to both route and hash changes
+	$: isMultiStepSignup = (() => {
+		if ($currentRoute !== 'signup') return false;
+		const hashParts = window.location.hash.split('?');
+		const params = hashParts[1] || '';
+		const urlParams = new URLSearchParams(params);
+		return urlParams.get('multi') === 'true';
+	})();
 
 	// Check auth and redirect if needed
 	$: {
@@ -41,7 +51,11 @@
 	{#if $currentRoute === 'login'}
 		<Login />
 	{:else if $currentRoute === 'signup'}
-		<Signup />
+		{#if isMultiStepSignup}
+			<SignupMultistep />
+		{:else}
+			<Signup />
+		{/if}
 	{:else if $currentRoute === 'profile'}
 		<Profile />
 	{:else if $currentRoute === 'groups'}
