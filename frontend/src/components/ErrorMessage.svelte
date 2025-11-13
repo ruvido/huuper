@@ -8,10 +8,12 @@
 
 <style>
 	.error {
-		background: #fff;
-		border: 1px solid #000;
+		color: #d32f2f;
+		background: #ffebee;
+		border: 2px solid #d32f2f;
 		padding: 0.75rem;
 		margin-bottom: 1rem;
 		font-size: 0.9rem;
+		font-weight: 600;
 	}
 </style>

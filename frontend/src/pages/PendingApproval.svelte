@@ -2,6 +2,7 @@
 	import { pb } from '../lib/pocketbase';
 	import { navigate } from '../lib/router';
 	import Button from '../components/Button.svelte';
+	import { X } from 'lucide-svelte';
 
 	function handleClose() {
 		pb.authStore.clear();
@@ -11,7 +12,7 @@
 
 <div class="pending-page">
 	<button class="close-btn" on:click={handleClose}>
-		✕
+		<X size={24} />
 	</button>
 	<div class="content">
 		<h1>Grazie!</h1>
@@ -90,19 +91,16 @@
 		top: clamp(1rem, 3vw, 1.5rem);
 		left: clamp(1rem, 3vw, 1.5rem);
 		background: transparent;
-		border: 2px solid #000;
-		font-size: clamp(1.5rem, 4vw, 2rem);
-		padding: clamp(0.25rem, 2vw, 0.5rem) clamp(0.75rem, 3vw, 1rem);
+		border: none;
+		padding: clamp(0.25rem, 2vw, 0.5rem);
 		line-height: 1;
 		cursor: pointer;
-		font-weight: 600;
 		color: #000;
-		transition: all 0.2s ease;
+		transition: color 0.2s ease;
 		z-index: 1000;
 	}
 
 	.close-btn:hover {
-		background: #000;
-		color: #fff;
+		color: #666;
 	}
 </style>

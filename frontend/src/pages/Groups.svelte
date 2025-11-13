@@ -5,6 +5,7 @@
 	import DashboardLayout from '../components/DashboardLayout.svelte';
 	import StateCard from '../components/StateCard.svelte';
 	import Button from '../components/Button.svelte';
+	import { Check } from 'lucide-svelte';
 
 	let groups = [];
 	let loaded = false;
@@ -87,7 +88,7 @@
 						<h3>
 							{group.name}
 							{#if memberGroups.includes(group.id)}
-								<span class="member-badge">✓ Member</span>
+								<span class="member-badge"><Check size={14} /> Member</span>
 							{/if}
 						</h3>
 						{#if group.description}

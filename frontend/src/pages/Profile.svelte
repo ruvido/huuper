@@ -5,6 +5,7 @@
 	import DashboardLayout from '../components/DashboardLayout.svelte';
 	import Card from '../components/Card.svelte';
 	import Button from '../components/Button.svelte';
+	import { Clock, Check } from 'lucide-svelte';
 
 	let user = pb.authStore.record;
 	let telegramData = user?.telegram;
@@ -104,12 +105,12 @@
 
 		{#if userStatus === 'pending'}
 			<div class="status-pending">
-				<p class="pending-message">⏳ In attesa di approvazione</p>
+				<p class="pending-message"><Clock size={20} /> In attesa di approvazione</p>
 				<p class="help-text">Il tuo account è in attesa di essere approvato da un amministratore.</p>
 			</div>
 		{:else}
 			<div class="status-active">
-				<p class="active-message">✓ Account attivo</p>
+				<p class="active-message"><Check size={20} /> Account attivo</p>
 			</div>
 		{/if}
 	</Card>
@@ -127,7 +128,7 @@
 							<strong>{telegramData.first_name} {telegramData.last_name || ''}</strong>
 						{/if}
 					</p>
-					<p class="telegram-status">✓ Connected</p>
+					<p class="telegram-status"><Check size={16} /> Connected</p>
 				</div>
 			{:else}
 				<div class="telegram-connect">

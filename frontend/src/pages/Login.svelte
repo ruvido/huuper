@@ -8,6 +8,8 @@
 
 	let email = '';
 	let password = '';
+	let emailError = '';
+	let passwordError = '';
 	let error = '';
 	let loading = false;
 
@@ -19,13 +21,20 @@
 
 		loading = true;
 		error = '';
+		emailError = '';
+		passwordError = '';
 
 		try {
 			await pb.collection('users').authWithPassword(email, password);
 			// Navigate to profile - global guard in App.svelte will handle onboarding redirect if needed
 			navigate('profile');
 		} catch (err) {
-			error = err.message || 'Login failed';
+			// Parse PocketBase errors - err.data is alias for err.response
+			if (err.status === 400) {
+				error = 'Invalid email or password';
+			} else {
+				error = err.message || 'Login failed';
+			}
 		} finally {
 			loading = false;
 		}
@@ -46,6 +55,7 @@
 			label="Email"
 			name="email"
 			bind:value={email}
+			bind:error={emailError}
 			disabled={loading}
 		/>
 
@@ -55,6 +65,7 @@
 			label="Password"
 			name="password"
 			bind:value={password}
+			bind:error={passwordError}
 			disabled={loading}
 		/>
 

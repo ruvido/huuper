@@ -1,6 +1,7 @@
 <script>
 	import { pb } from '../lib/pocketbase';
 	import { navigate } from '../lib/router';
+	import { X } from 'lucide-svelte';
 
 	export let isOpen = false;
 	export let onClose;
@@ -24,7 +25,7 @@
 
 <!-- Slide-in menu -->
 <nav class="menu" class:open={isOpen}>
-	<button class="close-btn" on:click={onClose} aria-label="Close menu">×</button>
+	<button class="close-btn" on:click={onClose} aria-label="Close menu"><X size={24} /></button>
 
 	<ul class="menu-list">
 		<li>
@@ -85,16 +86,16 @@
 		align-items: center;
 		justify-content: center;
 		background: transparent;
-		border: 2px solid #000;
-		font-size: 2rem;
+		border: none;
 		line-height: 1;
 		cursor: pointer;
 		touch-action: manipulation;
+		color: #000;
+		transition: color 0.2s ease;
 	}
 
 	.close-btn:hover {
-		background: #000;
-		color: #fff;
+		color: #666;
 	}
 
 	/* Menu list */

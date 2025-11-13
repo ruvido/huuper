@@ -59,7 +59,30 @@
 			// Redirect to profile (will check for empty data there)
 			navigate('profile');
 		} catch (err) {
-			error = err.message || 'Signup failed';
+			// Parse PocketBase field-specific errors
+			// err.data contains field-level validation errors
+			const fieldErrors = err.data?.data || err.data || {};
+
+			if (fieldErrors.email) {
+				const msg = fieldErrors.email.message || '';
+				if (msg.includes('must be unique') || msg.includes('already exists')) {
+					emailError = 'This email is already registered';
+				} else if (msg.includes('invalid')) {
+					emailError = 'Please enter a valid email address';
+				} else {
+					emailError = msg;
+				}
+			}
+			if (fieldErrors.password) {
+				passwordError = fieldErrors.password.message;
+			}
+			if (fieldErrors.passwordConfirm) {
+				confirmError = fieldErrors.passwordConfirm.message;
+			}
+			// General error if no field-specific errors
+			if (!emailError && !passwordError && !confirmError) {
+				error = err.message || 'Signup failed';
+			}
 		} finally {
 			loading = false;
 		}
