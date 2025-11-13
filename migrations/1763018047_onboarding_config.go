@@ -43,6 +43,13 @@ func init() {
 		onboardingConfig := map[string]any{
 			"steps": []map[string]any{
 				{
+					"id":     "start",
+					"title":  "Benvenuto in realmen",
+					"type":   "start",
+					"text":   "Per iniziare a usare i gruppi<br />completa il tuo profilo",
+					"button": "INIZIA",
+				},
+				{
 					"id":    "why",
 					"title": "Perché vuoi unirti?",
 					"type":  "textarea",

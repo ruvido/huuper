@@ -1,17 +1,25 @@
 <script>
+	import { pb } from '../lib/pocketbase';
+	import { navigate } from '../lib/router';
 	import Button from '../components/Button.svelte';
+
+	function handleClose() {
+		pb.authStore.clear();
+		navigate('login');
+	}
 </script>
 
 <div class="pending-page">
+	<button class="close-btn" on:click={handleClose}>
+		✕
+	</button>
 	<div class="content">
-		<h1>Grazie per aver chiesto di entrare nel Branco!</h1>
+		<h1>Grazie!</h1>
 
 		<div class="message">
 			<p class="main">La tua richiesta è stata inviata.</p>
 
-			<p>Nelle prossime ore riceverai un'email con i dettagli per il prossimo passo.</p>
-
-			<p>Un membro del gruppo locale ti contatterà per presentarti la realtà dei gruppi Realmen.</p>
+			<p>Nelle prossime ore <b>riceverai un'email</b> con i dettagli per il prossimo passo. Un membro del Branco ti contatterà per presentarti la realtà dei gruppi Realmen.</p>
 
 			<p>Ti introdurremo gradualmente al funzionamento e allo spirito della community.</p>
 
@@ -75,5 +83,26 @@
 		color: #666;
 		font-style: italic;
 		margin: 0;
+	}
+
+	.close-btn {
+		position: fixed;
+		top: clamp(1rem, 3vw, 1.5rem);
+		left: clamp(1rem, 3vw, 1.5rem);
+		background: transparent;
+		border: 2px solid #000;
+		font-size: clamp(1.5rem, 4vw, 2rem);
+		padding: clamp(0.25rem, 2vw, 0.5rem) clamp(0.75rem, 3vw, 1rem);
+		line-height: 1;
+		cursor: pointer;
+		font-weight: 600;
+		color: #000;
+		transition: all 0.2s ease;
+		z-index: 1000;
+	}
+
+	.close-btn:hover {
+		background: #000;
+		color: #fff;
 	}
 </style>

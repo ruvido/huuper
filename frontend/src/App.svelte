@@ -1,20 +1,21 @@
 <script>
 	import { onMount } from 'svelte';
-	import { isAuthenticated, pb } from './lib/pocketbase';
+	import { isAuthenticated, pb, authRecord } from './lib/pocketbase';
 	import { currentRoute, navigate, queryParams } from './lib/router';
 	import Header from './components/Header.svelte';
 	import Menu from './components/Menu.svelte';
 	import Login from './pages/Login.svelte';
 	import Signup from './pages/Signup.svelte';
 	import SignupSimple from './pages/SignupSimple.svelte';
-	import Welcome from './pages/Welcome.svelte';
 	import Onboarding from './pages/Onboarding.svelte';
 	import PendingApproval from './pages/PendingApproval.svelte';
+	import TelegramConnect from './pages/TelegramConnect.svelte';
 	import Profile from './pages/Profile.svelte';
 	import Groups from './pages/Groups.svelte';
 
 	let menuOpen = false;
 	let authReady = false;
+	let renderReady = false;
 
 	// Check if simple signup requested
 	$: showSimpleSignup = $queryParams.simple === 'true';
@@ -32,36 +33,59 @@
 		authReady = true; // Signal auth is synced
 	});
 
-	// Unified auth + status + onboarding guard - waits for auth to be ready
-	$: if (authReady) {
+	// Reset renderReady when route changes to re-run guards
+	$: if ($currentRoute) {
+		renderReady = false;
+	}
+
+	// Guard logic - runs BEFORE allowing render
+	$: if (authReady && !renderReady) {
+		let shouldRedirect = false;
+
 		if (!$isAuthenticated) {
 			// Not authenticated → login/signup only
 			if ($currentRoute !== 'login' && $currentRoute !== 'signup') {
 				navigate('login');
+				shouldRedirect = true;
 			}
 		} else {
-			// Authenticated → check status + data
-			const user = pb.authStore.record;
+			// Authenticated → check status + data + telegram
+			const user = $authRecord;
 			const status = user?.status;
 			const hasData = user?.data && Object.keys(user.data).length > 0;
+			const hasTelegram = user?.telegram && Object.keys(user.telegram).length > 0;
 
 			if (status === 'pending') {
 				// Pending users: onboarding → pending-approval
-				if (!hasData && !['welcome', 'onboarding'].includes($currentRoute)) {
-					navigate('welcome');
+				if (!hasData && $currentRoute !== 'onboarding') {
+					navigate('onboarding');
+					shouldRedirect = true;
 				} else if (hasData && $currentRoute !== 'pending-approval') {
 					navigate('pending-approval');
+					shouldRedirect = true;
 				}
 			} else if (status === 'active') {
 				// Active users: cannot stay on pending-approval
 				if ($currentRoute === 'pending-approval') {
 					navigate('profile');
+					shouldRedirect = true;
 				}
 				// Active users without data: onboarding required
-				else if (!hasData && !['welcome', 'onboarding'].includes($currentRoute)) {
-					navigate('welcome');
+				else if (!hasData && $currentRoute !== 'onboarding') {
+					navigate('onboarding');
+					shouldRedirect = true;
+				}
+				// Active users with data but no telegram: telegram-connect required
+				else if (hasData && !hasTelegram && $currentRoute !== 'telegram-connect') {
+					navigate('telegram-connect');
+					shouldRedirect = true;
 				}
 			}
+		}
+
+		// Only allow render if NOT redirecting
+		if (!shouldRedirect) {
+			renderReady = true;
 		}
 	}
 
@@ -79,35 +103,38 @@
 	}
 </script>
 
-<!-- Header: only visible when authenticated and not on welcome/onboarding/pending-approval -->
-{#if $isAuthenticated && !['welcome', 'onboarding', 'pending-approval'].includes($currentRoute)}
-	<Header onMenuClick={toggleMenu} />
-	<Menu isOpen={menuOpen} onClose={closeMenu} />
-{/if}
-
-<main>
-	{#if $currentRoute === 'login'}
-		<Login />
-	{:else if $currentRoute === 'signup'}
-		{#if showSimpleSignup}
-			<SignupSimple />
-		{:else}
-			<Signup />
-		{/if}
-	{:else if $currentRoute === 'welcome'}
-		<Welcome />
-	{:else if $currentRoute === 'onboarding'}
-		<Onboarding />
-	{:else if $currentRoute === 'pending-approval'}
-		<PendingApproval />
-	{:else if $currentRoute === 'profile'}
-		<Profile />
-	{:else if $currentRoute === 'groups'}
-		<Groups />
-	{:else}
-		<Login />
+<!-- Only render when guards have validated -->
+{#if renderReady}
+	<!-- Header: only visible when authenticated and not on onboarding/pending-approval/telegram-connect -->
+	{#if $isAuthenticated && !['onboarding', 'pending-approval', 'telegram-connect'].includes($currentRoute)}
+		<Header onMenuClick={toggleMenu} />
+		<Menu isOpen={menuOpen} onClose={closeMenu} />
 	{/if}
-</main>
+
+	<main>
+		{#if $currentRoute === 'login'}
+			<Login />
+		{:else if $currentRoute === 'signup'}
+			{#if showSimpleSignup}
+				<SignupSimple />
+			{:else}
+				<Signup />
+			{/if}
+		{:else if $currentRoute === 'onboarding'}
+			<Onboarding />
+		{:else if $currentRoute === 'pending-approval'}
+			<PendingApproval />
+		{:else if $currentRoute === 'telegram-connect'}
+			<TelegramConnect />
+		{:else if $currentRoute === 'profile'}
+			<Profile />
+		{:else if $currentRoute === 'groups'}
+			<Groups />
+		{:else}
+			<Login />
+		{/if}
+	</main>
+{/if}
 
 <style>
 	:global(body) {

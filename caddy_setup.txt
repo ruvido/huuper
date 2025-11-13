@@ -1,0 +1,95 @@
+# Caddy Configuration for PocketBase Realtime (SSE)
+
+## Problem
+PocketBase realtime subscriptions use Server-Sent Events (SSE) which require:
+- Long-lived HTTP connections
+- No response buffering
+- Proper headers for streaming
+
+Error seen: "The connection to https://branco.realmen.it/api/realtime has terminated unexpectedly"
+
+This happens when the reverse proxy (Caddy) doesn't properly handle SSE connections.
+
+## Solution: Caddy Configuration
+
+### Option 1: Specific /api/realtime route (RECOMMENDED)
+
+```caddyfile
+branco.realmen.it {
+    # Special handling for realtime SSE endpoint
+    handle /api/realtime* {
+        reverse_proxy localhost:8090 {
+            # Disable buffering for SSE streaming
+            flush_interval -1
+
+            # Long timeout for persistent connections
+            transport http {
+                read_timeout 1h
+                write_timeout 1h
+            }
+        }
+    }
+
+    # All other requests
+    handle {
+        reverse_proxy localhost:8090
+    }
+}
+```
+
+### Option 2: Global configuration (SIMPLER)
+
+```caddyfile
+branco.realmen.it {
+    reverse_proxy localhost:8090 {
+        # Disable buffering globally
+        flush_interval -1
+
+        # Long timeouts
+        transport http {
+            read_timeout 1h
+            write_timeout 1h
+        }
+    }
+}
+```
+
+## Key Configuration Explained
+
+1. **flush_interval -1**: Disables response buffering, required for SSE streaming
+2. **read_timeout / write_timeout 1h**: Prevents connection drops for long-lived SSE
+3. **handle /api/realtime***: Matches all realtime endpoints including query params
+
+## Testing
+
+After applying config:
+
+1. Reload Caddy:
+   ```bash
+   caddy reload
+   ```
+
+2. Test realtime in browser console:
+   ```javascript
+   const unsubscribe = await pb.collection('users').subscribe('RECORD_ID', (e) => {
+       console.log('Realtime update:', e);
+   });
+   ```
+
+3. Should see persistent connection in Network tab (EventStream type)
+
+## References
+
+- PocketBase Realtime Docs: https://pocketbase.io/docs/api-realtime/
+- Caddy Reverse Proxy: https://caddyserver.com/docs/caddyfile/directives/reverse_proxy
+- SSE Specification: https://html.spec.whatwg.org/multipage/server-sent-events.html
+
+## Alternative: Direct PocketBase (No Proxy)
+
+If you want to avoid proxy configuration, run PocketBase directly:
+
+```bash
+./pocketbase serve --http="0.0.0.0:443" --https
+```
+
+Then point DNS directly to the server without Caddy.
