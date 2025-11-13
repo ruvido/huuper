@@ -11,52 +11,40 @@
 	let passwordConfirm = '';
 	let error = '';
 	let loading = false;
-	let emailError = '';
-	let passwordError = '';
-	let confirmError = '';
 
 	// Use router query params
 	$: isDirect = $queryParams.direct === 'true';
 
 	async function handleSignup() {
-		// Reset errors
-		error = '';
-		emailError = '';
-		passwordError = '';
-		confirmError = '';
-
-		// Basic validation
 		if (!email || !password || !passwordConfirm) {
 			error = 'All fields are required';
 			return;
 		}
 
 		if (password !== passwordConfirm) {
-			confirmError = 'Passwords do not match';
+			error = 'Passwords do not match';
 			return;
 		}
 
 		if (password.length < 8) {
-			passwordError = 'Password must be at least 8 characters';
+			error = 'Password must be at least 8 characters';
 			return;
 		}
 
 		loading = true;
+		error = '';
 
 		try {
-			// Create user
-			const formData = new FormData();
-			formData.append('email', email);
-			formData.append('password', password);
-			formData.append('passwordConfirm', passwordConfirm);
-			formData.append('status', isDirect ? 'active' : 'pending');
+			// Create user with status based on direct parameter
+			await pb.collection('users').create({
+				email,
+				password,
+				passwordConfirm,
+				status: isDirect ? 'active' : 'pending',
+			});
 
-			await pb.collection('users').create(formData);
-
-			// Auto-login
 			await pb.collection('users').authWithPassword(email, password);
 
-			// Redirect to profile (will check for empty data there)
 			navigate('profile');
 		} catch (err) {
 			error = err.message || 'Signup failed';
@@ -71,7 +59,7 @@
 </script>
 
 <AuthLayout>
-	<h1>Sign Up</h1>
+	<h1>Create Account</h1>
 
 	<form on:submit|preventDefault={handleSignup}>
 		<FormGroup
@@ -80,9 +68,7 @@
 			label="Email"
 			name="email"
 			bind:value={email}
-			bind:error={emailError}
 			disabled={loading}
-			required={true}
 		/>
 
 		<FormGroup
@@ -91,9 +77,7 @@
 			label="Password"
 			name="password"
 			bind:value={password}
-			bind:error={passwordError}
 			disabled={loading}
-			required={true}
 		/>
 
 		<FormGroup
@@ -102,11 +86,7 @@
 			label="Confirm Password"
 			name="passwordConfirm"
 			bind:value={passwordConfirm}
-			bind:error={confirmError}
 			disabled={loading}
-			required={true}
-			matchField="password"
-			matchValue={password}
 		/>
 
 		<ErrorMessage {error} />

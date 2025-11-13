@@ -22,6 +22,7 @@
 
 		try {
 			await pb.collection('users').authWithPassword(email, password);
+			// Navigate to profile - global guard in App.svelte will handle onboarding redirect if needed
 			navigate('profile');
 		} catch (err) {
 			error = err.message || 'Login failed';

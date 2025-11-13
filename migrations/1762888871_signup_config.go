@@ -37,6 +37,7 @@ func init() {
 					"fields": []map[string]string{
 						{"name": "email", "type": "email", "label": "Email"},
 						{"name": "password", "type": "password", "label": "Password"},
+						{"name": "passwordConfirm", "type": "password", "label": "Confirm Password"},
 					},
 				},
 				{
