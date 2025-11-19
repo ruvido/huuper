@@ -1,10 +1,11 @@
 <script>
 	import { onMount } from 'svelte';
+	import { slide } from 'svelte/transition';
 	import { pb } from '../lib/pocketbase';
 	import { navigate } from '../lib/router';
 	import Button from '../components/Button.svelte';
 	import ErrorMessage from '../components/ErrorMessage.svelte';
-	import { X, ArrowLeft, ArrowRight } from 'lucide-svelte';
+	import { X, ArrowLeft, ArrowRight, Circle, CircleDot } from 'lucide-svelte';
 
 	let steps = [];
 	let currentStep = 0;
@@ -22,19 +23,41 @@
 		return count + 1; // 1-indexed
 	})();
 
+	// Progress percentage
+	$: progressPercentage = realSteps.length > 0 ? (realStepIndex / realSteps.length) * 100 : 0;
+
 	// Check if current step is complete
 	$: canProceed = (() => {
 		const step = steps[currentStep];
 		if (!step) return false;
 
 		if (step.type === 'start') {
-			return true; // Start step is always complete
+			return true;
+		} else if (step.type === 'text') {
+			return !!formData[step.field]?.trim();
 		} else if (step.type === 'textarea') {
-			return !!formData[step.field];
+			return !!formData[step.field]?.trim();
 		} else if (step.type === 'file') {
 			return !!formData[step.field];
-		} else if (step.type === 'checkboxes') {
-			return formData[step.field] && formData[step.field].length > 0;
+		} else if (step.type === 'select') {
+			const value = formData[step.field];
+			if (step.min) {
+				// Multiple selection
+				if (!value || value.length < step.min) return false;
+				// Check if any selected option needs custom input
+				const hasInputOption = value.some(v => v.includes(':input'));
+				if (hasInputOption) {
+					return !!formData[step.field + '_custom']?.trim();
+				}
+				return true;
+			} else if (step.max === 1) {
+				// Single selection
+				const needsCustom = value?.includes(':input');
+				if (needsCustom) {
+					return !!formData[step.field + '_custom']?.trim();
+				}
+				return !!value;
+			}
 		}
 		return false;
 	})();
@@ -66,13 +89,27 @@
 		}
 	}
 
-	function toggleCheckbox(field, value) {
-		if (!formData[field]) formData[field] = [];
-		const index = formData[field].indexOf(value);
-		if (index > -1) {
-			formData[field] = formData[field].filter(v => v !== value);
+	function toggleOption(field, value, isMultiple) {
+		if (isMultiple) {
+			if (!formData[field]) formData[field] = [];
+			const index = formData[field].indexOf(value);
+			if (index > -1) {
+				formData[field] = formData[field].filter(v => v !== value);
+			} else {
+				formData[field] = [...formData[field], value];
+			}
 		} else {
-			formData[field] = [...formData[field], value];
+			formData[field] = value;
+		}
+
+		// If option needs custom input, scroll to show it
+		if (value?.includes(':input')) {
+			setTimeout(() => {
+				const customInput = document.querySelector('.custom-input');
+				if (customInput) {
+					customInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+				}
+			}, 350); // After slide transition
 		}
 	}
 
@@ -99,7 +136,23 @@
 			const dataFields = {};
 			steps.forEach(step => {
 				if (step.type !== 'start' && step.field !== 'avatar' && formData[step.field]) {
-					dataFields[step.field] = formData[step.field];
+					const value = formData[step.field];
+
+					// Handle arrays (multiple selection)
+					if (Array.isArray(value)) {
+						dataFields[step.field] = value.map(v => {
+							if (v.includes(':input')) {
+								return formData[step.field + '_custom'] || v.split(':')[0];
+							}
+							return v;
+						});
+					}
+					// Handle single values
+					else if (value.includes?.(':input')) {
+						dataFields[step.field] = formData[step.field + '_custom'] || value.split(':')[0];
+					} else {
+						dataFields[step.field] = value;
+					}
 				}
 			});
 
@@ -136,19 +189,20 @@
 
 <div class="onboarding-page">
 	{#if steps[currentStep] && steps[currentStep].type !== 'start'}
+		<div class="progress-bar">
+			<div class="progress-fill" style="width: {progressPercentage}%"></div>
+		</div>
 		<nav class="top-nav">
 			{#if currentStep === 0}
 				<button class="nav-btn close" on:click={handleClose} disabled={loading}>
 					<X size={20} />
 				</button>
 			{:else}
-				<button class="nav-btn" on:click={prevStep} disabled={loading}>
-					<ArrowLeft size={20} /> Indietro
+				<button class="nav-btn back" on:click={prevStep} disabled={loading}>
+					<ArrowLeft size={20} />
 				</button>
 			{/if}
-			<div class="step-counter">
-				{realStepIndex}/{realSteps.length}
-			</div>
+			<div class="nav-spacer"></div>
 			{#if currentStep < steps.length - 1}
 				<button class="nav-btn next" on:click={nextStep} disabled={!canProceed || loading}>
 					Avanti <ArrowRight size={20} />
@@ -161,7 +215,9 @@
 		</nav>
 	{/if}
 
-	<div class="step-container" class:is-start={steps[currentStep]?.type === 'start'}>
+	<div class="step-container"
+	     class:is-start={steps[currentStep]?.type === 'start'}
+	     class:is-list={steps[currentStep]?.type === 'select'}>
 		{#if steps[currentStep]}
 			{@const step = steps[currentStep]}
 			<div class="step-content" class:is-start={step.type === 'start'}>
@@ -176,13 +232,60 @@
 					</Button>
 				{:else}
 					<h1>{step.title}</h1>
-					{#if step.type === 'textarea'}
-					<label for={step.id}>{step.label}</label>
-					<textarea
-						id={step.id}
-						bind:value={formData[step.field]}
-						on:keydown={(e) => {
-							if (e.key === 'Enter' && !e.shiftKey && canProceed) {
+					{#if step.type === 'text'}
+						<label for={step.id}>{step.label}</label>
+						<input
+							id={step.id}
+							type="text"
+							bind:value={formData[step.field]}
+							on:keydown={(e) => {
+								if (e.key === 'Enter' && canProceed) {
+									e.preventDefault();
+									nextStep();
+								}
+							}}
+							disabled={loading}
+							placeholder="Scrivi qui..."
+						/>
+					{:else if step.type === 'textarea'}
+						<label for={step.id}>{step.label}</label>
+						<textarea
+							id={step.id}
+							bind:value={formData[step.field]}
+							disabled={loading}
+							rows="8"
+							placeholder="Scrivi qui..."
+						></textarea>
+					{:else if step.type === 'file'}
+						<h2 class="file-label">{step.label}</h2>
+						<input
+							id={step.id}
+							type="file"
+							accept="image/*"
+							on:change={(e) => formData[step.field] = e.target.files[0]}
+							disabled={loading}
+							style="display: none;"
+						/>
+						<button
+							type="button"
+							class="file-button"
+							on:click={() => document.getElementById(step.id).click()}
+							disabled={loading}
+						>
+							{formData[step.field] ? 'Cambia foto' : 'Carica foto'}
+						</button>
+						{#if formData[step.field]}
+							<p class="file-name">{formData[step.field].name}</p>
+						{/if}
+					{:else if step.type === 'select'}
+						{@const isMultiple = !!step.min}
+						{@const selectedCount = formData[step.field]?.length || 0}
+						{@const remaining = step.min ? Math.max(0, step.min - selectedCount) : 0}
+						<p class="field-label" class:invisible={remaining === 0}>
+							Seleziona almeno {remaining || step.min}
+						</p>
+						<div class="grid-container" on:keydown={(e) => {
+							if (e.key === 'Enter' && canProceed) {
 								e.preventDefault();
 								if (currentStep < steps.length - 1) {
 									nextStep();
@@ -190,40 +293,52 @@
 									handleSubmit();
 								}
 							}
-						}}
-						enterkeyhint={currentStep < steps.length - 1 ? 'next' : 'done'}
-						disabled={loading}
-						rows="8"
-						placeholder="Scrivi qui..."
-					></textarea>
-				{:else if step.type === 'file'}
-					<label for={step.id}>{step.label}</label>
-					<input
-						id={step.id}
-						type="file"
-						accept="image/*"
-						on:change={(e) => formData[step.field] = e.target.files[0]}
-						disabled={loading}
-					/>
-					{#if formData[step.field]}
-						<p class="file-name">{formData[step.field].name}</p>
-					{/if}
-				{:else if step.type === 'checkboxes'}
-					<p class="field-label">{step.label}</p>
-					<div class="checkboxes">
-						{#each step.options as option}
-							<label class="checkbox-label">
-								<input
-									type="checkbox"
-									checked={formData[step.field]?.includes(option)}
-									on:change={() => toggleCheckbox(step.field, option)}
+						}}>
+							{#each step.options as option}
+								{@const needsInput = option.includes(':input')}
+								{@const displayText = needsInput ? option.split(':')[0] : option}
+								{@const isSelected = isMultiple
+									? formData[step.field]?.includes(option)
+									: formData[step.field] === option}
+								<button
+									type="button"
+									class="grid-box"
+									class:selected={isSelected}
+									on:click={() => toggleOption(step.field, option, isMultiple)}
 									disabled={loading}
-								/>
-								{option}
-							</label>
-						{/each}
-					</div>
-				{/if}
+								>
+									{displayText}
+								</button>
+							{/each}
+						</div>
+						{#key step.field}
+							{@const hasInputOption = isMultiple
+								? formData[step.field]?.some(v => v.includes(':input'))
+								: formData[step.field]?.includes(':input')}
+							{#if hasInputOption}
+								<div class="custom-input-container" transition:slide={{ duration: 300 }}>
+									<input
+										type="text"
+										class="custom-input"
+										bind:value={formData[step.field + '_custom']}
+										placeholder="Specifica..."
+										on:keydown={(e) => {
+											if (e.key === 'Enter' && canProceed) {
+												e.preventDefault();
+												if (currentStep < steps.length - 1) {
+													nextStep();
+												} else {
+													handleSubmit();
+												}
+											}
+										}}
+										autofocus
+										disabled={loading}
+									/>
+								</div>
+							{/if}
+						{/key}
+					{/if}
 				{/if}
 
 				{#if step.type !== 'start'}
@@ -242,24 +357,37 @@
 		background: #fff;
 	}
 
-	.top-nav {
+	.progress-bar {
 		position: fixed;
 		top: 0;
+		left: 0;
+		right: 0;
+		height: 3px;
+		background: #f0f0f0;
+		z-index: 101;
+	}
+
+	.progress-fill {
+		height: 100%;
+		background: #000;
+		transition: width 0.3s ease;
+	}
+
+	.top-nav {
+		position: fixed;
+		top: 3px;
 		left: 0;
 		right: 0;
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
 		padding: clamp(1rem, 3vw, 1.5rem);
-		border-bottom: 2px solid #000;
 		background: #fff;
 		z-index: 100;
 	}
 
-	.step-counter {
-		font-size: clamp(1rem, 3vw, 1.25rem);
-		font-weight: bold;
-		color: #000;
+	.nav-spacer {
+		flex: 1;
 	}
 
 	.nav-btn {
@@ -301,13 +429,23 @@
 		color: #666;
 	}
 
+	.nav-btn.back {
+		border: none;
+		padding: clamp(0.25rem, 1.5vw, 0.5rem);
+	}
+
+	.nav-btn.back:hover:not(:disabled) {
+		background: transparent;
+		color: #666;
+	}
+
 	.step-container {
 		flex: 1;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		padding: clamp(1rem, 3vw, 2rem);
-		padding-top: calc(70px + clamp(1rem, 3vw, 2rem));
+		padding-top: clamp(5rem, 12vw, 6rem);
 		overflow-y: auto;
 	}
 
@@ -316,17 +454,19 @@
 		min-height: 100vh;
 	}
 
+	.step-container.is-list {
+		align-items: flex-start;
+	}
+
 	.step-content {
 		width: 100%;
 		max-width: 32rem;
 		background: #fff;
-		border: 2px solid #000;
 		padding: clamp(1.5rem, 4vw, 2.5rem);
 		position: relative;
 	}
 
 	.step-content.is-start {
-		border: none;
 		text-align: center;
 		max-width: 28rem;
 	}
@@ -348,6 +488,10 @@
 		font-size: clamp(0.875rem, 2.5vw, 1rem);
 	}
 
+	.field-label.invisible {
+		visibility: hidden;
+	}
+
 	textarea {
 		width: 100%;
 		padding: clamp(0.75rem, 2vw, 1rem);
@@ -363,39 +507,125 @@
 		outline-offset: -2px;
 	}
 
-	input[type="file"] {
+	.file-label {
+		display: block;
+		margin-bottom: 1.5rem;
+		font-weight: 600;
+		color: #000;
+		font-size: clamp(0.875rem, 2.5vw, 1rem);
+	}
+
+	.file-button {
 		width: 100%;
-		padding: 0.5rem;
-		margin-bottom: 0.5rem;
+		padding: clamp(1rem, 3vw, 1.25rem);
+		background: #000;
+		color: #fff;
 		border: 2px solid #000;
 		font-size: clamp(0.875rem, 2.5vw, 1rem);
+		font-weight: 600;
+		font-family: inherit;
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+
+	.file-button:hover:not(:disabled) {
+		background: #333;
+	}
+
+	.file-button:disabled {
+		background: #ccc;
+		border-color: #ccc;
+		color: #666;
+		cursor: not-allowed;
 	}
 
 	.file-name {
 		font-size: 0.875rem;
 		color: #666;
-		margin-top: 0.5rem;
+		margin-top: 0.75rem;
+		text-align: center;
 	}
 
-	.checkboxes {
-		display: flex;
-		flex-direction: column;
+	input[type="text"] {
+		width: 100%;
+		padding: clamp(0.75rem, 2vw, 1rem);
+		border: 2px solid #000;
+		font-size: clamp(0.875rem, 2.5vw, 1rem);
+		font-family: inherit;
+	}
+
+	input[type="text"]:focus {
+		outline: 2px solid #000;
+		outline-offset: -2px;
+	}
+
+	.custom-input-container {
+		margin-top: clamp(1rem, 3vw, 1.5rem);
+	}
+
+	.custom-input {
+		width: 100%;
+		padding: clamp(0.75rem, 2vw, 1rem);
+		border: 2px solid #000;
+		font-size: clamp(0.875rem, 2.5vw, 1rem);
+		font-family: inherit;
+	}
+
+	.custom-input:focus {
+		outline: 2px solid #000;
+		outline-offset: -2px;
+	}
+
+	.grid-container {
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
 		gap: clamp(0.75rem, 2vw, 1rem);
 	}
 
-	.checkbox-label {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		cursor: pointer;
-		font-weight: normal;
-		font-size: clamp(0.875rem, 2.5vw, 1rem);
+	@media (min-width: 768px) {
+		.grid-container {
+			grid-template-columns: repeat(3, 1fr);
+		}
 	}
 
-	.checkbox-label input[type="checkbox"] {
-		width: clamp(1.25rem, 3vw, 1.5rem);
-		height: clamp(1.25rem, 3vw, 1.5rem);
+	@media (min-width: 1024px) {
+		.grid-container {
+			grid-template-columns: repeat(4, 1fr);
+		}
+	}
+
+	.grid-box {
+		padding: clamp(0.75rem, 2vw, 1rem);
+		border: 2px solid #000;
+		background: #fff;
+		color: #000;
+		font-size: clamp(0.875rem, 2.5vw, 1rem);
+		font-weight: 500;
+		font-family: inherit;
+		line-height: 1.3;
 		cursor: pointer;
+		transition: all 0.15s ease;
+		text-align: center;
+		height: clamp(4rem, 10vw, 5rem);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		word-wrap: break-word;
+		hyphens: auto;
+	}
+
+	.grid-box:hover:not(:disabled) {
+		background: #f5f5f5;
+	}
+
+	.grid-box.selected {
+		background: #000;
+		color: #fff;
+	}
+
+	.grid-box:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 
 	.nav-btn.close {
