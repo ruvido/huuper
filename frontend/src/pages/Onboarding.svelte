@@ -5,7 +5,8 @@
 	import { navigate } from '../lib/router';
 	import Button from '../components/Button.svelte';
 	import ErrorMessage from '../components/ErrorMessage.svelte';
-	import { X, ArrowLeft, ArrowRight, Circle, CircleDot } from 'lucide-svelte';
+	import { X, ArrowLeft, ArrowRight, Circle, CircleDot, CheckCircle } from 'lucide-svelte';
+	import Compressor from 'compressorjs';
 
 	let steps = [];
 	let currentStep = 0;
@@ -257,12 +258,37 @@
 							placeholder="Scrivi qui..."
 						></textarea>
 					{:else if step.type === 'file'}
+						{#if formData[step.field]}
+							<div class="success-check">
+								<CheckCircle size={64} strokeWidth={2} />
+							</div>
+						{/if}
 						<h2 class="file-label">{step.label}</h2>
 						<input
 							id={step.id}
 							type="file"
 							accept="image/*"
-							on:change={(e) => formData[step.field] = e.target.files[0]}
+							on:change={(e) => {
+							const file = e.target.files[0];
+							if (file) {
+								loading = true;
+								new Compressor(file, {
+									quality: 0.6,
+									maxWidth: 400,
+									maxHeight: 400,
+									mimeType: 'image/webp',
+									success(result) {
+										formData[step.field] = new File([result], file.name.replace(/\.[^/.]+$/, '.webp'), { type: 'image/webp' });
+										loading = false;
+									},
+									error(err) {
+										console.error(err.message);
+										error = 'Errore nel caricamento dell\'immagine';
+										loading = false;
+									}
+								});
+							}
+						}}
 							disabled={loading}
 							style="display: none;"
 						/>
@@ -505,6 +531,23 @@
 	textarea:focus {
 		outline: 2px solid #000;
 		outline-offset: -2px;
+	}
+
+	.success-check {
+		display: flex;
+		justify-content: center;
+		margin-bottom: 1.5rem;
+		color: #22c55e;
+		animation: scaleIn 0.3s ease;
+	}
+
+	@keyframes scaleIn {
+		from {
+			transform: scale(0);
+		}
+		to {
+			transform: scale(1);
+		}
 	}
 
 	.file-label {

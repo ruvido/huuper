@@ -14,7 +14,9 @@
     "vite": "^7.1.7"
   },
   "dependencies": {
+    "compressorjs": "^1.2.1",
     "lucide-svelte": "^0.553.0",
-    "pocketbase": "^0.26.3"
+    "pocketbase": "^0.26.3",
+    "svelte-easy-crop": "^5.0.0"
   }
 }
