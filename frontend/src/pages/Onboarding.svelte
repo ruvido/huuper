@@ -15,6 +15,11 @@
 	let formData = {};
 	let error = '';
 	let loading = false;
+	let showConfirmation = false;
+
+	// Separate confirmation step from form steps
+	$: confirmationStep = steps.find(s => s.type === 'confirmation');
+	$: formSteps = steps.filter(s => s.type !== 'confirmation');
 
 	// Crop state
 	let showCropModal = false;
@@ -26,11 +31,11 @@
 	let croppedAreaPixels = null;
 
 	// Count only non-start steps
-	$: realSteps = steps.filter(s => s.type !== 'start');
+	$: realSteps = formSteps.filter(s => s.type !== 'start');
 	$: realStepIndex = (() => {
 		let count = 0;
 		for (let i = 0; i < currentStep; i++) {
-			if (steps[i].type !== 'start') count++;
+			if (formSteps[i].type !== 'start') count++;
 		}
 		return count + 1; // 1-indexed
 	})();
@@ -40,7 +45,7 @@
 
 	// Check if current step is complete
 	$: canProceed = (() => {
-		const step = steps[currentStep];
+		const step = formSteps[currentStep];
 		if (!step) return false;
 
 		if (step.type === 'start') {
@@ -90,7 +95,7 @@
 	});
 
 	function nextStep() {
-		if (currentStep < steps.length - 1 && canProceed) {
+		if (currentStep < formSteps.length - 1 && canProceed) {
 			currentStep++;
 		}
 	}
@@ -212,13 +217,18 @@
 			const fileName = cropFile.name.replace(/\.[^/.]+$/, '.jpg');
 			formData[cropField] = new File([blob], fileName, { type: 'image/jpeg' });
 
-			console.log(`✅ Immagine processata: ${(blob.size/1024).toFixed(2)} KB (${width}x${height})`);
 
 			showCropModal = false;
 			cropImage = '';
 			cropFile = null;
+
+			// Auto-advance after crop
+			if (currentStep < formSteps.length - 1) {
+				currentStep++;
+			} else {
+				showConfirmation = true;
+			}
 		} catch (err) {
-			console.error('❌ Errore:', err);
 			error = 'Errore nel processare l\'immagine';
 		} finally {
 			loading = false;
@@ -241,7 +251,7 @@
 
 			// Collect all data fields (excluding avatar and start step)
 			const dataFields = {};
-			steps.forEach(step => {
+			formSteps.forEach(step => {
 				if (step.type !== 'start' && step.field !== 'avatar' && formData[step.field]) {
 					const value = formData[step.field];
 
@@ -295,7 +305,7 @@
 </script>
 
 <div class="onboarding-page">
-	{#if steps[currentStep] && steps[currentStep].type !== 'start'}
+	{#if formSteps[currentStep] && formSteps[currentStep].type !== 'start' && !showConfirmation}
 		<div class="progress-bar">
 			<div class="progress-fill" style="width: {progressPercentage}%"></div>
 		</div>
@@ -310,23 +320,24 @@
 				</button>
 			{/if}
 			<div class="nav-spacer"></div>
-			{#if currentStep < steps.length - 1}
+			{#if currentStep < formSteps.length - 1}
 				<button class="nav-btn next" on:click={nextStep} disabled={!canProceed || loading}>
 					Avanti <ArrowRight size={20} />
 				</button>
 			{:else}
-				<button class="nav-btn next" on:click={handleSubmit} disabled={!canProceed || loading}>
-					{loading ? 'Salvataggio...' : 'Completa'}
+				<button class="nav-btn next" on:click={() => showConfirmation = true} disabled={!canProceed || loading}>
+					Completa
 				</button>
 			{/if}
 		</nav>
 	{/if}
 
+	{#if !showConfirmation}
 	<div class="step-container"
-	     class:is-start={steps[currentStep]?.type === 'start'}
-	     class:is-list={steps[currentStep]?.type === 'select'}>
-		{#if steps[currentStep]}
-			{@const step = steps[currentStep]}
+	     class:is-start={formSteps[currentStep]?.type === 'start'}
+	     class:is-list={formSteps[currentStep]?.type === 'select'}>
+		{#if formSteps[currentStep]}
+			{@const step = formSteps[currentStep]}
 			<div class="step-content" class:is-start={step.type === 'start'}>
 				{#if step.type === 'start'}
 					<button class="close-btn-start" on:click={handleClose} disabled={loading}>
@@ -398,8 +409,14 @@
 						{@const isMultiple = !!step.min}
 						{@const selectedCount = formData[step.field]?.length || 0}
 						{@const remaining = step.min ? Math.max(0, step.min - selectedCount) : 0}
-						<p class="field-label" class:invisible={remaining === 0}>
-							Seleziona almeno {remaining || step.min}
+						{@const showCounter = step.min && step.min > 1 && remaining > 0}
+						{@const hideDefaultLabel = !step.label && remaining === 0}
+						<p class="field-label" class:invisible={hideDefaultLabel}>
+							{#if step.label && step.label !== ''}
+								{step.label}{#if showCounter} • {remaining}{/if}
+							{:else if step.min}
+								Seleziona almeno {remaining || step.min}
+							{/if}
 						</p>
 						<div class="grid-container" on:keydown={(e) => {
 							if (e.key === 'Enter' && canProceed) {
@@ -424,7 +441,7 @@
 									on:click={() => toggleOption(step.field, option, isMultiple)}
 									disabled={loading}
 								>
-									{displayText}
+									{@html displayText.replace(/\n/g, '<br>')}
 								</button>
 							{/each}
 						</div>
@@ -464,6 +481,24 @@
 			</div>
 		{/if}
 	</div>
+	{/if}
+
+	<!-- Confirmation Page -->
+	{#if showConfirmation && confirmationStep}
+		<div class="confirmation-page">
+			<div class="checkmark-container">
+				<svg class="checkmark" viewBox="0 0 52 52">
+					<circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
+					<path class="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+				</svg>
+			</div>
+			<h1>{confirmationStep.title}</h1>
+			<p class="confirmation-text">{@html confirmationStep.text.replace(/\n/g, '<br>')}</p>
+			<Button variant="submit" on:click={handleSubmit} disabled={loading}>
+				{loading ? 'Invio...' : confirmationStep.button}
+			</Button>
+		</div>
+	{/if}
 </div>
 
 <!-- Crop Modal -->
@@ -903,5 +938,64 @@
 	.crop-btn:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
+	}
+
+	/* Confirmation Page */
+	.confirmation-page {
+		min-height: 100vh;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		padding: 2rem;
+		text-align: center;
+	}
+
+	.confirmation-page h1 {
+		margin: 0 0 1.5rem 0;
+		font-size: clamp(1.75rem, 5vw, 2.5rem);
+	}
+
+	.confirmation-text {
+		max-width: 28rem;
+		font-size: clamp(1rem, 3vw, 1.1rem);
+		color: #333;
+		line-height: 1.6;
+		margin: 0 0 2rem 0;
+	}
+
+	.checkmark-container {
+		width: 100px;
+		height: 100px;
+		margin-bottom: 2rem;
+	}
+
+	.checkmark {
+		width: 100%;
+		height: 100%;
+	}
+
+	.checkmark-circle {
+		stroke: #22c55e;
+		stroke-width: 2;
+		stroke-dasharray: 166;
+		stroke-dashoffset: 166;
+		animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+	}
+
+	.checkmark-check {
+		stroke: #22c55e;
+		stroke-width: 3;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		stroke-dasharray: 48;
+		stroke-dashoffset: 48;
+		animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.6s forwards;
+	}
+
+	@keyframes stroke {
+		100% {
+			stroke-dashoffset: 0;
+		}
 	}
 </style>

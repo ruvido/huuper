@@ -9,7 +9,6 @@ export const authRecord = writable(pb.authStore.record);
 
 // Auto refresh auth state
 pb.authStore.onChange(() => {
-	console.log('Auth state changed:', pb.authStore.isValid);
 	isAuthenticated.set(pb.authStore.isValid);
 	authRecord.set(pb.authStore.record);
 });
