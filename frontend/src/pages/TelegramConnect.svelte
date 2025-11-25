@@ -9,6 +9,7 @@
 	let error = '';
 	let botName = '';
 	let unsubscribe;
+	let config = null;
 
 	onMount(async () => {
 		// Fetch bot name
@@ -20,6 +21,17 @@
 			}
 		} catch (err) {
 			// Silently fail - bot name is optional
+		}
+
+		// Fetch telegram_connect config
+		try {
+			const response = await fetch('/api/settings/telegram_connect');
+			if (response.ok) {
+				const data = await response.json();
+				config = data.data;
+			}
+		} catch (err) {
+			// Silently fail
 		}
 
 		// Subscribe to user changes to detect when Telegram is connected
@@ -80,17 +92,18 @@
 	}
 </script>
 
+{#if config}
 <div class="telegram-page">
 	<button class="close-btn" on:click={handleClose}>
 		<X size={24} />
 	</button>
 	<div class="content">
-		<h1>Connetti Telegram</h1>
+		<h1>{config.title}</h1>
 
 		<div class="message">
-			<p class="main">Per accedere ai gruppi devi connettere il tuo account Telegram.</p>
+			<p class="main">{config.main_text}</p>
 
-			<p>Clicca sul pulsante qui sotto per collegare il tuo profilo Telegram e accedere ai contenuti riservati della community.</p>
+			<p>{config.description}</p>
 		</div>
 
 		{#if error}
@@ -98,10 +111,11 @@
 		{/if}
 
 		<Button variant="submit" on:click={handleConnect} disabled={connecting}>
-			{connecting ? 'CONNESSIONE...' : 'CONNETTI TELEGRAM'}
+			{connecting ? config.loading : config.button}
 		</Button>
 	</div>
 </div>
+{/if}
 
 <style>
 	.telegram-page {
