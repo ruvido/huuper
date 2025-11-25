@@ -8,4 +8,7 @@ export default defineConfig({
     outDir: '../pb_public',
     emptyOutDir: true,
   },
+  optimizeDeps: {
+    exclude: ['@jsquash/jpeg', '@jsquash/resize']
+  }
 })

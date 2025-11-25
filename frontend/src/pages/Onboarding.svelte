@@ -6,13 +6,24 @@
 	import Button from '../components/Button.svelte';
 	import ErrorMessage from '../components/ErrorMessage.svelte';
 	import { X, ArrowLeft, ArrowRight, Circle, CircleDot, CheckCircle } from 'lucide-svelte';
-	import Compressor from 'compressorjs';
+	import { decode, encode } from '@jsquash/jpeg';
+	import resize from '@jsquash/resize';
+	import Cropper from 'svelte-easy-crop';
 
 	let steps = [];
 	let currentStep = 0;
 	let formData = {};
 	let error = '';
 	let loading = false;
+
+	// Crop state
+	let showCropModal = false;
+	let cropImage = '';
+	let cropFile = null;
+	let cropField = '';
+	let crop = { x: 0, y: 0 };
+	let zoom = 1;
+	let croppedAreaPixels = null;
 
 	// Count only non-start steps
 	$: realSteps = steps.filter(s => s.type !== 'start');
@@ -117,6 +128,101 @@
 	function handleClose() {
 		pb.authStore.clear();
 		navigate('login');
+	}
+
+	// Crop helpers
+	function openCropModal(file, field) {
+		cropFile = file;
+		cropField = field;
+		crop = { x: 0, y: 0 };
+		zoom = 1;
+		croppedAreaPixels = null;
+
+		const reader = new FileReader();
+		reader.onload = (e) => {
+			cropImage = e.target.result;
+			showCropModal = true;
+		};
+		reader.readAsDataURL(file);
+	}
+
+	function handleCropComplete(e) {
+		croppedAreaPixels = e.pixels;
+	}
+
+	function cancelCrop() {
+		showCropModal = false;
+		cropImage = '';
+		cropFile = null;
+	}
+
+	function cropImageData(imageData, x, y, width, height) {
+		const croppedData = new Uint8ClampedArray(width * height * 4);
+		for (let row = 0; row < height; row++) {
+			const srcOffset = ((y + row) * imageData.width + x) * 4;
+			const dstOffset = row * width * 4;
+			croppedData.set(
+				imageData.data.subarray(srcOffset, srcOffset + width * 4),
+				dstOffset
+			);
+		}
+		return new ImageData(croppedData, width, height);
+	}
+
+	async function confirmCrop() {
+		if (!croppedAreaPixels || !cropFile) return;
+
+		loading = true;
+		error = '';
+
+		try {
+			// Step 1: Decode file originale
+			const buffer = await cropFile.arrayBuffer();
+			const imageData = await decode(buffer);
+
+			// Step 2: Crop manuale su ImageData
+			const cropped = cropImageData(
+				imageData,
+				Math.round(croppedAreaPixels.x),
+				Math.round(croppedAreaPixels.y),
+				Math.round(croppedAreaPixels.width),
+				Math.round(croppedAreaPixels.height)
+			);
+
+			// Step 3: Resize (max 400px mantenendo proporzioni)
+			const maxSize = 400;
+			let width = cropped.width;
+			let height = cropped.height;
+
+			if (width > height) {
+				height = Math.round((height * maxSize) / width);
+				width = maxSize;
+			} else {
+				width = Math.round((width * maxSize) / height);
+				height = maxSize;
+			}
+
+			const resized = await resize(cropped, { width, height });
+
+			// Step 4: Encode
+			const jpegBuffer = await encode(resized, { quality: 85 });
+
+			// Create File
+			const blob = new Blob([jpegBuffer], { type: 'image/jpeg' });
+			const fileName = cropFile.name.replace(/\.[^/.]+$/, '.jpg');
+			formData[cropField] = new File([blob], fileName, { type: 'image/jpeg' });
+
+			console.log(`✅ Immagine processata: ${(blob.size/1024).toFixed(2)} KB (${width}x${height})`);
+
+			showCropModal = false;
+			cropImage = '';
+			cropFile = null;
+		} catch (err) {
+			console.error('❌ Errore:', err);
+			error = 'Errore nel processare l\'immagine';
+		} finally {
+			loading = false;
+		}
 	}
 
 	async function handleSubmit() {
@@ -269,26 +375,11 @@
 							type="file"
 							accept="image/*"
 							on:change={(e) => {
-							const file = e.target.files[0];
-							if (file) {
-								loading = true;
-								new Compressor(file, {
-									quality: 0.6,
-									maxWidth: 400,
-									maxHeight: 400,
-									mimeType: 'image/webp',
-									success(result) {
-										formData[step.field] = new File([result], file.name.replace(/\.[^/.]+$/, '.webp'), { type: 'image/webp' });
-										loading = false;
-									},
-									error(err) {
-										console.error(err.message);
-										error = 'Errore nel caricamento dell\'immagine';
-										loading = false;
-									}
-								});
-							}
-						}}
+								const file = e.target.files[0];
+								if (file) {
+									openCropModal(file, step.field);
+								}
+							}}
 							disabled={loading}
 							style="display: none;"
 						/>
@@ -374,6 +465,32 @@
 		{/if}
 	</div>
 </div>
+
+<!-- Crop Modal -->
+{#if showCropModal}
+	<div class="crop-overlay">
+		<div class="crop-modal">
+			<h2>Ritaglia foto</h2>
+			<div class="crop-area">
+				<Cropper
+					image={cropImage}
+					bind:crop
+					bind:zoom
+					aspect={1}
+					oncropcomplete={handleCropComplete}
+				/>
+			</div>
+			<div class="crop-buttons">
+				<button type="button" class="crop-btn cancel" on:click={cancelCrop} disabled={loading}>
+					Annulla
+				</button>
+				<button type="button" class="crop-btn confirm" on:click={confirmCrop} disabled={loading}>
+					{loading ? 'Elaborazione...' : 'Conferma'}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
 
 <style>
 	.onboarding-page {
@@ -711,5 +828,80 @@
 	.step-content.is-start h1 {
 		margin-top: 0;
 		font-size: clamp(1.75rem, 5vw, 2.5rem);
+	}
+
+	/* Crop Modal */
+	.crop-overlay {
+		position: fixed;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+		background: rgba(0, 0, 0, 0.9);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 2000;
+	}
+
+	.crop-modal {
+		background: #fff;
+		padding: 1.5rem;
+		border-radius: 8px;
+		max-width: 450px;
+		width: 90%;
+	}
+
+	.crop-modal h2 {
+		margin: 0 0 1rem 0;
+		font-size: 1.25rem;
+		text-align: center;
+	}
+
+	.crop-area {
+		position: relative;
+		width: 100%;
+		height: 300px;
+		background: #000;
+		margin-bottom: 1rem;
+	}
+
+	.crop-buttons {
+		display: flex;
+		gap: 1rem;
+		justify-content: flex-end;
+	}
+
+	.crop-btn {
+		padding: 0.75rem 1.5rem;
+		font-size: 1rem;
+		font-family: inherit;
+		font-weight: 600;
+		border: 2px solid #000;
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+
+	.crop-btn.cancel {
+		background: #fff;
+		color: #000;
+	}
+
+	.crop-btn.cancel:hover:not(:disabled) {
+		background: #f0f0f0;
+	}
+
+	.crop-btn.confirm {
+		background: #000;
+		color: #fff;
+	}
+
+	.crop-btn.confirm:hover:not(:disabled) {
+		background: #333;
+	}
+
+	.crop-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 </style>
