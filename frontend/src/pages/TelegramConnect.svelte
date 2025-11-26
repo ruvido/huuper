@@ -83,7 +83,7 @@
 
 			const cleanBotName = botName.replace('@', '');
 			const deepLink = `https://t.me/${cleanBotName}?start=${token}`;
-			window.open(deepLink, '_blank');
+			window.location.href = deepLink;
 
 		} catch (err) {
 			error = err.message || 'Failed to connect Telegram';

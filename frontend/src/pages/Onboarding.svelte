@@ -6,7 +6,7 @@
 	import Button from '../components/Button.svelte';
 	import ErrorMessage from '../components/ErrorMessage.svelte';
 	import { X, ArrowLeft, ArrowRight, Circle, CircleDot, CheckCircle } from 'lucide-svelte';
-	import { decode, encode } from '@jsquash/jpeg';
+	import { encode } from '@jsquash/jpeg';
 	import resize from '@jsquash/resize';
 	import Cropper from 'svelte-easy-crop';
 
@@ -181,9 +181,19 @@
 		error = '';
 
 		try {
-			// Step 1: Decode file originale
-			const buffer = await cropFile.arrayBuffer();
-			const imageData = await decode(buffer);
+			// Step 1: Decode any image format via Canvas API
+			const img = new Image();
+			img.src = cropImage;
+			await new Promise((resolve, reject) => {
+				img.onload = resolve;
+				img.onerror = reject;
+			});
+			const canvas = document.createElement('canvas');
+			canvas.width = img.width;
+			canvas.height = img.height;
+			const ctx = canvas.getContext('2d');
+			ctx.drawImage(img, 0, 0);
+			const imageData = ctx.getImageData(0, 0, img.width, img.height);
 
 			// Step 2: Crop manuale su ImageData
 			const cropped = cropImageData(
@@ -530,6 +540,8 @@
 <style>
 	.onboarding-page {
 		min-height: 100vh;
+		max-width: 100%;
+		overflow-x: hidden;
 		display: flex;
 		flex-direction: column;
 		background: #fff;
@@ -674,7 +686,7 @@
 		width: 100%;
 		padding: clamp(0.75rem, 2vw, 1rem);
 		border: 2px solid #000;
-		font-size: clamp(0.875rem, 2.5vw, 1rem);
+		font-size: max(16px, 1rem);
 		font-family: inherit;
 		resize: vertical;
 		min-height: 12rem;
@@ -745,7 +757,7 @@
 		width: 100%;
 		padding: clamp(0.75rem, 2vw, 1rem);
 		border: 2px solid #000;
-		font-size: clamp(0.875rem, 2.5vw, 1rem);
+		font-size: max(16px, 1rem);
 		font-family: inherit;
 	}
 
@@ -762,7 +774,7 @@
 		width: 100%;
 		padding: clamp(0.75rem, 2vw, 1rem);
 		border: 2px solid #000;
-		font-size: clamp(0.875rem, 2.5vw, 1rem);
+		font-size: max(16px, 1rem);
 		font-family: inherit;
 	}
 
@@ -792,14 +804,13 @@
 	.grid-box {
 		padding: clamp(0.75rem, 2vw, 1rem);
 		border: 2px solid #000;
-		background: #fff;
+		background-color: #fff;
 		color: #000;
 		font-size: clamp(0.875rem, 2.5vw, 1rem);
 		font-weight: 500;
 		font-family: inherit;
 		line-height: 1.3;
 		cursor: pointer;
-		transition: all 0.15s ease;
 		text-align: center;
 		height: clamp(4rem, 10vw, 5rem);
 		display: flex;
@@ -807,14 +818,18 @@
 		justify-content: center;
 		word-wrap: break-word;
 		hyphens: auto;
+		-webkit-tap-highlight-color: transparent;
 	}
 
-	.grid-box:hover:not(:disabled) {
-		background: #f5f5f5;
+	.grid-box:hover:not(:disabled):not(.selected) {
+		background-color: #f5f5f5;
 	}
 
-	.grid-box.selected {
-		background: #000;
+	.grid-box.selected,
+	.grid-box.selected:hover,
+	.grid-box.selected:focus,
+	.grid-box.selected:active {
+		background-color: #000;
 		color: #fff;
 	}
 
