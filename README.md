@@ -96,6 +96,21 @@ The project follows these principles:
 - **Best practices only**: Follow official conventions
 - **Zero redundancy**: Avoid complex and duplicated code
 
+## Avatar upload test
+
+You can quickly verify that the `users` collection accepts JPEG, PNG, WebP, and GIF avatars thanks to the fixtures in `test/images/`. Each format has a 1:1 sample file that mirrors what the onboarding flow produces.
+
+1. Start PocketBase locally (e.g. `./launch.sh`).
+2. From the repo root run:
+
+```bash
+POCKETBASE_URL=http://127.0.0.1:8090 node scripts/test-avatar-uploads.mjs
+```
+
+   - The script posts four users (one per image type) with generated emails like `webp-avatar+<timestamp>@test.local`.
+   - Override `POCKETBASE_URL` if your API runs elsewhere; `TEST_PASSWORD` customizes the generated password (`Test1234!` by default).
+3. Confirm the new accounts under `users` inside PocketBase (the CLI prints record IDs).
+
 ## License
 
 MIT

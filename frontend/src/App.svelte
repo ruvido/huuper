@@ -6,7 +6,7 @@
 	import Menu from './components/Menu.svelte';
 	import Login from './pages/Login.svelte';
 	import Signup from './pages/Signup.svelte';
-	import SignupSimple from './pages/SignupSimple.svelte';
+	import SignupDirect from './pages/SignupDirect.svelte';
 	import Onboarding from './pages/Onboarding.svelte';
 	import PendingApproval from './pages/PendingApproval.svelte';
 	import TelegramConnect from './pages/TelegramConnect.svelte';
@@ -16,9 +16,6 @@
 	let menuOpen = false;
 	let authReady = false;
 	let renderReady = false;
-
-	// Check if simple signup requested
-	$: showSimpleSignup = $queryParams.simple === 'true';
 
 	// Refresh auth on app load to sync with server
 	onMount(async () => {
@@ -43,8 +40,8 @@
 		let shouldRedirect = false;
 
 		if (!$isAuthenticated) {
-			// Not authenticated → login/signup only
-			if ($currentRoute !== 'login' && $currentRoute !== 'signup') {
+			// Not authenticated → login/signup/signup-direct only
+			if ($currentRoute !== 'login' && $currentRoute !== 'signup' && $currentRoute !== 'signup-direct') {
 				navigate('login');
 				shouldRedirect = true;
 			}
@@ -115,11 +112,9 @@
 		{#if $currentRoute === 'login'}
 			<Login />
 		{:else if $currentRoute === 'signup'}
-			{#if showSimpleSignup}
-				<SignupSimple />
-			{:else}
-				<Signup />
-			{/if}
+			<Signup />
+		{:else if $currentRoute === 'signup-direct'}
+			<SignupDirect />
 		{:else if $currentRoute === 'onboarding'}
 			<Onboarding />
 		{:else if $currentRoute === 'pending-approval'}

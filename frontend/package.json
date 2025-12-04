@@ -15,7 +15,9 @@
   },
   "dependencies": {
     "@jsquash/jpeg": "^1.6.0",
+    "@jsquash/png": "^3.1.1",
     "@jsquash/resize": "^2.1.0",
+    "@jsquash/webp": "^1.5.0",
     "browser-image-compression": "^2.0.2",
     "compressorjs": "^1.2.1",
     "lucide-svelte": "^0.553.0",

@@ -5,7 +5,7 @@
 	import DashboardLayout from '../components/DashboardLayout.svelte';
 	import Card from '../components/Card.svelte';
 	import Button from '../components/Button.svelte';
-	import { Clock, Check } from 'lucide-svelte';
+	import { Clock, Check, X } from 'lucide-svelte';
 
 	let user = pb.authStore.record;
 	let telegramData = user?.telegram;
@@ -13,6 +13,10 @@
 	let connecting = false;
 	let error = '';
 	let botName = '';
+	let showWelcomeModal = false;
+	let welcomeContent = '';
+	let welcomeFetchInProgress = false;
+	const WELCOME_STORAGE_KEY = 'profile_welcome_seen';
 
 	let unsubscribe;
 
@@ -26,6 +30,8 @@
 		} catch (err) {
 			// Silently fail - auth refresh is optional enhancement
 		}
+
+		maybeShowWelcomePopup();
 
 		try {
 			const response = await fetch('/api/settings/telegram');
@@ -43,6 +49,7 @@
 				telegramData = e.record.telegram;
 				userStatus = e.record.status;
 				connecting = false;
+				maybeShowWelcomePopup();
 			});
 		} catch (err) {
 			// Silently fail - subscription is optional enhancement
@@ -86,6 +93,49 @@
 
 	function goToGroups() {
 		navigate('groups');
+	}
+
+	function hasSeenWelcome() {
+		if (typeof window === 'undefined') return true;
+		return window.localStorage.getItem(WELCOME_STORAGE_KEY) === 'true';
+	}
+
+	function markWelcomeSeen() {
+		if (typeof window === 'undefined') return;
+		window.localStorage.setItem(WELCOME_STORAGE_KEY, 'true');
+	}
+
+	async function loadWelcomeMessage() {
+		if (welcomeFetchInProgress) return;
+		welcomeFetchInProgress = true;
+
+		try {
+			const response = await fetch('/api/settings/welcome');
+			if (!response.ok) return;
+			const data = await response.json();
+			const content = data?.data?.content;
+			if (content) {
+				welcomeContent = content;
+				showWelcomeModal = true;
+				markWelcomeSeen();
+			}
+		} catch (err) {
+			// Ignore welcome fetch errors
+		} finally {
+			welcomeFetchInProgress = false;
+		}
+	}
+
+	function maybeShowWelcomePopup() {
+		if (userStatus !== 'active') return;
+		if (showWelcomeModal) return;
+		if (hasSeenWelcome()) return;
+		loadWelcomeMessage();
+	}
+
+	function closeWelcomeModal() {
+		showWelcomeModal = false;
+		markWelcomeSeen();
 	}
 </script>
 
@@ -153,6 +203,19 @@
 	<Button variant="primary" on:click={goToGroups}>
 		View Groups
 	</Button>
+
+		{#if showWelcomeModal}
+			<div class="welcome-overlay">
+				<div class="welcome-modal">
+					<div class="welcome-content" aria-live="polite">
+						{@html welcomeContent}
+					</div>
+				<button class="welcome-action" on:click={closeWelcomeModal}>
+					Ok
+				</button>
+			</div>
+		</div>
+	{/if}
 </DashboardLayout>
 
 <style>
@@ -233,6 +296,54 @@
 	.btn-telegram:hover {
 		background: #006699;
 		border-color: #006699;
+	}
+
+	.welcome-overlay {
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background: rgba(0, 0, 0, 0.6);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 1.5rem;
+		z-index: 2000;
+	}
+
+	.welcome-modal {
+		background: #fff;
+		border: 2px solid #000;
+		max-width: 28rem;
+		width: 100%;
+		padding: clamp(1.25rem, 4vw, 2rem);
+		position: relative;
+		box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+	}
+
+	.welcome-content {
+		max-height: 50vh;
+		overflow-y: auto;
+		font-size: clamp(0.95rem, 3vw, 1rem);
+		color: #000;
+		line-height: 1.5;
+		margin-bottom: 1.5rem;
+	}
+
+	.welcome-action {
+		width: 100%;
+		padding: 0.85rem;
+		background: #000;
+		color: #fff;
+		border: 2px solid #000;
+		font-size: 1rem;
+		font-weight: 600;
+		cursor: pointer;
+	}
+
+	.welcome-action:hover {
+		background: #333;
 	}
 
 	.connecting-message {

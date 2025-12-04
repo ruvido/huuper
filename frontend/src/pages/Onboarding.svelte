@@ -6,9 +6,14 @@
 	import Button from '../components/Button.svelte';
 	import ErrorMessage from '../components/ErrorMessage.svelte';
 	import { X, ArrowLeft, ArrowRight, Circle, CircleDot, CheckCircle } from 'lucide-svelte';
-	import { encode } from '@jsquash/jpeg';
+	import { decode as decodeJpeg, encode as encodeJpeg } from '@jsquash/jpeg';
+	import { decode as decodePng } from '@jsquash/png';
+	import { decode as decodeWebp } from '@jsquash/webp';
 	import resize from '@jsquash/resize';
 	import Cropper from 'svelte-easy-crop';
+
+	const MAX_AVATAR_SIZE = 400;
+	const JPEG_QUALITY = 85;
 
 	let steps = [];
 	let currentStep = 0;
@@ -161,8 +166,22 @@
 		cropFile = null;
 	}
 
-	function cropImageData(imageData, x, y, width, height) {
+	function clampCropArea(imageData, area) {
+		const startX = Math.max(0, Math.min(Math.floor(area.x), imageData.width - 1));
+		const startY = Math.max(0, Math.min(Math.floor(area.y), imageData.height - 1));
+		const maxWidth = imageData.width - startX;
+		const maxHeight = imageData.height - startY;
+
+		const width = Math.max(1, Math.min(maxWidth, Math.round(area.width)));
+		const height = Math.max(1, Math.min(maxHeight, Math.round(area.height)));
+
+		return { x: startX, y: startY, width, height };
+	}
+
+	function cropImageData(imageData, area) {
+		const { x, y, width, height } = clampCropArea(imageData, area);
 		const croppedData = new Uint8ClampedArray(width * height * 4);
+
 		for (let row = 0; row < height; row++) {
 			const srcOffset = ((y + row) * imageData.width + x) * 4;
 			const dstOffset = row * width * 4;
@@ -171,7 +190,60 @@
 				dstOffset
 			);
 		}
+
 		return new ImageData(croppedData, width, height);
+	}
+
+	function getResizeDimensions(width, height) {
+		if (width <= 0 || height <= 0) {
+			return { width: MAX_AVATAR_SIZE, height: MAX_AVATAR_SIZE };
+		}
+
+		if (width >= height) {
+			return {
+				width: MAX_AVATAR_SIZE,
+				height: Math.max(1, Math.round((height / width) * MAX_AVATAR_SIZE)),
+			};
+		}
+
+		return {
+			width: Math.max(1, Math.round((width / height) * MAX_AVATAR_SIZE)),
+			height: MAX_AVATAR_SIZE,
+		};
+	}
+
+	async function decodeImageFile(file) {
+		const buffer = await file.arrayBuffer();
+		const mime = (file.type || '').toLowerCase();
+		const name = (file.name || '').toLowerCase();
+		const hints = [mime, name];
+		const attempts = [];
+
+		if (hints.some(value => value.includes('png'))) {
+			attempts.push(() => decodePng(buffer));
+		}
+
+		if (hints.some(value => value.includes('webp'))) {
+			attempts.push(() => decodeWebp(buffer));
+		}
+
+		if (hints.some(value => value.includes('jpg') || value.includes('jpeg'))) {
+			attempts.push(() => decodeJpeg(buffer, { preserveOrientation: true }));
+		}
+
+		// Default fallback (covers unknown types, ensures JPEG still attempted)
+		attempts.push(() => decodeJpeg(buffer, { preserveOrientation: true }));
+
+		let lastError;
+		for (const decodeFn of attempts) {
+			try {
+				return await decodeFn();
+			} catch (err) {
+				lastError = err;
+			}
+		}
+
+		throw lastError || new Error('Formato immagine non supportato');
 	}
 
 	async function confirmCrop() {
@@ -181,52 +253,14 @@
 		error = '';
 
 		try {
-			// Step 1: Decode any image format via Canvas API
-			const img = new Image();
-			img.src = cropImage;
-			await new Promise((resolve, reject) => {
-				img.onload = resolve;
-				img.onerror = reject;
-			});
-			const canvas = document.createElement('canvas');
-			canvas.width = img.width;
-			canvas.height = img.height;
-			const ctx = canvas.getContext('2d');
-			ctx.drawImage(img, 0, 0);
-			const imageData = ctx.getImageData(0, 0, img.width, img.height);
-
-			// Step 2: Crop manuale su ImageData
-			const cropped = cropImageData(
-				imageData,
-				Math.round(croppedAreaPixels.x),
-				Math.round(croppedAreaPixels.y),
-				Math.round(croppedAreaPixels.width),
-				Math.round(croppedAreaPixels.height)
-			);
-
-			// Step 3: Resize (max 400px mantenendo proporzioni)
-			const maxSize = 400;
-			let width = cropped.width;
-			let height = cropped.height;
-
-			if (width > height) {
-				height = Math.round((height * maxSize) / width);
-				width = maxSize;
-			} else {
-				width = Math.round((width * maxSize) / height);
-				height = maxSize;
-			}
-
+			const imageData = await decodeImageFile(cropFile);
+			const cropped = cropImageData(imageData, croppedAreaPixels);
+			const { width, height } = getResizeDimensions(cropped.width, cropped.height);
 			const resized = await resize(cropped, { width, height });
-
-			// Step 4: Encode
-			const jpegBuffer = await encode(resized, { quality: 85 });
-
-			// Create File
+			const jpegBuffer = await encodeJpeg(resized, { quality: JPEG_QUALITY });
 			const blob = new Blob([jpegBuffer], { type: 'image/jpeg' });
 			const fileName = cropFile.name.replace(/\.[^/.]+$/, '.jpg');
 			formData[cropField] = new File([blob], fileName, { type: 'image/jpeg' });
-
 
 			showCropModal = false;
 			cropImage = '';
@@ -428,6 +462,7 @@
 								Seleziona almeno {remaining || step.min}
 							{/if}
 						</p>
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
 						<div class="grid-container" on:keydown={(e) => {
 							if (e.key === 'Enter' && canProceed) {
 								e.preventDefault();
@@ -476,7 +511,6 @@
 												}
 											}
 										}}
-										autofocus
 										disabled={loading}
 									/>
 								</div>
@@ -873,6 +907,7 @@
 		color: #333;
 		line-height: 1.6;
 		margin: 0 0 2rem 0;
+		white-space: pre-line;
 	}
 
 	.step-content.is-start h1 {

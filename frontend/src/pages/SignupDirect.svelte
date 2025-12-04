@@ -41,12 +41,12 @@
 		loading = true;
 
 		try {
-			// Create user
+			// Create user with active status
 			const formData = new FormData();
 			formData.append('email', email);
 			formData.append('password', password);
 			formData.append('passwordConfirm', passwordConfirm);
-			formData.append('status', 'pending');
+			formData.append('status', 'active');
 
 			await pb.collection('users').create(formData);
 
@@ -57,7 +57,6 @@
 			navigate('profile');
 		} catch (err) {
 			// Parse PocketBase field-specific errors
-			// err.data contains field-level validation errors
 			const fieldErrors = err.data?.data || err.data || {};
 
 			if (fieldErrors.email) {
@@ -84,14 +83,10 @@
 			loading = false;
 		}
 	}
-
-	function goToLogin() {
-		navigate('login');
-	}
 </script>
 
 <AuthLayout>
-	<h1>Sign Up</h1>
+	<h1>Sign Up (beta mk2)</h1>
 
 	<form on:submit|preventDefault={handleSignup}>
 		<FormGroup
@@ -135,13 +130,6 @@
 			{loading ? 'Creating account...' : 'Sign Up'}
 		</Button>
 	</form>
-
-	<div class="footer">
-		Already have an account?
-		<Button variant="link" on:click={goToLogin} disabled={loading}>
-			Login
-		</Button>
-	</div>
 </AuthLayout>
 
 <style>
@@ -150,11 +138,5 @@
 		font-size: 1.5rem;
 		text-align: center;
 		font-weight: bold;
-	}
-
-	.footer {
-		margin-top: 1rem;
-		text-align: center;
-		font-size: 0.9rem;
 	}
 </style>
