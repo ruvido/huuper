@@ -1,0 +1,71 @@
+# Git
+.git/
+.gitignore
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# PocketBase data (built at runtime)
+pb_data/
+pocketbase
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.svelte-kit/
+frontend/build/
+frontend/.vite/
+
+# Node modules
+node_modules/
+
+# Build outputs
+pb_public/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Testing
+test/
+scripts/
+
+# Documentation
+*.md
+!README.md
+
+# OS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+*~
+
+# Temporary
+tmp/
+temp/
+*.tmp
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+
+# Caddy
+caddy_setup.txt
+
+# Launch scripts
+launch.sh
