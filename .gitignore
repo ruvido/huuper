@@ -95,3 +95,6 @@ temp/
 *.tmp
 dist-ssr/
 *.local
+
+# Docker
+backups/

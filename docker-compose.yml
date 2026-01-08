@@ -1,0 +1,29 @@
+services:
+  huuper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: huuper
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    volumes:
+      # Persist database and uploads
+      - ./pb_data:/app/pb_data
+    env_file:
+      - .env
+    networks:
+      - huuper-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8090/api/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+networks:
+  huuper-network:
+    driver: bridge
+
+volumes:
+  pb_data:
