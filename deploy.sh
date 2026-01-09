@@ -66,29 +66,56 @@ case "${1:-}" in
         ;;
 
     backup)
+        info "Stopping services for safe backup..."
+        docker compose down
+
         BACKUP_DIR="backups/$(date +%Y%m%d_%H%M%S)"
         mkdir -p "$BACKUP_DIR"
+
         info "Creating backup in $BACKUP_DIR..."
-        cp -r pb_data "$BACKUP_DIR/"
-        info "Backup completed!"
+
+        # Safe backup: stop service first to ensure consistency
+        if [ -d "pb_data" ]; then
+            cp -r pb_data "$BACKUP_DIR/"
+            info "Backup completed: $BACKUP_DIR"
+        else
+            error "pb_data directory not found!"
+        fi
+
+        info "Restarting services..."
+        docker compose up -d
+        info "Services restarted!"
         ;;
 
     restore)
         if [ -z "$2" ]; then
             error "Usage: ./deploy.sh restore <backup_directory>"
         fi
-        if [ ! -d "$2" ]; then
-            error "Backup directory not found: $2"
+        if [ ! -d "$2/pb_data" ]; then
+            error "Backup directory not found or invalid: $2/pb_data"
         fi
+
         warn "This will overwrite current pb_data. Continue? (y/N)"
         read -r response
         if [[ "$response" =~ ^[Yy]$ ]]; then
-            info "Restoring from $2..."
+            info "Stopping services..."
             docker compose down
-            rm -rf pb_data
+
+            # Safety: move current pb_data to restore directory
+            if [ -d "pb_data" ]; then
+                RESTORE_BACKUP="restore/pb_data.$(date +%Y%m%d_%H%M%S)"
+                mkdir -p restore
+                info "Moving current pb_data to: $RESTORE_BACKUP"
+                mv pb_data "$RESTORE_BACKUP"
+            fi
+
+            info "Restoring from $2..."
             cp -r "$2/pb_data" .
+
+            info "Starting services..."
             docker compose up -d
             info "Restore completed!"
+            info "Previous data saved in: $RESTORE_BACKUP"
         else
             info "Restore cancelled"
         fi

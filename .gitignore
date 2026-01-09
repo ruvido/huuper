@@ -98,3 +98,4 @@ dist-ssr/
 
 # Docker
 backups/
+restore/
