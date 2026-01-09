@@ -1,5 +1,5 @@
 # Stage 1: Build frontend
-FROM node:18-alpine AS frontend-builder
+FROM node:20-alpine AS frontend-builder
 
 WORKDIR /app/frontend
 
@@ -16,12 +16,15 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: Build Go binary
-FROM golang:1.21-alpine AS go-builder
+FROM golang:1.24-alpine AS go-builder
 
 WORKDIR /app
 
 # Install build dependencies
 RUN apk add --no-cache git
+
+# Enable Go toolchain auto-download
+ENV GOTOOLCHAIN=auto
 
 # Copy Go module files
 COPY go.mod go.sum ./
@@ -31,7 +34,10 @@ RUN go mod download
 COPY . .
 
 # Copy built frontend from previous stage
-COPY --from=frontend-builder /app/frontend/dist ./pb_public
+COPY --from=frontend-builder /app/pb_public ./pb_public
+
+# Ensure go.mod is tidy
+RUN go mod tidy
 
 # Build Go binary
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o huuper .
