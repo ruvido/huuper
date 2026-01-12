@@ -19,6 +19,18 @@
 
 	// Refresh auth on app load to sync with server
 	onMount(async () => {
+		try {
+			const response = await fetch('/api/settings/title');
+			if (response.ok) {
+				const data = await response.json();
+				if (data?.data?.name) {
+					document.title = data.data.name;
+				}
+			}
+		} catch (err) {
+			// Silently fail - title is optional
+		}
+
 		if (pb.authStore.isValid) {
 			try {
 				await pb.collection('users').authRefresh();
