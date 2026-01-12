@@ -16,6 +16,7 @@
 	let menuOpen = false;
 	let authReady = false;
 	let renderReady = false;
+	const version = __APP_VERSION__;
 
 	// Refresh auth on app load to sync with server
 	onMount(async () => {
@@ -143,6 +144,8 @@
 	</main>
 {/if}
 
+<div class="version">{version}</div>
+
 <style>
 	:global(body) {
 		overflow-x: hidden;
@@ -151,5 +154,15 @@
 	main {
 		width: 100%;
 		max-width: 100%;
+	}
+
+	.version {
+		position: fixed;
+		top: 8px;
+		left: 8px;
+		font-size: 10px;
+		color: #999;
+		z-index: 9999;
+		pointer-events: none;
 	}
 </style>
