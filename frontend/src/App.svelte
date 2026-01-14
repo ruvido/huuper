@@ -5,8 +5,7 @@
 	import Header from './components/Header.svelte';
 	import Menu from './components/Menu.svelte';
 	import Login from './pages/Login.svelte';
-	import Signup from './pages/Signup.svelte';
-	import SignupDirect from './pages/SignupDirect.svelte';
+	import Signup from './pages/SignupDirect.svelte';
 	import Onboarding from './pages/Onboarding.svelte';
 	import PendingApproval from './pages/PendingApproval.svelte';
 	import TelegramConnect from './pages/TelegramConnect.svelte';
@@ -127,7 +126,7 @@
 		{:else if $currentRoute === 'signup'}
 			<Signup />
 		{:else if $currentRoute === 'signup-direct'}
-			<SignupDirect />
+			<Signup defaultStatus="active" showFooter={false} pageTitle="Sign Up (beta direct)" />
 		{:else if $currentRoute === 'onboarding'}
 			<Onboarding />
 		{:else if $currentRoute === 'pending-approval'}

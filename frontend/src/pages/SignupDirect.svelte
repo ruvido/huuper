@@ -6,6 +6,11 @@
 	import Button from '../components/Button.svelte';
 	import ErrorMessage from '../components/ErrorMessage.svelte';
 
+	// Props configurabili
+	export let defaultStatus = 'pending';
+	export let showFooter = true;
+	export let pageTitle = 'Sign Up';
+
 	let email = '';
 	let password = '';
 	let passwordConfirm = '';
@@ -41,12 +46,12 @@
 		loading = true;
 
 		try {
-			// Create user with active status
+			// Create user with configured status
 			const formData = new FormData();
 			formData.append('email', email);
 			formData.append('password', password);
 			formData.append('passwordConfirm', passwordConfirm);
-			formData.append('status', 'active');
+			formData.append('status', defaultStatus);
 
 			await pb.collection('users').create(formData);
 
@@ -83,10 +88,14 @@
 			loading = false;
 		}
 	}
+
+	function goToLogin() {
+		navigate('login');
+	}
 </script>
 
 <AuthLayout>
-	<h1>Sign Up (beta mk2)</h1>
+	<h1>{pageTitle}</h1>
 
 	<form on:submit|preventDefault={handleSignup}>
 		<FormGroup
@@ -130,6 +139,15 @@
 			{loading ? 'Creating account...' : 'Sign Up'}
 		</Button>
 	</form>
+
+	{#if showFooter}
+		<div class="footer">
+			Already have an account?
+			<Button variant="link" on:click={goToLogin} disabled={loading}>
+				Login
+			</Button>
+		</div>
+	{/if}
 </AuthLayout>
 
 <style>
@@ -138,5 +156,11 @@
 		font-size: 1.5rem;
 		text-align: center;
 		font-weight: bold;
+	}
+
+	.footer {
+		margin-top: 1rem;
+		text-align: center;
+		font-size: 0.9rem;
 	}
 </style>

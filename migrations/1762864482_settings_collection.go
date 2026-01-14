@@ -40,10 +40,35 @@ func init() {
 			}
 		}
 
-		// Get existing settings collection
+		// Create settings collection if it doesn't exist
 		settings, err := app.FindCollectionByNameOrId("settings")
 		if err != nil {
-			return err
+			// Collection doesn't exist, create it
+			settings = core.NewBaseCollection("settings")
+			settings.Fields.Add(
+				&core.AutodateField{
+					Name:     "created",
+					OnCreate: true,
+				},
+				&core.AutodateField{
+					Name:     "updated",
+					OnCreate: true,
+					OnUpdate: true,
+				},
+				&core.TextField{
+					Name:     "name",
+					Required: true,
+					Max:      255,
+				},
+				&core.TextField{
+					Name:     "data",
+					Required: true,
+					Max:      5000,
+				},
+			)
+			if err := app.Save(settings); err != nil {
+				return err
+			}
 		}
 
 		// Seed bot messages from .env (required)
@@ -121,6 +146,37 @@ func init() {
 		urlRecord.Set("data", string(urlJSON))
 		if err := app.Save(urlRecord); err != nil {
 			return err
+		}
+
+		// Seed Telegram settings from .env (required)
+		telegramToken := os.Getenv("TELEGRAM_BOT_TOKEN")
+		telegramName := os.Getenv("TELEGRAM_BOT_NAME")
+
+		if telegramToken == "" || telegramName == "" {
+			return fmt.Errorf("TELEGRAM_BOT_TOKEN and TELEGRAM_BOT_NAME must be set in .env")
+		}
+
+		// Check if telegram record already exists
+		existingTelegramRecord, err := app.FindFirstRecordByFilter(
+			"settings",
+			"name = 'telegram'",
+			map[string]any{},
+		)
+
+		// Only create if it doesn't exist
+		if err != nil || existingTelegramRecord == nil {
+			telegramData := map[string]string{
+				"token": telegramToken,
+				"name":  telegramName,
+			}
+			telegramJSON, _ := json.Marshal(telegramData)
+
+			telegramRecord := core.NewRecord(settings)
+			telegramRecord.Set("name", "telegram")
+			telegramRecord.Set("data", string(telegramJSON))
+			if err := app.Save(telegramRecord); err != nil {
+				return err
+			}
 		}
 
 		return nil
