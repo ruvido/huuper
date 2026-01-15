@@ -1,7 +1,6 @@
 package migrations
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -60,10 +59,9 @@ func init() {
 					Required: true,
 					Max:      255,
 				},
-				&core.TextField{
+				&core.JSONField{
 					Name:     "data",
 					Required: true,
-					Max:      5000,
 				},
 			)
 			if err := app.Save(settings); err != nil {
@@ -71,109 +69,80 @@ func init() {
 			}
 		}
 
-		// Seed bot messages from .env (required)
-		msgWelcomeRaw := os.Getenv("MESSAGE_WELCOME")
-		msgNotRegisteredRaw := os.Getenv("MESSAGE_NOT_REGISTERED")
-		msgRegisteredRaw := os.Getenv("MESSAGE_REGISTERED")
-
-		if msgWelcomeRaw == "" || msgNotRegisteredRaw == "" || msgRegisteredRaw == "" {
-			return fmt.Errorf("MESSAGE_WELCOME, MESSAGE_NOT_REGISTERED, and MESSAGE_REGISTERED must be set in .env")
-		}
-
-		// Remove surrounding quotes and parse escape sequences
-		msgWelcome := strings.Trim(msgWelcomeRaw, `"`)
-		msgWelcome = strings.ReplaceAll(msgWelcome, `\n`, "\n")
-
-		msgNotRegistered := strings.Trim(msgNotRegisteredRaw, `"`)
-		msgNotRegistered = strings.ReplaceAll(msgNotRegistered, `\n`, "\n")
-
-		msgRegistered := strings.Trim(msgRegisteredRaw, `"`)
-		msgRegistered = strings.ReplaceAll(msgRegistered, `\n`, "\n")
-
-		// Delete existing bot_messages record if it exists
+		// Seed bot messages with defaults if missing
 		existingRecord, err := app.FindFirstRecordByFilter(
 			"settings",
 			"name = 'bot_messages'",
 			map[string]any{},
 		)
-		if err == nil && existingRecord != nil {
-			if err := app.Delete(existingRecord); err != nil {
+		if err != nil || existingRecord == nil {
+			// Create new bot_messages record with correct newlines
+			botMessagesData := map[string]string{
+				"welcome": "Welcome! This group requires registration.\n\nPlease sign up here:\n{url}",
+				"warning": "This bot doesn't reply to messages.\n\nPlease sign up on the web app:\n{url}",
+			}
+
+			botMessagesRecord := core.NewRecord(settings)
+			botMessagesRecord.Set("name", "bot_messages")
+			botMessagesRecord.Set("data", botMessagesData)
+			if err := app.Save(botMessagesRecord); err != nil {
 				return err
 			}
 		}
 
-		// Create new bot_messages record with correct newlines
-		botMessagesData := map[string]string{
-			"welcome":        msgWelcome,
-			"not_registered": msgNotRegistered,
-			"registered":     msgRegistered,
-		}
-		botMessagesJSON, _ := json.Marshal(botMessagesData)
-
-		botMessagesRecord := core.NewRecord(settings)
-		botMessagesRecord.Set("name", "bot_messages")
-		botMessagesRecord.Set("data", string(botMessagesJSON))
-		if err := app.Save(botMessagesRecord); err != nil {
-			return err
-		}
-
 		// Seed URL from .env (required)
-		urlEnv := os.Getenv("URL")
-		if urlEnv == "" {
-			return fmt.Errorf("URL must be set in .env")
-		}
-
-		// Delete existing url record if it exists
 		existingURLRecord, err := app.FindFirstRecordByFilter(
 			"settings",
 			"name = 'url'",
 			map[string]any{},
 		)
-		if err == nil && existingURLRecord != nil {
-			if err := app.Delete(existingURLRecord); err != nil {
+		if err != nil || existingURLRecord == nil {
+			urlEnv := os.Getenv("URL")
+			if urlEnv == "" {
+				return fmt.Errorf("missing required env vars: URL\n\n.env.example:\n%s", envExample)
+			}
+
+			urlData := map[string]string{
+				"address": urlEnv,
+			}
+
+			urlRecord := core.NewRecord(settings)
+			urlRecord.Set("name", "url")
+			urlRecord.Set("data", urlData)
+			if err := app.Save(urlRecord); err != nil {
 				return err
 			}
 		}
 
-		// Create new url record
-		urlData := map[string]string{
-			"address": urlEnv,
-		}
-		urlJSON, _ := json.Marshal(urlData)
-
-		urlRecord := core.NewRecord(settings)
-		urlRecord.Set("name", "url")
-		urlRecord.Set("data", string(urlJSON))
-		if err := app.Save(urlRecord); err != nil {
-			return err
-		}
-
 		// Seed Telegram settings from .env (required)
-		telegramToken := os.Getenv("TELEGRAM_BOT_TOKEN")
-		telegramName := os.Getenv("TELEGRAM_BOT_NAME")
-
-		if telegramToken == "" || telegramName == "" {
-			return fmt.Errorf("TELEGRAM_BOT_TOKEN and TELEGRAM_BOT_NAME must be set in .env")
-		}
-
-		// Check if telegram record already exists
 		existingTelegramRecord, err := app.FindFirstRecordByFilter(
 			"settings",
 			"name = 'telegram'",
 			map[string]any{},
 		)
-
-		// Only create if it doesn't exist
 		if err != nil || existingTelegramRecord == nil {
+			telegramToken := os.Getenv("TELEGRAM_BOT_TOKEN")
+			telegramName := os.Getenv("TELEGRAM_BOT_NAME")
+
+			if telegramToken == "" || telegramName == "" {
+				missing := []string{}
+				if telegramToken == "" {
+					missing = append(missing, "TELEGRAM_BOT_TOKEN")
+				}
+				if telegramName == "" {
+					missing = append(missing, "TELEGRAM_BOT_NAME")
+				}
+				return fmt.Errorf("missing required env vars: %s\n\n.env.example:\n%s", strings.Join(missing, ", "), envExample)
+			}
+
 			telegramData := map[string]string{
 				"token": telegramToken,
 				"name":  telegramName,
 			}
-			telegramJSON, _ := json.Marshal(telegramData)
 
 			telegramRecord := core.NewRecord(settings)
 			telegramRecord.Set("name", "telegram")
-			telegramRecord.Set("data", string(telegramJSON))
+			telegramRecord.Set("data", telegramData)
 			if err := app.Save(telegramRecord); err != nil {
 				return err
 			}
@@ -206,7 +175,21 @@ func init() {
 		if err != nil {
 			return err
 		}
-		users.Fields.RemoveById("status")
+		statusField := users.Fields.GetByName("status")
+		if statusField != nil {
+			users.Fields.RemoveById(statusField.GetId())
+		}
 		return app.Save(users)
 	})
 }
+
+const envExample = `ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=changeme123456
+PORT=8090
+APP_NAME=App Title
+
+TELEGRAM_BOT_TOKEN=your_bot_token_here
+TELEGRAM_BOT_NAME=@your_bot_name
+
+URL=http://localhost:8090
+`

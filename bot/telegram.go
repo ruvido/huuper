@@ -85,7 +85,9 @@ func listenForUpdates() {
 		// Handle /start command with token
 		if update.Message.IsCommand() && update.Message.Command() == "start" {
 			args := update.Message.CommandArguments()
-			if args != "" {
+			if args == "" {
+				sendWarningMessage(update.Message.Chat.ID)
+			} else {
 				handleStartCommand(update.Message, args)
 			}
 			continue
@@ -528,63 +530,55 @@ func sendWelcomeMessage(chatID int64) {
 }
 
 func handlePrivateMessage(message *tgbotapi.Message) {
-	// Check if user's telegram ID is in database
-	user, err := app.FindFirstRecordByFilter(
-		"users",
-		"telegram.id = {:id}",
-		map[string]any{"id": message.From.ID},
-	)
+	sendWarningMessage(message.Chat.ID)
+}
 
+func sendWarningMessage(chatID int64) {
 	// Get URL from settings
-	urlRecord, err2 := app.FindFirstRecordByFilter(
+	urlRecord, err := app.FindFirstRecordByFilter(
 		"settings",
 		"name = 'url'",
 		map[string]any{},
 	)
-	if err2 != nil {
-		log.Printf("Failed to get URL settings: %v", err2)
+	if err != nil {
+		log.Printf("Failed to get URL settings: %v", err)
 		return
 	}
 
 	var urlData struct {
 		Address string `json:"address"`
 	}
-	if err2 := urlRecord.UnmarshalJSONField("data", &urlData); err2 != nil {
-		log.Printf("Failed to parse URL settings: %v", err2)
+	if err := urlRecord.UnmarshalJSONField("data", &urlData); err != nil {
+		log.Printf("Failed to parse URL settings: %v", err)
 		return
 	}
 
-	// Get bot messages from settings
-	messagesRecord, err3 := app.FindFirstRecordByFilter(
+	// Get warning message from settings
+	messagesRecord, err := app.FindFirstRecordByFilter(
 		"settings",
 		"name = 'bot_messages'",
 		map[string]any{},
 	)
-	if err3 != nil {
-		log.Printf("Failed to get bot messages settings: %v", err3)
+	if err != nil {
+		log.Printf("Failed to get bot messages settings: %v", err)
 		return
 	}
 
 	var messagesData struct {
-		NotRegistered string `json:"not_registered"`
-		Registered    string `json:"registered"`
+		Warning string `json:"warning"`
 	}
-	if err3 := messagesRecord.UnmarshalJSONField("data", &messagesData); err3 != nil {
-		log.Printf("Failed to parse bot messages settings: %v", err3)
+	if err := messagesRecord.UnmarshalJSONField("data", &messagesData); err != nil {
+		log.Printf("Failed to parse bot messages settings: %v", err)
 		return
 	}
 
-	var responseMsg string
-	if err != nil || user == nil {
-		// User not found
-		responseMsg = strings.ReplaceAll(messagesData.NotRegistered, "{url}", urlData.Address)
-	} else {
-		// User found
-		responseMsg = strings.ReplaceAll(messagesData.Registered, "{url}", urlData.Address)
+	message := strings.ReplaceAll(messagesData.Warning, "{url}", urlData.Address)
+	if message == "" {
+		return
 	}
 
-	msg := tgbotapi.NewMessage(message.Chat.ID, responseMsg)
+	msg := tgbotapi.NewMessage(chatID, message)
 	if _, err := bot.Send(msg); err != nil {
-		log.Printf("Failed to send private message reply: %v", err)
+		log.Printf("Failed to send warning message: %v", err)
 	}
 }

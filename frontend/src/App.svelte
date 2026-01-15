@@ -1,6 +1,6 @@
 <script>
 	import { onMount } from 'svelte';
-	import { isAuthenticated, pb, authRecord } from './lib/pocketbase';
+	import { isAuthenticated, pb, authRecord, fetchSetting } from './lib/pocketbase';
 	import { currentRoute, navigate, queryParams } from './lib/router';
 	import Header from './components/Header.svelte';
 	import Menu from './components/Menu.svelte';
@@ -20,7 +20,7 @@
 	// Refresh auth on app load to sync with server
 	onMount(async () => {
 		try {
-			const response = await fetch('/api/settings/title');
+			const response = await fetchSetting('title');
 			if (response.ok) {
 				const data = await response.json();
 				if (data?.data?.name) {

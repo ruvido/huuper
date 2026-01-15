@@ -1,6 +1,6 @@
 <script>
 	import { onMount, onDestroy } from 'svelte';
-	import { pb } from '../lib/pocketbase';
+	import { pb, fetchSetting } from '../lib/pocketbase';
 	import { navigate } from '../lib/router';
 	import Button from '../components/Button.svelte';
 	import { X } from 'lucide-svelte';
@@ -14,7 +14,7 @@
 	onMount(async () => {
 		// Fetch bot name
 		try {
-			const response = await fetch('/api/settings/telegram');
+			const response = await fetchSetting('telegram');
 			if (response.ok) {
 				const data = await response.json();
 				botName = data.data.name;
@@ -25,7 +25,7 @@
 
 		// Fetch telegram_connect config
 		try {
-			const response = await fetch('/api/settings/telegram_connect');
+			const response = await fetchSetting('telegram_connect');
 			if (response.ok) {
 				const data = await response.json();
 				config = data.data;

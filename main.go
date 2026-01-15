@@ -31,7 +31,7 @@ func main() {
 		}
 
 		// API routes
-		se.Router.GET("/api/settings/{name}", api.GetSettingsHandler(app))
+		se.Router.GET("/api/settings/{name}", api.GetSettingsHandler(app)).Bind(apis.RequireAuth())
 		se.Router.POST("/api/telegram/generate-token", api.GenerateTelegramTokenHandler(app)).Bind(apis.RequireAuth())
 
 		// Serve frontend
