@@ -1,6 +1,7 @@
 <script>
 	import { onMount, onDestroy } from 'svelte';
 	import { pb, fetchSetting } from '../lib/pocketbase';
+	import { generateTelegramDeepLink } from '../lib/telegram';
 	import { navigate } from '../lib/router';
 	import DashboardLayout from '../components/DashboardLayout.svelte';
 	import Card from '../components/Card.svelte';
@@ -69,22 +70,7 @@
 		error = '';
 
 		try {
-			const response = await fetch('/api/telegram/generate-token', {
-				method: 'POST',
-				headers: {
-					'Authorization': pb.authStore.token,
-				},
-			});
-
-			if (!response.ok) {
-				throw new Error('Failed to generate connection token');
-			}
-
-			const data = await response.json();
-			const token = data.token;
-
-			const cleanBotName = botName.replace('@', '');
-			const deepLink = `https://t.me/${cleanBotName}?start=${token}`;
+			const deepLink = await generateTelegramDeepLink(botName);
 			window.open(deepLink, '_blank');
 
 		} catch (err) {
@@ -94,7 +80,7 @@
 	}
 
 	function goToGroups() {
-		navigate('groups');
+		navigate('app/groups');
 	}
 
 	function hasSeenWelcome() {

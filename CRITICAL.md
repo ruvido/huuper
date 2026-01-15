@@ -1,8 +1,15 @@
-# Critical Issue: Settings Exposure
+# Critical Issues
 
-The `/api/settings/{name}` endpoint used to allow public access and return full
-`settings` records, including sensitive values like the Telegram bot token. This
-is now mitigated by requiring auth on the route and locking the `settings`
-collection to admin-only, but the token still lives in the `settings` data.
+## Critical: Settings Exposure
+
+The `/api/settings/{name}` endpoint returns the full `data` payload to any
+authenticated user. This leaks sensitive values such as
+`settings.telegram.token`, even though the `settings` collection is admin-only.
 
 We are **not** addressing this now, but it needs to be fixed before production.
+
+## High: Telegram Tokens Never Expire
+
+Telegram connect tokens are only cleaned up when a new token is generated. If no
+one generates new tokens, old tokens remain valid indefinitely, so the intended
+24-hour expiry is not enforced.

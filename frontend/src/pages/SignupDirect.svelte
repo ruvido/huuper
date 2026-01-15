@@ -59,7 +59,7 @@
 			await pb.collection('users').authWithPassword(email, password);
 
 			// Redirect to profile (will check for empty data there)
-			navigate('profile');
+			navigate('app/profile');
 		} catch (err) {
 			// Parse PocketBase field-specific errors
 			const fieldErrors = err.data?.data || err.data || {};

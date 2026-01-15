@@ -66,7 +66,7 @@
 	});
 
 	function goToProfile() {
-		navigate('profile');
+		navigate('app/profile');
 	}
 </script>
 

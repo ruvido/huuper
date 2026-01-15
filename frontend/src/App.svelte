@@ -1,7 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
 	import { isAuthenticated, pb, authRecord, fetchSetting } from './lib/pocketbase';
-	import { currentRoute, navigate, queryParams } from './lib/router';
+	import { currentRoute, navigate, queryParams, getTargetRoute } from './lib/router';
 	import Header from './components/Header.svelte';
 	import Menu from './components/Menu.svelte';
 	import Login from './pages/Login.svelte';
@@ -51,45 +51,10 @@
 	$: if (authReady && !renderReady) {
 		let shouldRedirect = false;
 
-		if (!$isAuthenticated) {
-			// Not authenticated → login/signup/signup-direct only
-			if ($currentRoute !== 'login' && $currentRoute !== 'signup' && $currentRoute !== 'signup-direct') {
-				navigate('login');
-				shouldRedirect = true;
-			}
-		} else {
-			// Authenticated → check status + data + telegram
-			const user = $authRecord;
-			const status = user?.status;
-			const hasData = user?.data && Object.keys(user.data).length > 0;
-			const hasTelegram = user?.telegram && Object.keys(user.telegram).length > 0;
-
-			if (status === 'pending') {
-				// Pending users: onboarding → pending-approval
-				if (!hasData && $currentRoute !== 'onboarding') {
-					navigate('onboarding');
-					shouldRedirect = true;
-				} else if (hasData && $currentRoute !== 'pending-approval') {
-					navigate('pending-approval');
-					shouldRedirect = true;
-				}
-			} else if (status === 'active') {
-				// Active users: cannot stay on pending-approval
-				if ($currentRoute === 'pending-approval') {
-					navigate('profile');
-					shouldRedirect = true;
-				}
-				// Active users without data: onboarding required
-				else if (!hasData && $currentRoute !== 'onboarding') {
-					navigate('onboarding');
-					shouldRedirect = true;
-				}
-				// Active users with data but no telegram: telegram-connect required
-				else if (hasData && !hasTelegram && $currentRoute !== 'telegram-connect') {
-					navigate('telegram-connect');
-					shouldRedirect = true;
-				}
-			}
+		const targetRoute = getTargetRoute($isAuthenticated, $authRecord, $currentRoute);
+		if (targetRoute !== $currentRoute) {
+			navigate(targetRoute);
+			shouldRedirect = true;
 		}
 
 		// Only allow render if NOT redirecting
@@ -115,7 +80,7 @@
 <!-- Only render when guards have validated -->
 {#if renderReady}
 	<!-- Header: only visible when authenticated and not on onboarding/pending-approval/telegram-connect -->
-	{#if $isAuthenticated && !['onboarding', 'pending-approval', 'telegram-connect'].includes($currentRoute)}
+	{#if $isAuthenticated && $currentRoute.startsWith('app/')}
 		<Header onMenuClick={toggleMenu} />
 		<Menu isOpen={menuOpen} onClose={closeMenu} />
 	{/if}
@@ -133,9 +98,9 @@
 			<PendingApproval />
 		{:else if $currentRoute === 'telegram-connect'}
 			<TelegramConnect />
-		{:else if $currentRoute === 'profile'}
+		{:else if $currentRoute === 'app/profile'}
 			<Profile />
-		{:else if $currentRoute === 'groups'}
+		{:else if $currentRoute === 'app/groups'}
 			<Groups />
 		{:else}
 			<Login />

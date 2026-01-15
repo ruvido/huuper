@@ -1,6 +1,7 @@
 <script>
 	import { onMount, onDestroy } from 'svelte';
 	import { pb, fetchSetting } from '../lib/pocketbase';
+	import { generateTelegramDeepLink } from '../lib/telegram';
 	import { navigate } from '../lib/router';
 	import Button from '../components/Button.svelte';
 	import { X } from 'lucide-svelte';
@@ -43,7 +44,7 @@
 					// Telegram connected! Sync to authStore immediately (official PocketBase pattern)
 					pb.authStore.save(pb.authStore.token, e.record);
 					// Now navigate - authStore updated synchronously
-					navigate('profile');
+					navigate('app/profile');
 				}
 			});
 		} catch (err) {
@@ -67,22 +68,7 @@
 		error = '';
 
 		try {
-			const response = await fetch('/api/telegram/generate-token', {
-				method: 'POST',
-				headers: {
-					'Authorization': pb.authStore.token,
-				},
-			});
-
-			if (!response.ok) {
-				throw new Error('Failed to generate connection token');
-			}
-
-			const data = await response.json();
-			const token = data.token;
-
-			const cleanBotName = botName.replace('@', '');
-			const deepLink = `https://t.me/${cleanBotName}?start=${token}`;
+			const deepLink = await generateTelegramDeepLink(botName);
 			window.location.href = deepLink;
 
 		} catch (err) {

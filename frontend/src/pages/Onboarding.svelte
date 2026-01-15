@@ -236,7 +236,7 @@
 			if (updatedUser.status === 'pending') {
 				navigate('pending-approval');
 			} else {
-				navigate('profile');
+				navigate('app/profile');
 			}
 		} catch (err) {
 			error = err.message || 'Failed to save profile';

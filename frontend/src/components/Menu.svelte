@@ -29,10 +29,10 @@
 
 	<ul class="menu-list">
 		<li>
-			<button on:click={() => handleNavigate('profile')}>Profile</button>
+			<button on:click={() => handleNavigate('app/profile')}>Profile</button>
 		</li>
 		<li>
-			<button on:click={() => handleNavigate('groups')}>Groups</button>
+			<button on:click={() => handleNavigate('app/groups')}>Groups</button>
 		</li>
 		<li>
 			<button on:click={handleLogout}>Logout</button>
