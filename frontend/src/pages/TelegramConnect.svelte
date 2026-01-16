@@ -3,6 +3,7 @@
 	import { pb, fetchSetting } from '../lib/pocketbase';
 	import { generateTelegramDeepLink } from '../lib/telegram';
 	import { navigate } from '../lib/router';
+	import { renderContent } from '../lib/markdown';
 	import Button from '../components/Button.svelte';
 	import { X } from 'lucide-svelte';
 
@@ -11,6 +12,9 @@
 	let botName = '';
 	let unsubscribe;
 	let config = null;
+	let primaryLink = '';
+	let fallbackLink = '';
+	let helperTextHtml = '';
 
 	onMount(async () => {
 		// Fetch bot name
@@ -33,6 +37,11 @@
 			}
 		} catch (err) {
 			// Silently fail
+		}
+
+		// Pre-generate links so the fallback is always visible
+		if (botName) {
+			await prepareLinks();
 		}
 
 		// Subscribe to user changes to detect when Telegram is connected
@@ -68,13 +77,38 @@
 		error = '';
 
 		try {
-			const deepLink = await generateTelegramDeepLink(botName);
-			window.open(deepLink, '_blank', 'noopener');
+			if (!primaryLink || !fallbackLink) {
+				await prepareLinks();
+			}
+			if (!primaryLink) {
+				throw new Error('Missing Telegram link');
+			}
+			window.open(primaryLink, '_blank', 'noopener');
 
 		} catch (err) {
 			error = err.message || 'Failed to connect Telegram';
 			connecting = false;
 		}
+	}
+
+	async function prepareLinks() {
+		const { primary, fallback } = await generateTelegramDeepLink(botName);
+		primaryLink = primary;
+		fallbackLink = fallback;
+		updateHelperText();
+	}
+
+	function updateHelperText() {
+		if (!config?.helper_text) {
+			helperTextHtml = '';
+			return;
+		}
+		const linkValue = fallbackLink || '#';
+		helperTextHtml = config.helper_text.replaceAll('{fallback_link}', linkValue);
+	}
+
+	$: if (config && fallbackLink) {
+		updateHelperText();
 	}
 </script>
 
@@ -87,9 +121,9 @@
 		<h1>{config.title}</h1>
 
 		<div class="message">
-			<p class="main">{config.main_text}</p>
+			<div class="main">{@html renderContent(config.main_text)}</div>
 
-			<p>{config.description}</p>
+			<div class="text">{@html renderContent(config.description)}</div>
 		</div>
 
 		{#if error}
@@ -99,6 +133,11 @@
 		<Button variant="submit" on:click={handleConnect} disabled={connecting}>
 			{connecting ? config.loading : config.button}
 		</Button>
+		{#if config.helper_text}
+			<div class="helper">
+				{@html renderContent(helperTextHtml)}
+			</div>
+		{/if}
 	</div>
 </div>
 {/if}
@@ -130,14 +169,15 @@
 		margin-bottom: 2rem;
 	}
 
-	.message p {
+	.message .main,
+	.message .text {
 		margin: 0 0 1.25rem 0;
 		font-size: clamp(1rem, 3vw, 1.125rem);
 		color: #333;
 		line-height: 1.6;
 	}
 
-	.message p.main {
+	.message .main {
 		font-size: clamp(1.125rem, 3.5vw, 1.25rem);
 		font-weight: 600;
 		color: #000;
@@ -167,5 +207,11 @@
 		font-size: clamp(0.875rem, 2.5vw, 1rem);
 		margin: 1rem 0;
 		text-align: center;
+	}
+
+	.helper {
+		margin: 1rem 0 0.5rem;
+		font-size: clamp(0.875rem, 2.5vw, 1rem);
+		color: #444;
 	}
 </style>

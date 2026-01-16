@@ -16,5 +16,8 @@ export async function generateTelegramDeepLink(botName) {
 	const token = data.token;
 	const cleanBotName = (botName || '').replace('@', '');
 
-	return `https://t.me/${cleanBotName}?start=${token}`;
+	return {
+		primary: `tg://resolve?domain=${cleanBotName}&start=${token}`,
+		fallback: `https://t.me/${cleanBotName}?start=${token}`,
+	};
 }

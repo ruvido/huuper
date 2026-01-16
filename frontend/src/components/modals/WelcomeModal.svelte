@@ -1,4 +1,6 @@
 <script>
+	import { renderContent } from '../../lib/markdown';
+
 	export let show = false;
 	export let content = '';
 	export let onClose;
@@ -6,10 +8,10 @@
 
 {#if show}
 	<div class="welcome-overlay">
-		<div class="welcome-modal">
-			<div class="welcome-content" aria-live="polite">
-				{@html content}
-			</div>
+			<div class="welcome-modal">
+				<div class="welcome-content" aria-live="polite">
+					{@html renderContent(content)}
+				</div>
 			<button class="welcome-action" on:click={onClose}>
 				Ok
 			</button>

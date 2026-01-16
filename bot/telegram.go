@@ -82,6 +82,12 @@ func listenForUpdates() {
 			continue
 		}
 
+		// Handle group name change
+		if update.Message.NewChatTitle != "" {
+			updateGroupName(update.Message.Chat.ID, update.Message.NewChatTitle)
+			continue
+		}
+
 		// Handle /start command with token
 		if update.Message.IsCommand() && update.Message.Command() == "start" {
 			args := update.Message.CommandArguments()
@@ -580,5 +586,26 @@ func sendWarningMessage(chatID int64) {
 	msg := tgbotapi.NewMessage(chatID, message)
 	if _, err := bot.Send(msg); err != nil {
 		log.Printf("Failed to send warning message: %v", err)
+	}
+}
+
+func updateGroupName(chatID int64, newTitle string) {
+	chatIDStr := fmt.Sprintf("%d", chatID)
+
+	group, err := app.FindFirstRecordByFilter(
+		"groups",
+		"telegram.chat_id = {:id}",
+		map[string]any{"id": chatIDStr},
+	)
+
+	if err != nil {
+		return
+	}
+
+	group.Set("name", newTitle)
+	if err := app.Save(group); err != nil {
+		log.Printf("Failed to update group name: %v", err)
+	} else {
+		log.Printf("✓ Updated group name to '%s' (ID: %d)", newTitle, chatID)
 	}
 }

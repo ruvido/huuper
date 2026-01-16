@@ -19,6 +19,7 @@
 	let showWelcomeModal = false;
 	let welcomeContent = '';
 	let welcomeFetchInProgress = false;
+	let fallbackLink = '';
 	const WELCOME_STORAGE_KEY = 'profile_welcome_seen';
 
 	let unsubscribe;
@@ -70,8 +71,9 @@
 		error = '';
 
 		try {
-			const deepLink = await generateTelegramDeepLink(botName);
-			window.open(deepLink, '_blank');
+			const { primary, fallback } = await generateTelegramDeepLink(botName);
+			fallbackLink = fallback;
+			window.open(primary, '_blank', 'noopener');
 
 		} catch (err) {
 			error = err.message || 'Failed to connect Telegram';
@@ -165,6 +167,11 @@
 						<button class="btn-telegram" on:click={connectTelegram}>
 							Connect Telegram
 						</button>
+						{#if fallbackLink}
+							<a class="fallback" href={fallbackLink} target="_blank" rel="noopener">
+								Open in browser if the app doesn't open
+							</a>
+						{/if}
 					{/if}
 
 					{#if error}
@@ -264,6 +271,14 @@
 	.btn-telegram:hover {
 		background: #006699;
 		border-color: #006699;
+	}
+
+	.fallback {
+		display: inline-block;
+		margin-top: 0.5rem;
+		color: #000;
+		text-decoration: underline;
+		font-size: 0.9rem;
 	}
 
 

@@ -3,6 +3,7 @@
 	import Button from '../Button.svelte';
 	import ErrorMessage from '../ErrorMessage.svelte';
 	import GridSelector from '../ui/GridSelector.svelte';
+	import { renderContent } from '../../lib/markdown';
 	import { X, CheckCircle } from 'lucide-svelte';
 
 	export let step;
@@ -35,7 +36,7 @@
 			<X size={24} />
 		</button>
 		<h1>{step.title}</h1>
-		<p class="start-text">{@html step.text}</p>
+		<div class="start-text">{@html renderContent(step.text)}</div>
 		<Button variant="submit" on:click={onNext}>
 			{step.button}
 		</Button>
