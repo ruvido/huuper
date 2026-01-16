@@ -61,7 +61,7 @@ func GenerateTelegramTokenHandler(app *pocketbase.PocketBase) func(e *core.Reque
 		}
 
 		// Clean up expired tokens (older than 24 hours)
-		go cleanupExpiredTokens(app)
+		cleanupExpiredTokens(app)
 
 		return e.JSON(http.StatusOK, map[string]interface{}{
 			"token": token,
@@ -69,9 +69,9 @@ func GenerateTelegramTokenHandler(app *pocketbase.PocketBase) func(e *core.Reque
 	}
 }
 
-// cleanupExpiredTokens removes tokens older than 24 hours
+// cleanupExpiredTokens removes tokens older than 7 days
 func cleanupExpiredTokens(app *pocketbase.PocketBase) {
-	cutoff := time.Now().Add(-24 * time.Hour)
+	cutoff := time.Now().Add(-7 * 24 * time.Hour)
 
 	records, err := app.FindRecordsByFilter(
 		"tokens",

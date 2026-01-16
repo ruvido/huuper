@@ -15,6 +15,7 @@
 	let menuOpen = false;
 	let authReady = false;
 	let renderReady = false;
+	let appTitle = 'Members';
 	const version = __APP_VERSION__;
 
 	// Refresh auth on app load to sync with server
@@ -24,7 +25,8 @@
 			if (response.ok) {
 				const data = await response.json();
 				if (data?.data?.name) {
-					document.title = data.data.name;
+					appTitle = data.data.name;
+					document.title = appTitle;
 				}
 			}
 		} catch (err) {
@@ -81,7 +83,7 @@
 {#if renderReady}
 	<!-- Header: only visible when authenticated and not on onboarding/pending-approval/telegram-connect -->
 	{#if $isAuthenticated && $currentRoute.startsWith('app/')}
-		<Header onMenuClick={toggleMenu} />
+		<Header onMenuClick={toggleMenu} title={appTitle} />
 		<Menu isOpen={menuOpen} onClose={closeMenu} />
 	{/if}
 

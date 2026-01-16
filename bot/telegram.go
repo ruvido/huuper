@@ -54,8 +54,20 @@ func StartTelegramBot(pbApp *pocketbase.PocketBase) error {
 
 	// Start listening for updates
 	go listenForUpdates()
+	// Catch-up for group names when the app was offline.
+	go syncGroupNames()
 
 	return nil
+}
+
+// StopTelegramBot stops the update receiver if it is running.
+func StopTelegramBot() {
+	if bot == nil {
+		return
+	}
+
+	bot.StopReceivingUpdates()
+	log.Printf("Telegram bot stopped")
 }
 
 func listenForUpdates() {
@@ -102,6 +114,49 @@ func listenForUpdates() {
 		// Handle private messages (non-commands)
 		if update.Message.Chat.IsPrivate() && !update.Message.IsCommand() {
 			handlePrivateMessage(update.Message)
+		}
+	}
+}
+
+func syncGroupNames() {
+	groups, err := app.FindRecordsByFilter("groups", "type = 'telegram'", "", 0, 0)
+	if err != nil {
+		return
+	}
+
+	for _, group := range groups {
+		var telegramGroupData struct {
+			ChatID string `json:"chat_id"`
+		}
+		if err := group.UnmarshalJSONField("telegram", &telegramGroupData); err != nil {
+			continue
+		}
+		if telegramGroupData.ChatID == "" {
+			continue
+		}
+
+		var chatID int64
+		fmt.Sscanf(telegramGroupData.ChatID, "%d", &chatID)
+		if chatID == 0 {
+			continue
+		}
+
+		chat, err := bot.GetChat(tgbotapi.ChatInfoConfig{
+			ChatConfig: tgbotapi.ChatConfig{ChatID: chatID},
+		})
+		if err != nil || chat.Title == "" {
+			continue
+		}
+
+		if group.GetString("name") == chat.Title {
+			continue
+		}
+
+		group.Set("name", chat.Title)
+		if err := app.Save(group); err != nil {
+			log.Printf("Failed to sync group name: %v", err)
+		} else {
+			log.Printf("✓ Synced group name to '%s' (ID: %d)", chat.Title, chatID)
 		}
 	}
 }
