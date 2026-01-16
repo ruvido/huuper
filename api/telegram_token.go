@@ -33,6 +33,23 @@ func GenerateTelegramTokenHandler(app *pocketbase.PocketBase) func(e *core.Reque
 			return apis.NewNotFoundError("Tokens collection not found", err)
 		}
 
+		// Invalidate previous tokens for this user/service
+		oldTokens, err := app.FindRecordsByFilter(
+			"tokens",
+			"user = {:user} && service = 'telegram'",
+			"",
+			0,
+			0,
+			map[string]any{
+				"user": authRecord.Id,
+			},
+		)
+		if err == nil {
+			for _, oldToken := range oldTokens {
+				app.Delete(oldToken)
+			}
+		}
+
 		// Create token record
 		tokenRecord := core.NewRecord(tokensCollection)
 		tokenRecord.Set("token", token)
