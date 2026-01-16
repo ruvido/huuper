@@ -29,12 +29,16 @@ fi
 # Parse command
 case "${1:-}" in
     build)
+        info "Building frontend..."
+        cd frontend && npm run build && cd ..
         info "Building Docker image..."
         docker compose build
         info "Build completed successfully!"
         ;;
 
     up)
+        info "Building frontend..."
+        cd frontend && npm run build && cd ..
         info "Starting services..."
         docker compose up -d
         info "Services started!"
@@ -60,6 +64,8 @@ case "${1:-}" in
     rebuild)
         info "Rebuilding and restarting..."
         docker compose down
+        info "Building frontend..."
+        cd frontend && npm run build && cd ..
         docker compose build --no-cache
         docker compose up -d
         info "Rebuild completed!"
