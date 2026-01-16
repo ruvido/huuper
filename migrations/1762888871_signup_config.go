@@ -1,8 +1,6 @@
 package migrations
 
 import (
-	"encoding/json"
-
 	"github.com/pocketbase/pocketbase/core"
 	m "github.com/pocketbase/pocketbase/migrations"
 )
@@ -15,19 +13,16 @@ func init() {
 			return err
 		}
 
-		// Delete existing signup config if it exists
+		// Create signup multistep config if missing
 		existingRecord, err := app.FindFirstRecordByFilter(
 			"settings",
 			"name = 'signup'",
 			map[string]any{},
 		)
 		if err == nil && existingRecord != nil {
-			if err := app.Delete(existingRecord); err != nil {
-				return err
-			}
+			return nil
 		}
 
-		// Create signup multistep config
 		signupConfig := map[string]any{
 			"steps": []map[string]any{
 				{
@@ -72,11 +67,9 @@ func init() {
 			},
 		}
 
-		signupJSON, _ := json.Marshal(signupConfig)
-
 		signupRecord := core.NewRecord(settings)
 		signupRecord.Set("name", "signup")
-		signupRecord.Set("data", string(signupJSON))
+		signupRecord.Set("data", signupConfig)
 		if err := app.Save(signupRecord); err != nil {
 			return err
 		}

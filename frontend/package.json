@@ -21,6 +21,7 @@
     "browser-image-compression": "^2.0.2",
     "compressorjs": "^1.2.1",
     "lucide-svelte": "^0.553.0",
+    "marked": "^15.0.2",
     "pica": "^9.0.1",
     "pocketbase": "^0.26.3",
     "svelte-easy-crop": "^5.0.0"

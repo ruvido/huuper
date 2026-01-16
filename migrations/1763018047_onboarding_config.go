@@ -1,8 +1,6 @@
 package migrations
 
 import (
-	"encoding/json"
-
 	"github.com/pocketbase/pocketbase/core"
 	m "github.com/pocketbase/pocketbase/migrations"
 )
@@ -15,31 +13,16 @@ func init() {
 			return err
 		}
 
-		// Delete existing signup config if it exists (cleanup old config)
-		existingSignup, err := app.FindFirstRecordByFilter(
-			"settings",
-			"name = 'signup'",
-			map[string]any{},
-		)
-		if err == nil && existingSignup != nil {
-			if err := app.Delete(existingSignup); err != nil {
-				return err
-			}
-		}
-
-		// Delete existing onboarding config if it exists
+		// Create onboarding multistep config if missing
 		existingOnboarding, err := app.FindFirstRecordByFilter(
 			"settings",
 			"name = 'onboarding'",
 			map[string]any{},
 		)
 		if err == nil && existingOnboarding != nil {
-			if err := app.Delete(existingOnboarding); err != nil {
-				return err
-			}
+			return nil
 		}
 
-		// Create onboarding multistep config
 		onboardingConfig := map[string]any{
 			"steps": []map[string]any{
 				{
@@ -59,9 +42,10 @@ func init() {
 				{
 					"id":      "hobbies",
 					"title":   "I tuoi interessi",
-					"type":    "checkboxes",
+					"type":    "select",
 					"field":   "hobbies",
 					"label":   "Seleziona i tuoi interessi",
+					"min":     1,
 					"options": []string{
 						"Musica",
 						"Sport",
@@ -78,14 +62,19 @@ func init() {
 					"field": "avatar",
 					"label": "Carica la tua foto profilo",
 				},
+				{
+					"id":     "confirmation",
+					"type":   "confirmation",
+					"title":  "Tutto pronto!",
+					"text":   "Hai completato il tuo profilo.\n\nClicca il pulsante per inviare la tua richiesta di iscrizione.",
+					"button": "Iscriviti!",
+				},
 			},
 		}
 
-		onboardingJSON, _ := json.Marshal(onboardingConfig)
-
 		onboardingRecord := core.NewRecord(settings)
 		onboardingRecord.Set("name", "onboarding")
-		onboardingRecord.Set("data", string(onboardingJSON))
+		onboardingRecord.Set("data", onboardingConfig)
 		if err := app.Save(onboardingRecord); err != nil {
 			return err
 		}

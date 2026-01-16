@@ -16,6 +16,9 @@ func GenerateTelegramTokenHandler(app *pocketbase.PocketBase) func(e *core.Reque
 	return func(e *core.RequestEvent) error {
 		// Get authenticated user
 		authRecord := e.Auth
+		if authRecord == nil {
+			return apis.NewUnauthorizedError("Unauthorized", nil)
+		}
 
 		// Generate cryptographically secure random token
 		bytes := make([]byte, 32)
@@ -30,6 +33,23 @@ func GenerateTelegramTokenHandler(app *pocketbase.PocketBase) func(e *core.Reque
 			return apis.NewNotFoundError("Tokens collection not found", err)
 		}
 
+		// Invalidate previous tokens for this user/service
+		oldTokens, err := app.FindRecordsByFilter(
+			"tokens",
+			"user = {:user} && service = 'telegram'",
+			"",
+			0,
+			0,
+			map[string]any{
+				"user": authRecord.Id,
+			},
+		)
+		if err == nil {
+			for _, oldToken := range oldTokens {
+				app.Delete(oldToken)
+			}
+		}
+
 		// Create token record
 		tokenRecord := core.NewRecord(tokensCollection)
 		tokenRecord.Set("token", token)
@@ -41,7 +61,7 @@ func GenerateTelegramTokenHandler(app *pocketbase.PocketBase) func(e *core.Reque
 		}
 
 		// Clean up expired tokens (older than 24 hours)
-		go cleanupExpiredTokens(app)
+		cleanupExpiredTokens(app)
 
 		return e.JSON(http.StatusOK, map[string]interface{}{
 			"token": token,
@@ -49,9 +69,9 @@ func GenerateTelegramTokenHandler(app *pocketbase.PocketBase) func(e *core.Reque
 	}
 }
 
-// cleanupExpiredTokens removes tokens older than 24 hours
+// cleanupExpiredTokens removes tokens older than 7 days
 func cleanupExpiredTokens(app *pocketbase.PocketBase) {
-	cutoff := time.Now().Add(-24 * time.Hour)
+	cutoff := time.Now().Add(-7 * 24 * time.Hour)
 
 	records, err := app.FindRecordsByFilter(
 		"tokens",

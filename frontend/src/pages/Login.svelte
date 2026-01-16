@@ -27,7 +27,7 @@
 		try {
 			await pb.collection('users').authWithPassword(email, password);
 			// Navigate to profile - global guard in App.svelte will handle onboarding redirect if needed
-			navigate('profile');
+			navigate('app/profile');
 		} catch (err) {
 			// Parse PocketBase errors - err.data is alias for err.response
 			if (err.status === 400) {

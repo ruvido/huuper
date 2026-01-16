@@ -1,10 +1,13 @@
 <script>
 	import { onMount, onDestroy } from 'svelte';
-	import { pb } from '../lib/pocketbase';
+	import { pb, fetchSetting } from '../lib/pocketbase';
+	import { generateTelegramDeepLink } from '../lib/telegram';
 	import { navigate } from '../lib/router';
 	import DashboardLayout from '../components/DashboardLayout.svelte';
 	import Card from '../components/Card.svelte';
 	import Button from '../components/Button.svelte';
+	import WelcomeModal from '../components/modals/WelcomeModal.svelte';
+	import AccountStatusCard from '../components/cards/AccountStatusCard.svelte';
 	import { Clock, Check, X } from 'lucide-svelte';
 
 	let user = pb.authStore.record;
@@ -16,6 +19,7 @@
 	let showWelcomeModal = false;
 	let welcomeContent = '';
 	let welcomeFetchInProgress = false;
+	let fallbackLink = '';
 	const WELCOME_STORAGE_KEY = 'profile_welcome_seen';
 
 	let unsubscribe;
@@ -34,7 +38,7 @@
 		maybeShowWelcomePopup();
 
 		try {
-			const response = await fetch('/api/settings/telegram');
+			const response = await fetchSetting('telegram');
 			if (response.ok) {
 				const data = await response.json();
 				botName = data.data.name;
@@ -67,23 +71,9 @@
 		error = '';
 
 		try {
-			const response = await fetch('/api/telegram/generate-token', {
-				method: 'POST',
-				headers: {
-					'Authorization': pb.authStore.token,
-				},
-			});
-
-			if (!response.ok) {
-				throw new Error('Failed to generate connection token');
-			}
-
-			const data = await response.json();
-			const token = data.token;
-
-			const cleanBotName = botName.replace('@', '');
-			const deepLink = `https://t.me/${cleanBotName}?start=${token}`;
-			window.open(deepLink, '_blank');
+			const { primary, fallback } = await generateTelegramDeepLink(botName);
+			fallbackLink = fallback;
+			window.open(primary, '_blank', 'noopener');
 
 		} catch (err) {
 			error = err.message || 'Failed to connect Telegram';
@@ -92,7 +82,7 @@
 	}
 
 	function goToGroups() {
-		navigate('groups');
+		navigate('app/groups');
 	}
 
 	function hasSeenWelcome() {
@@ -110,7 +100,7 @@
 		welcomeFetchInProgress = true;
 
 		try {
-			const response = await fetch('/api/settings/welcome');
+			const response = await fetchSetting('welcome');
 			if (!response.ok) return;
 			const data = await response.json();
 			const content = data?.data?.content;
@@ -150,20 +140,7 @@
 		{/if}
 	</Card>
 
-	<Card>
-		<h3 class="section-title">Account Status</h3>
-
-		{#if userStatus === 'pending'}
-			<div class="status-pending">
-				<p class="pending-message"><Clock size={20} /> In attesa di approvazione</p>
-				<p class="help-text">Il tuo account è in attesa di essere approvato da un amministratore.</p>
-			</div>
-		{:else}
-			<div class="status-active">
-				<p class="active-message"><Check size={20} /> Account attivo</p>
-			</div>
-		{/if}
-	</Card>
+	<AccountStatusCard status={userStatus} />
 
 	{#if userStatus === 'active'}
 		<Card>
@@ -190,6 +167,11 @@
 						<button class="btn-telegram" on:click={connectTelegram}>
 							Connect Telegram
 						</button>
+						{#if fallbackLink}
+							<a class="fallback" href={fallbackLink} target="_blank" rel="noopener">
+								Open in browser if the app doesn't open
+							</a>
+						{/if}
 					{/if}
 
 					{#if error}
@@ -204,18 +186,11 @@
 		View Groups
 	</Button>
 
-		{#if showWelcomeModal}
-			<div class="welcome-overlay">
-				<div class="welcome-modal">
-					<div class="welcome-content" aria-live="polite">
-						{@html welcomeContent}
-					</div>
-				<button class="welcome-action" on:click={closeWelcomeModal}>
-					Ok
-				</button>
-			</div>
-		</div>
-	{/if}
+	<WelcomeModal
+		show={showWelcomeModal}
+		content={welcomeContent}
+		onClose={closeWelcomeModal}
+	/>
 </DashboardLayout>
 
 <style>
@@ -298,53 +273,14 @@
 		border-color: #006699;
 	}
 
-	.welcome-overlay {
-		position: fixed;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		background: rgba(0, 0, 0, 0.6);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding: 1.5rem;
-		z-index: 2000;
-	}
-
-	.welcome-modal {
-		background: #fff;
-		border: 2px solid #000;
-		max-width: 28rem;
-		width: 100%;
-		padding: clamp(1.25rem, 4vw, 2rem);
-		position: relative;
-		box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
-	}
-
-	.welcome-content {
-		max-height: 50vh;
-		overflow-y: auto;
-		font-size: clamp(0.95rem, 3vw, 1rem);
+	.fallback {
+		display: inline-block;
+		margin-top: 0.5rem;
 		color: #000;
-		line-height: 1.5;
-		margin-bottom: 1.5rem;
+		text-decoration: underline;
+		font-size: 0.9rem;
 	}
 
-	.welcome-action {
-		width: 100%;
-		padding: 0.85rem;
-		background: #000;
-		color: #fff;
-		border: 2px solid #000;
-		font-size: 1rem;
-		font-weight: 600;
-		cursor: pointer;
-	}
-
-	.welcome-action:hover {
-		background: #333;
-	}
 
 	.connecting-message {
 		font-weight: 600;
@@ -362,22 +298,4 @@
 		margin-top: clamp(1rem, 3vw, 1.5rem) !important;
 	}
 
-	.status-pending,
-	.status-active {
-		text-align: center;
-	}
-
-	.pending-message {
-		font-weight: 600;
-		color: #ff8c00;
-		font-size: clamp(1rem, 3vw, 1.125rem);
-		margin: 0 0 clamp(0.5rem, 2vw, 0.75rem) 0;
-	}
-
-	.active-message {
-		font-weight: 600;
-		color: #008000;
-		font-size: clamp(1rem, 3vw, 1.125rem);
-		margin: 0;
-	}
 </style>
