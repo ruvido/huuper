@@ -1,9 +1,10 @@
 <script>
 	export let onMenuClick;
+	export let title = '';
 </script>
 
 <header class="header">
-	<h1 class="app-name">Members</h1>
+	<h1 class="app-name">{title}</h1>
 	<button class="hamburger" on:click={onMenuClick} aria-label="Menu">
 		<span class="hamburger-line"></span>
 		<span class="hamburger-line"></span>
@@ -25,7 +26,6 @@
 		align-items: center;
 		padding: 0 1rem;
 		background: #fff;
-		border-bottom: 2px solid #000;
 		z-index: 100;
 	}
 

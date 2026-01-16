@@ -1,7 +1,9 @@
 <script>
 	import { onMount, onDestroy } from 'svelte';
-	import { pb } from '../lib/pocketbase';
+	import { pb, fetchSetting } from '../lib/pocketbase';
+	import { generateTelegramDeepLink } from '../lib/telegram';
 	import { navigate } from '../lib/router';
+	import { renderContent } from '../lib/markdown';
 	import Button from '../components/Button.svelte';
 	import { X } from 'lucide-svelte';
 
@@ -10,11 +12,14 @@
 	let botName = '';
 	let unsubscribe;
 	let config = null;
+	let primaryLink = '';
+	let fallbackLink = '';
+	let helperTextHtml = '';
 
 	onMount(async () => {
 		// Fetch bot name
 		try {
-			const response = await fetch('/api/settings/telegram');
+			const response = await fetchSetting('telegram');
 			if (response.ok) {
 				const data = await response.json();
 				botName = data.data.name;
@@ -25,13 +30,18 @@
 
 		// Fetch telegram_connect config
 		try {
-			const response = await fetch('/api/settings/telegram_connect');
+			const response = await fetchSetting('telegram_connect');
 			if (response.ok) {
 				const data = await response.json();
 				config = data.data;
 			}
 		} catch (err) {
 			// Silently fail
+		}
+
+		// Pre-generate links so the fallback is always visible
+		if (botName) {
+			await prepareLinks();
 		}
 
 		// Subscribe to user changes to detect when Telegram is connected
@@ -43,7 +53,7 @@
 					// Telegram connected! Sync to authStore immediately (official PocketBase pattern)
 					pb.authStore.save(pb.authStore.token, e.record);
 					// Now navigate - authStore updated synchronously
-					navigate('profile');
+					navigate('app/profile');
 				}
 			});
 		} catch (err) {
@@ -67,28 +77,38 @@
 		error = '';
 
 		try {
-			const response = await fetch('/api/telegram/generate-token', {
-				method: 'POST',
-				headers: {
-					'Authorization': pb.authStore.token,
-				},
-			});
-
-			if (!response.ok) {
-				throw new Error('Failed to generate connection token');
+			if (!primaryLink || !fallbackLink) {
+				await prepareLinks();
 			}
-
-			const data = await response.json();
-			const token = data.token;
-
-			const cleanBotName = botName.replace('@', '');
-			const deepLink = `https://t.me/${cleanBotName}?start=${token}`;
-			window.location.href = deepLink;
+			if (!primaryLink) {
+				throw new Error('Missing Telegram link');
+			}
+			window.open(primaryLink, '_blank', 'noopener');
 
 		} catch (err) {
 			error = err.message || 'Failed to connect Telegram';
 			connecting = false;
 		}
+	}
+
+	async function prepareLinks() {
+		const { primary, fallback } = await generateTelegramDeepLink(botName);
+		primaryLink = primary;
+		fallbackLink = fallback;
+		updateHelperText();
+	}
+
+	function updateHelperText() {
+		if (!config?.helper_text) {
+			helperTextHtml = '';
+			return;
+		}
+		const linkValue = fallbackLink || '#';
+		helperTextHtml = config.helper_text.replaceAll('{fallback_link}', linkValue);
+	}
+
+	$: if (config && fallbackLink) {
+		updateHelperText();
 	}
 </script>
 
@@ -101,9 +121,9 @@
 		<h1>{config.title}</h1>
 
 		<div class="message">
-			<p class="main">{config.main_text}</p>
+			<div class="main">{@html renderContent(config.main_text)}</div>
 
-			<p>{config.description}</p>
+			<div class="text">{@html renderContent(config.description)}</div>
 		</div>
 
 		{#if error}
@@ -113,6 +133,11 @@
 		<Button variant="submit" on:click={handleConnect} disabled={connecting}>
 			{connecting ? config.loading : config.button}
 		</Button>
+		{#if config.helper_text}
+			<div class="helper">
+				{@html renderContent(helperTextHtml)}
+			</div>
+		{/if}
 	</div>
 </div>
 {/if}
@@ -144,14 +169,15 @@
 		margin-bottom: 2rem;
 	}
 
-	.message p {
+	.message .main,
+	.message .text {
 		margin: 0 0 1.25rem 0;
 		font-size: clamp(1rem, 3vw, 1.125rem);
 		color: #333;
 		line-height: 1.6;
 	}
 
-	.message p.main {
+	.message .main {
 		font-size: clamp(1.125rem, 3.5vw, 1.25rem);
 		font-weight: 600;
 		color: #000;
@@ -181,5 +207,11 @@
 		font-size: clamp(0.875rem, 2.5vw, 1rem);
 		margin: 1rem 0;
 		text-align: center;
+	}
+
+	.helper {
+		margin: 1rem 0 0.5rem;
+		font-size: clamp(0.875rem, 2.5vw, 1rem);
+		color: #444;
 	}
 </style>

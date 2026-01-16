@@ -12,3 +12,11 @@ pb.authStore.onChange(() => {
 	isAuthenticated.set(pb.authStore.isValid);
 	authRecord.set(pb.authStore.record);
 });
+
+export function fetchSetting(name) {
+	return fetch(`/api/settings/${name}`, {
+		headers: {
+			Authorization: pb.authStore.token,
+		},
+	});
+}

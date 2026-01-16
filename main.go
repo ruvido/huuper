@@ -24,6 +24,11 @@ func init() {
 func main() {
 	app := pocketbase.New()
 
+	app.OnTerminate().BindFunc(func(e *core.TerminateEvent) error {
+		bot.StopTelegramBot()
+		return e.Next()
+	})
+
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
 		// Start Telegram bot
 		if err := bot.StartTelegramBot(app); err != nil {

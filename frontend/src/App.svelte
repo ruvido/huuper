@@ -1,12 +1,11 @@
 <script>
 	import { onMount } from 'svelte';
-	import { isAuthenticated, pb, authRecord } from './lib/pocketbase';
-	import { currentRoute, navigate, queryParams } from './lib/router';
+	import { isAuthenticated, pb, authRecord, fetchSetting } from './lib/pocketbase';
+	import { currentRoute, navigate, queryParams, getTargetRoute } from './lib/router';
 	import Header from './components/Header.svelte';
 	import Menu from './components/Menu.svelte';
 	import Login from './pages/Login.svelte';
-	import Signup from './pages/Signup.svelte';
-	import SignupDirect from './pages/SignupDirect.svelte';
+	import Signup from './pages/SignupDirect.svelte';
 	import Onboarding from './pages/Onboarding.svelte';
 	import PendingApproval from './pages/PendingApproval.svelte';
 	import TelegramConnect from './pages/TelegramConnect.svelte';
@@ -16,16 +15,18 @@
 	let menuOpen = false;
 	let authReady = false;
 	let renderReady = false;
+	let appTitle = 'Members';
 	const version = __APP_VERSION__;
 
 	// Refresh auth on app load to sync with server
 	onMount(async () => {
 		try {
-			const response = await fetch('/api/settings/title');
+			const response = await fetchSetting('title');
 			if (response.ok) {
 				const data = await response.json();
 				if (data?.data?.name) {
-					document.title = data.data.name;
+					appTitle = data.data.name;
+					document.title = appTitle;
 				}
 			}
 		} catch (err) {
@@ -52,45 +53,10 @@
 	$: if (authReady && !renderReady) {
 		let shouldRedirect = false;
 
-		if (!$isAuthenticated) {
-			// Not authenticated → login/signup/signup-direct only
-			if ($currentRoute !== 'login' && $currentRoute !== 'signup' && $currentRoute !== 'signup-direct') {
-				navigate('login');
-				shouldRedirect = true;
-			}
-		} else {
-			// Authenticated → check status + data + telegram
-			const user = $authRecord;
-			const status = user?.status;
-			const hasData = user?.data && Object.keys(user.data).length > 0;
-			const hasTelegram = user?.telegram && Object.keys(user.telegram).length > 0;
-
-			if (status === 'pending') {
-				// Pending users: onboarding → pending-approval
-				if (!hasData && $currentRoute !== 'onboarding') {
-					navigate('onboarding');
-					shouldRedirect = true;
-				} else if (hasData && $currentRoute !== 'pending-approval') {
-					navigate('pending-approval');
-					shouldRedirect = true;
-				}
-			} else if (status === 'active') {
-				// Active users: cannot stay on pending-approval
-				if ($currentRoute === 'pending-approval') {
-					navigate('profile');
-					shouldRedirect = true;
-				}
-				// Active users without data: onboarding required
-				else if (!hasData && $currentRoute !== 'onboarding') {
-					navigate('onboarding');
-					shouldRedirect = true;
-				}
-				// Active users with data but no telegram: telegram-connect required
-				else if (hasData && !hasTelegram && $currentRoute !== 'telegram-connect') {
-					navigate('telegram-connect');
-					shouldRedirect = true;
-				}
-			}
+		const targetRoute = getTargetRoute($isAuthenticated, $authRecord, $currentRoute);
+		if (targetRoute !== $currentRoute) {
+			navigate(targetRoute);
+			shouldRedirect = true;
 		}
 
 		// Only allow render if NOT redirecting
@@ -116,8 +82,8 @@
 <!-- Only render when guards have validated -->
 {#if renderReady}
 	<!-- Header: only visible when authenticated and not on onboarding/pending-approval/telegram-connect -->
-	{#if $isAuthenticated && !['onboarding', 'pending-approval', 'telegram-connect'].includes($currentRoute)}
-		<Header onMenuClick={toggleMenu} />
+	{#if $isAuthenticated && $currentRoute.startsWith('app/')}
+		<Header onMenuClick={toggleMenu} title={appTitle} />
 		<Menu isOpen={menuOpen} onClose={closeMenu} />
 	{/if}
 
@@ -127,16 +93,16 @@
 		{:else if $currentRoute === 'signup'}
 			<Signup />
 		{:else if $currentRoute === 'signup-direct'}
-			<SignupDirect />
+			<Signup defaultStatus="active" showFooter={false} pageTitle="Sign Up (beta direct)" />
 		{:else if $currentRoute === 'onboarding'}
 			<Onboarding />
 		{:else if $currentRoute === 'pending-approval'}
 			<PendingApproval />
 		{:else if $currentRoute === 'telegram-connect'}
 			<TelegramConnect />
-		{:else if $currentRoute === 'profile'}
+		{:else if $currentRoute === 'app/profile'}
 			<Profile />
-		{:else if $currentRoute === 'groups'}
+		{:else if $currentRoute === 'app/groups'}
 			<Groups />
 		{:else}
 			<Login />

@@ -54,8 +54,20 @@ func StartTelegramBot(pbApp *pocketbase.PocketBase) error {
 
 	// Start listening for updates
 	go listenForUpdates()
+	// Catch-up for group names when the app was offline.
+	go syncGroupNames()
 
 	return nil
+}
+
+// StopTelegramBot stops the update receiver if it is running.
+func StopTelegramBot() {
+	if bot == nil {
+		return
+	}
+
+	bot.StopReceivingUpdates()
+	log.Printf("Telegram bot stopped")
 }
 
 func listenForUpdates() {
@@ -82,10 +94,18 @@ func listenForUpdates() {
 			continue
 		}
 
+		// Handle group name change
+		if update.Message.NewChatTitle != "" {
+			updateGroupName(update.Message.Chat.ID, update.Message.NewChatTitle)
+			continue
+		}
+
 		// Handle /start command with token
 		if update.Message.IsCommand() && update.Message.Command() == "start" {
 			args := update.Message.CommandArguments()
-			if args != "" {
+			if args == "" {
+				sendWarningMessage(update.Message.Chat.ID)
+			} else {
 				handleStartCommand(update.Message, args)
 			}
 			continue
@@ -94,6 +114,49 @@ func listenForUpdates() {
 		// Handle private messages (non-commands)
 		if update.Message.Chat.IsPrivate() && !update.Message.IsCommand() {
 			handlePrivateMessage(update.Message)
+		}
+	}
+}
+
+func syncGroupNames() {
+	groups, err := app.FindRecordsByFilter("groups", "type = 'telegram'", "", 0, 0)
+	if err != nil {
+		return
+	}
+
+	for _, group := range groups {
+		var telegramGroupData struct {
+			ChatID string `json:"chat_id"`
+		}
+		if err := group.UnmarshalJSONField("telegram", &telegramGroupData); err != nil {
+			continue
+		}
+		if telegramGroupData.ChatID == "" {
+			continue
+		}
+
+		var chatID int64
+		fmt.Sscanf(telegramGroupData.ChatID, "%d", &chatID)
+		if chatID == 0 {
+			continue
+		}
+
+		chat, err := bot.GetChat(tgbotapi.ChatInfoConfig{
+			ChatConfig: tgbotapi.ChatConfig{ChatID: chatID},
+		})
+		if err != nil || chat.Title == "" {
+			continue
+		}
+
+		if group.GetString("name") == chat.Title {
+			continue
+		}
+
+		group.Set("name", chat.Title)
+		if err := app.Save(group); err != nil {
+			log.Printf("Failed to sync group name: %v", err)
+		} else {
+			log.Printf("✓ Synced group name to '%s' (ID: %d)", chat.Title, chatID)
 		}
 	}
 }
@@ -528,63 +591,76 @@ func sendWelcomeMessage(chatID int64) {
 }
 
 func handlePrivateMessage(message *tgbotapi.Message) {
-	// Check if user's telegram ID is in database
-	user, err := app.FindFirstRecordByFilter(
-		"users",
-		"telegram.id = {:id}",
-		map[string]any{"id": message.From.ID},
-	)
+	sendWarningMessage(message.Chat.ID)
+}
 
+func sendWarningMessage(chatID int64) {
 	// Get URL from settings
-	urlRecord, err2 := app.FindFirstRecordByFilter(
+	urlRecord, err := app.FindFirstRecordByFilter(
 		"settings",
 		"name = 'url'",
 		map[string]any{},
 	)
-	if err2 != nil {
-		log.Printf("Failed to get URL settings: %v", err2)
+	if err != nil {
+		log.Printf("Failed to get URL settings: %v", err)
 		return
 	}
 
 	var urlData struct {
 		Address string `json:"address"`
 	}
-	if err2 := urlRecord.UnmarshalJSONField("data", &urlData); err2 != nil {
-		log.Printf("Failed to parse URL settings: %v", err2)
+	if err := urlRecord.UnmarshalJSONField("data", &urlData); err != nil {
+		log.Printf("Failed to parse URL settings: %v", err)
 		return
 	}
 
-	// Get bot messages from settings
-	messagesRecord, err3 := app.FindFirstRecordByFilter(
+	// Get warning message from settings
+	messagesRecord, err := app.FindFirstRecordByFilter(
 		"settings",
 		"name = 'bot_messages'",
 		map[string]any{},
 	)
-	if err3 != nil {
-		log.Printf("Failed to get bot messages settings: %v", err3)
+	if err != nil {
+		log.Printf("Failed to get bot messages settings: %v", err)
 		return
 	}
 
 	var messagesData struct {
-		NotRegistered string `json:"not_registered"`
-		Registered    string `json:"registered"`
+		Warning string `json:"warning"`
 	}
-	if err3 := messagesRecord.UnmarshalJSONField("data", &messagesData); err3 != nil {
-		log.Printf("Failed to parse bot messages settings: %v", err3)
+	if err := messagesRecord.UnmarshalJSONField("data", &messagesData); err != nil {
+		log.Printf("Failed to parse bot messages settings: %v", err)
 		return
 	}
 
-	var responseMsg string
-	if err != nil || user == nil {
-		// User not found
-		responseMsg = strings.ReplaceAll(messagesData.NotRegistered, "{url}", urlData.Address)
-	} else {
-		// User found
-		responseMsg = strings.ReplaceAll(messagesData.Registered, "{url}", urlData.Address)
+	message := strings.ReplaceAll(messagesData.Warning, "{url}", urlData.Address)
+	if message == "" {
+		return
 	}
 
-	msg := tgbotapi.NewMessage(message.Chat.ID, responseMsg)
+	msg := tgbotapi.NewMessage(chatID, message)
 	if _, err := bot.Send(msg); err != nil {
-		log.Printf("Failed to send private message reply: %v", err)
+		log.Printf("Failed to send warning message: %v", err)
+	}
+}
+
+func updateGroupName(chatID int64, newTitle string) {
+	chatIDStr := fmt.Sprintf("%d", chatID)
+
+	group, err := app.FindFirstRecordByFilter(
+		"groups",
+		"telegram.chat_id = {:id}",
+		map[string]any{"id": chatIDStr},
+	)
+
+	if err != nil {
+		return
+	}
+
+	group.Set("name", newTitle)
+	if err := app.Save(group); err != nil {
+		log.Printf("Failed to update group name: %v", err)
+	} else {
+		log.Printf("✓ Updated group name to '%s' (ID: %d)", newTitle, chatID)
 	}
 }

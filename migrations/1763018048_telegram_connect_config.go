@@ -1,8 +1,6 @@
 package migrations
 
 import (
-	"encoding/json"
-
 	"github.com/pocketbase/pocketbase/core"
 	m "github.com/pocketbase/pocketbase/migrations"
 )
@@ -15,19 +13,16 @@ func init() {
 			return err
 		}
 
-		// Delete existing telegram_connect config if it exists
+		// Create telegram_connect config if missing
 		existing, err := app.FindFirstRecordByFilter(
 			"settings",
 			"name = 'telegram_connect'",
 			map[string]any{},
 		)
 		if err == nil && existing != nil {
-			if err := app.Delete(existing); err != nil {
-				return err
-			}
+			return nil
 		}
 
-		// Create telegram_connect config
 		config := map[string]any{
 			"title":       "Connetti Telegram",
 			"main_text":   "Per accedere ai gruppi devi connettere il tuo account Telegram.",
@@ -36,11 +31,9 @@ func init() {
 			"loading":     "CONNESSIONE...",
 		}
 
-		configJSON, _ := json.Marshal(config)
-
 		record := core.NewRecord(settings)
 		record.Set("name", "telegram_connect")
-		record.Set("data", string(configJSON))
+		record.Set("data", config)
 		if err := app.Save(record); err != nil {
 			return err
 		}
