@@ -16,6 +16,9 @@ func GenerateTelegramTokenHandler(app *pocketbase.PocketBase) func(e *core.Reque
 	return func(e *core.RequestEvent) error {
 		// Get authenticated user
 		authRecord := e.Auth
+		if authRecord == nil {
+			return apis.NewUnauthorizedError("Unauthorized", nil)
+		}
 
 		// Generate cryptographically secure random token
 		bytes := make([]byte, 32)

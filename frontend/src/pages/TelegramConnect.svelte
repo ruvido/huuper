@@ -69,7 +69,7 @@
 
 		try {
 			const deepLink = await generateTelegramDeepLink(botName);
-			window.location.href = deepLink;
+			window.open(deepLink, '_blank', 'noopener');
 
 		} catch (err) {
 			error = err.message || 'Failed to connect Telegram';
