@@ -2,7 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { pb, fetchSetting } from '../lib/pocketbase';
 	import { generateTelegramDeepLink } from '../lib/telegram';
-	import { navigate } from '../lib/router';
+	import { navigate, defaultAppRoute } from '../lib/router';
 	import { renderContent } from '../lib/markdown';
 	import Button from '../components/Button.svelte';
 	import { X } from 'lucide-svelte';
@@ -53,7 +53,7 @@
 					// Telegram connected! Sync to authStore immediately (official PocketBase pattern)
 					pb.authStore.save(pb.authStore.token, e.record);
 					// Now navigate - authStore updated synchronously
-					navigate('app/profile');
+					navigate(defaultAppRoute);
 				}
 			});
 		} catch (err) {

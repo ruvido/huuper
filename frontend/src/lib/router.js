@@ -6,8 +6,8 @@ export const queryParams = writable({});
 const publicRoutes = ['login', 'signup', 'signup-direct'];
 const authOnlyRoutes = ['onboarding', 'pending-approval', 'telegram-connect'];
 const appPrefix = 'app/';
-const defaultAppRoute = 'app/profile';
-const appRoutes = ['app/profile', 'app/groups'];
+export const defaultAppRoute = 'app/profile';
+const appRoutes = [defaultAppRoute, 'app/groups'];
 
 function updateRoute() {
 	const hash = window.location.hash.slice(1) || 'login'; // Remove #
