@@ -6,6 +6,7 @@
 	import Menu from './components/Menu.svelte';
 	import Login from './pages/Login.svelte';
 	import Signup from './pages/SignupDirect.svelte';
+	import PasswordReset from './pages/PasswordReset.svelte';
 	import Onboarding from './pages/Onboarding.svelte';
 	import PendingApproval from './pages/PendingApproval.svelte';
 	import TelegramConnect from './pages/TelegramConnect.svelte';
@@ -94,6 +95,8 @@
 			<Signup />
 		{:else if $currentRoute === 'signup-direct'}
 			<Signup defaultStatus="active" showFooter={false} pageTitle="Sign Up (beta direct)" />
+		{:else if $currentRoute === 'password-reset'}
+			<PasswordReset />
 		{:else if $currentRoute === 'onboarding'}
 			<Onboarding />
 		{:else if $currentRoute === 'pending-approval'}

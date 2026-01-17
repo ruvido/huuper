@@ -3,7 +3,7 @@ import { writable } from 'svelte/store';
 export const currentRoute = writable('login');
 export const queryParams = writable({});
 
-const publicRoutes = ['login', 'signup', 'signup-direct'];
+const publicRoutes = ['login', 'signup', 'signup-direct', 'password-reset'];
 const authOnlyRoutes = ['onboarding', 'pending-approval', 'telegram-connect'];
 const appPrefix = 'app/';
 export const defaultAppRoute = 'app/profile';

@@ -43,6 +43,10 @@
 	function goToSignup() {
 		navigate('signup');
 	}
+
+	function goToForgotPassword() {
+		navigate('password-reset');
+	}
 </script>
 
 <AuthLayout>
@@ -75,6 +79,13 @@
 			{loading ? 'Logging in...' : 'Login'}
 		</Button>
 	</form>
+
+	<div class="footer">
+		Forgot your password?
+		<Button variant="link" on:click={goToForgotPassword} disabled={loading}>
+			Reset it
+		</Button>
+	</div>
 
 	<div class="footer">
 		Don't have an account?
