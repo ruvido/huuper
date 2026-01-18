@@ -8,6 +8,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/tools/types"
 )
 
 var bot *tgbotapi.BotAPI
@@ -162,12 +163,17 @@ func syncGroupNames() {
 }
 
 func handleStartCommand(message *tgbotapi.Message, token string) {
+	service := "telegram_connect"
+	now := types.NowDateTime()
+
 	// Find token in database
 	tokenRecord, err := app.FindFirstRecordByFilter(
 		"tokens",
-		"token = {:token} && service = 'telegram'",
+		"token = {:token} && service = {:service} && used_at = '' && expires_at > {:now}",
 		map[string]any{
-			"token": token,
+			"token":   token,
+			"service": service,
+			"now":     now,
 		},
 	)
 
@@ -205,9 +211,10 @@ func handleStartCommand(message *tgbotapi.Message, token string) {
 		return
 	}
 
-	// Delete used token
-	if err := app.Delete(tokenRecord); err != nil {
-		log.Printf("Failed to delete token: %v", err)
+	// Mark token as used (one-shot)
+	tokenRecord.Set("used_at", now)
+	if err := app.Save(tokenRecord); err != nil {
+		log.Printf("Failed to mark token used: %v", err)
 	}
 
 	// Sync user group memberships

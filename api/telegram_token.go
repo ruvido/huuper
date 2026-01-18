@@ -9,6 +9,7 @@ import (
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/tools/types"
 )
 
 // GenerateTelegramTokenHandler creates a new token for Telegram connection
@@ -33,15 +34,19 @@ func GenerateTelegramTokenHandler(app *pocketbase.PocketBase) func(e *core.Reque
 			return apis.NewNotFoundError("Tokens collection not found", err)
 		}
 
+		service := "telegram_connect"
+		expiresAt := types.NowDateTime().Add(24 * time.Hour)
+
 		// Invalidate previous tokens for this user/service
 		oldTokens, err := app.FindRecordsByFilter(
 			"tokens",
-			"user = {:user} && service = 'telegram'",
+			"user = {:user} && service = {:service}",
 			"",
 			0,
 			0,
 			map[string]any{
-				"user": authRecord.Id,
+				"user":    authRecord.Id,
+				"service": service,
 			},
 		)
 		if err == nil {
@@ -54,13 +59,14 @@ func GenerateTelegramTokenHandler(app *pocketbase.PocketBase) func(e *core.Reque
 		tokenRecord := core.NewRecord(tokensCollection)
 		tokenRecord.Set("token", token)
 		tokenRecord.Set("user", authRecord.Id)
-		tokenRecord.Set("service", "telegram")
+		tokenRecord.Set("service", service)
+		tokenRecord.Set("expires_at", expiresAt)
 
 		if err := app.Save(tokenRecord); err != nil {
 			return apis.NewBadRequestError("Failed to save token", err)
 		}
 
-		// Clean up expired tokens (older than 24 hours)
+		// Clean up expired tokens
 		cleanupExpiredTokens(app)
 
 		return e.JSON(http.StatusOK, map[string]interface{}{
@@ -69,18 +75,18 @@ func GenerateTelegramTokenHandler(app *pocketbase.PocketBase) func(e *core.Reque
 	}
 }
 
-// cleanupExpiredTokens removes tokens older than 7 days
+// cleanupExpiredTokens removes expired tokens
 func cleanupExpiredTokens(app *pocketbase.PocketBase) {
-	cutoff := time.Now().Add(-7 * 24 * time.Hour)
+	now := types.NowDateTime()
 
 	records, err := app.FindRecordsByFilter(
 		"tokens",
-		"created < {:cutoff}",
-		"-created",
+		"expires_at < {:now}",
+		"-expires_at",
 		0,
 		0,
 		map[string]any{
-			"cutoff": cutoff,
+			"now": now,
 		},
 	)
 

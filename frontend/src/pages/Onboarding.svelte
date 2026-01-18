@@ -81,7 +81,7 @@
 			const response = await fetchSetting('onboarding');
 			if (response.ok) {
 				const data = await response.json();
-				steps = data.data.steps || [];
+				steps = await hydrateSteps(data.data.steps || []);
 			} else {
 				error = 'Failed to load onboarding configuration';
 			}
@@ -89,6 +89,49 @@
 			error = 'Failed to load onboarding configuration';
 		}
 	});
+
+	async function hydrateSteps(rawSteps) {
+		const hydrated = [];
+		for (const step of rawSteps) {
+			if (!step?.options_source) {
+				hydrated.push(step);
+				continue;
+			}
+
+			const options = await loadOptions(step.options_source);
+			hydrated.push({
+				...step,
+				options: options.length ? options : step.options || [],
+			});
+		}
+
+		return hydrated;
+	}
+
+	async function loadOptions(source) {
+		let collection = '';
+		let field = 'name';
+		let sort = 'name';
+
+		if (typeof source === 'string') {
+			collection = source;
+		} else if (source && typeof source === 'object') {
+			collection = source.collection || '';
+			field = source.field || field;
+			sort = source.sort || sort;
+		}
+
+		if (!collection) return [];
+
+		try {
+			const records = await pb.collection(collection).getFullList({ sort });
+			return records
+				.map(record => record[field])
+				.filter(option => typeof option === 'string' && option.trim() !== '');
+		} catch (err) {
+			return [];
+		}
+	}
 
 	function nextStep() {
 		if (currentStep < formSteps.length - 1 && canProceed) {
