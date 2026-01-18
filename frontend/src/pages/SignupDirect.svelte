@@ -1,6 +1,6 @@
 <script>
 	import { pb } from '../lib/pocketbase';
-	import { navigate } from '../lib/router';
+	import { navigate, defaultAppRoute } from '../lib/router';
 	import AuthLayout from '../components/AuthLayout.svelte';
 	import FormGroup from '../components/FormGroup.svelte';
 	import Button from '../components/Button.svelte';
@@ -58,8 +58,8 @@
 			// Auto-login
 			await pb.collection('users').authWithPassword(email, password);
 
-			// Redirect to profile (will check for empty data there)
-			navigate('app/profile');
+			// Redirect to default app route (will check for empty data there)
+			navigate(defaultAppRoute);
 		} catch (err) {
 			// Parse PocketBase field-specific errors
 			const fieldErrors = err.data?.data || err.data || {};

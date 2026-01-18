@@ -1,7 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
 	import { pb, fetchSetting } from '../lib/pocketbase';
-	import { navigate } from '../lib/router';
+	import { navigate, defaultAppRoute } from '../lib/router';
 	import ProgressBar from '../components/ui/ProgressBar.svelte';
 	import OnboardingNavigation from '../components/onboarding/OnboardingNavigation.svelte';
 	import OnboardingStep from '../components/onboarding/OnboardingStep.svelte';
@@ -236,7 +236,7 @@
 			if (updatedUser.status === 'pending') {
 				navigate('pending-approval');
 			} else {
-				navigate('app/profile');
+				navigate(defaultAppRoute);
 			}
 		} catch (err) {
 			error = err.message || 'Failed to save profile';

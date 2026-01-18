@@ -1,7 +1,7 @@
 <script>
 	import { onMount, onDestroy } from 'svelte';
 	import { pb } from '../lib/pocketbase';
-	import { navigate } from '../lib/router';
+	import { navigate, defaultAppRoute } from '../lib/router';
 	import DashboardLayout from '../components/DashboardLayout.svelte';
 	import StateCard from '../components/StateCard.svelte';
 	import Button from '../components/Button.svelte';
@@ -66,7 +66,7 @@
 	});
 
 	function goToProfile() {
-		navigate('app/profile');
+		navigate(defaultAppRoute);
 	}
 </script>
 

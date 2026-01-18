@@ -1,6 +1,6 @@
 <script>
 	import { pb } from '../lib/pocketbase';
-	import { navigate } from '../lib/router';
+	import { navigate, defaultAppRoute } from '../lib/router';
 	import AuthLayout from '../components/AuthLayout.svelte';
 	import FormGroup from '../components/FormGroup.svelte';
 	import Button from '../components/Button.svelte';
@@ -26,8 +26,8 @@
 
 		try {
 			await pb.collection('users').authWithPassword(email, password);
-			// Navigate to profile - global guard in App.svelte will handle onboarding redirect if needed
-			navigate('app/profile');
+			// Navigate to default app route - App.svelte will handle onboarding redirect if needed
+			navigate(defaultAppRoute);
 		} catch (err) {
 			// Parse PocketBase errors - err.data is alias for err.response
 			if (err.status === 400) {
@@ -42,6 +42,10 @@
 
 	function goToSignup() {
 		navigate('signup');
+	}
+
+	function goToForgotPassword() {
+		navigate('password-reset');
 	}
 </script>
 
@@ -75,6 +79,13 @@
 			{loading ? 'Logging in...' : 'Login'}
 		</Button>
 	</form>
+
+	<div class="footer">
+		Forgot your password?
+		<Button variant="link" on:click={goToForgotPassword} disabled={loading}>
+			Reset it
+		</Button>
+	</div>
 
 	<div class="footer">
 		Don't have an account?

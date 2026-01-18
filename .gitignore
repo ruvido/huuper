@@ -72,6 +72,7 @@ frontend/node_modules/
 frontend/dist/
 frontend/.svelte-kit/
 frontend/build/
+frontend/.npm-cache/
 frontend/.env
 frontend/.env.local
 frontend/.env.*.local
