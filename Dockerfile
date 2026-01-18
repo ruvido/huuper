@@ -1,21 +1,4 @@
-# Stage 1: Build frontend
-FROM node:20-alpine AS frontend-builder
-
-WORKDIR /app/frontend
-
-# Copy frontend package files
-COPY frontend/package*.json ./
-
-# Install dependencies
-RUN npm ci
-
-# Copy frontend source
-COPY frontend/ ./
-
-# Build frontend
-RUN npm run build
-
-# Stage 2: Build Go binary
+# Stage 1: Build Go binary
 FROM golang:1.24-alpine AS go-builder
 
 WORKDIR /app
@@ -30,11 +13,8 @@ ENV GOTOOLCHAIN=auto
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy source code
+# Copy source code (pb_public will be mounted as volume)
 COPY . .
-
-# Copy built frontend from previous stage
-COPY --from=frontend-builder /app/pb_public ./pb_public
 
 # Ensure go.mod is tidy
 RUN go mod tidy
@@ -42,7 +22,7 @@ RUN go mod tidy
 # Build Go binary
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o huuper .
 
-# Stage 3: Final runtime image
+# Stage 2: Final runtime image
 FROM alpine:latest
 
 WORKDIR /app

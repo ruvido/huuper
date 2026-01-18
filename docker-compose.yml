@@ -10,6 +10,8 @@ services:
     volumes:
       # Persist database and uploads
       - ./pb_data:/app/pb_data
+      # Mount frontend build
+      - ./pb_public:/app/pb_public
     env_file:
       - .env
     networks:

@@ -21,6 +21,17 @@ error() {
     exit 1
 }
 
+ensure_frontend_deps() {
+    if [ ! -d "frontend/node_modules" ] || [ ! -d "frontend/node_modules/marked" ]; then
+        info "Installing frontend dependencies..."
+        if [ -f "frontend/package-lock.json" ]; then
+            (cd frontend && npm ci)
+        else
+            (cd frontend && npm install)
+        fi
+    fi
+}
+
 # Check .env file exists
 if [ ! -f .env ]; then
     error ".env file not found! Please create it from .env.example"
@@ -29,12 +40,18 @@ fi
 # Parse command
 case "${1:-}" in
     build)
+        ensure_frontend_deps
+        info "Building frontend..."
+        cd frontend && npm run build && cd ..
         info "Building Docker image..."
         docker compose build
         info "Build completed successfully!"
         ;;
 
     up)
+        ensure_frontend_deps
+        info "Building frontend..."
+        cd frontend && npm run build && cd ..
         info "Starting services..."
         docker compose up -d
         info "Services started!"
@@ -60,6 +77,9 @@ case "${1:-}" in
     rebuild)
         info "Rebuilding and restarting..."
         docker compose down
+        ensure_frontend_deps
+        info "Building frontend..."
+        cd frontend && npm run build && cd ..
         docker compose build --no-cache
         docker compose up -d
         info "Rebuild completed!"
