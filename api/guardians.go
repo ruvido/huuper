@@ -9,60 +9,51 @@ import (
 	"github.com/pocketbase/pocketbase/tools/types"
 )
 
-type approvalRequest struct {
+type guardianApprovalRequest struct {
 	User  string `json:"user"`
 	Group string `json:"group"`
 }
 
-// LeaderApproveHandler marks a user as leader-approved for a group.
-func LeaderApproveHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+// LeaderApproveGuardianHandler marks leader approval for a guardian record.
+func LeaderApproveGuardianHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		authRecord := e.Auth
 		if authRecord == nil {
 			return apis.NewUnauthorizedError("Unauthorized", nil)
 		}
 
-		var payload approvalRequest
+		var payload guardianApprovalRequest
 		if err := e.BindBody(&payload); err != nil {
 			return apis.NewBadRequestError("Invalid request", err)
 		}
 
-		if payload.User == "" || payload.Group == "" {
-			return apis.NewBadRequestError("Missing user or group", nil)
+		if payload.User == "" {
+			return apis.NewBadRequestError("Missing user", nil)
 		}
 
-		group, err := app.FindRecordById("groups", payload.Group)
+		record, err := app.FindFirstRecordByFilter(
+			"guardians",
+			"user = {:user}",
+			map[string]any{
+				"user": payload.User,
+			},
+		)
+		if err != nil || record == nil {
+			return apis.NewNotFoundError("Guardian record not found", err)
+		}
+
+		groupID := record.GetString("group")
+		if payload.Group != "" && payload.Group != groupID {
+			return apis.NewBadRequestError("User assigned to a different group", nil)
+		}
+
+		group, err := app.FindRecordById("groups", groupID)
 		if err != nil {
 			return apis.NewNotFoundError("Group not found", err)
 		}
 
 		if group.GetString("leader") != authRecord.Id {
 			return apis.NewForbiddenError("Forbidden", nil)
-		}
-
-		if _, err := app.FindRecordById("users", payload.User); err != nil {
-			return apis.NewNotFoundError("User not found", err)
-		}
-
-		approvals, err := app.FindCollectionByNameOrId("approvals")
-		if err != nil {
-			return apis.NewNotFoundError("Approvals collection not found", err)
-		}
-
-		record, err := app.FindFirstRecordByFilter(
-			"approvals",
-			"user = {:user}",
-			map[string]any{
-				"user": payload.User,
-			},
-		)
-
-		if err != nil || record == nil {
-			record = core.NewRecord(approvals)
-			record.Set("user", payload.User)
-			record.Set("group", payload.Group)
-		} else if record.GetString("group") != payload.Group {
-			return apis.NewBadRequestError("User assigned to a different group", nil)
 		}
 
 		if record.GetDateTime("leader_approved_at").IsZero() {
@@ -83,8 +74,8 @@ func LeaderApproveHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 	}
 }
 
-// AdminApproveHandler marks a user as admin-confirmed.
-func AdminApproveHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+// AdminConfirmGuardianHandler marks admin confirmation for a guardian record.
+func AdminConfirmGuardianHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		authRecord := e.Auth
 		if authRecord == nil {
@@ -95,7 +86,7 @@ func AdminApproveHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) 
 			return apis.NewForbiddenError("Forbidden", nil)
 		}
 
-		var payload approvalRequest
+		var payload guardianApprovalRequest
 		if err := e.BindBody(&payload); err != nil {
 			return apis.NewBadRequestError("Invalid request", err)
 		}
@@ -105,14 +96,14 @@ func AdminApproveHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) 
 		}
 
 		record, err := app.FindFirstRecordByFilter(
-			"approvals",
+			"guardians",
 			"user = {:user}",
 			map[string]any{
 				"user": payload.User,
 			},
 		)
 		if err != nil || record == nil {
-			return apis.NewNotFoundError("Approval record not found", err)
+			return apis.NewNotFoundError("Guardian record not found", err)
 		}
 
 		if record.GetDateTime("leader_approved_at").IsZero() {

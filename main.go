@@ -38,8 +38,8 @@ func main() {
 		// API routes
 		se.Router.GET("/api/settings/{name}", api.GetSettingsHandler(app))
 		se.Router.POST("/api/telegram/generate-token", api.GenerateTelegramTokenHandler(app)).Bind(apis.RequireAuth())
-		se.Router.POST("/api/approvals/leader", api.LeaderApproveHandler(app)).Bind(apis.RequireAuth())
-		se.Router.POST("/api/approvals/admin", api.AdminApproveHandler(app)).Bind(apis.RequireAuth())
+		se.Router.POST("/api/guardians/leader-approve", api.LeaderApproveGuardianHandler(app)).Bind(apis.RequireAuth())
+		se.Router.POST("/api/guardians/admin-confirm", api.AdminConfirmGuardianHandler(app)).Bind(apis.RequireAuth())
 
 		// Serve frontend
 		se.Router.GET("/{path...}", apis.Static(os.DirFS("./pb_public"), false))

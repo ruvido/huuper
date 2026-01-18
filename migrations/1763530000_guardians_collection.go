@@ -3,7 +3,6 @@ package migrations
 import (
 	"github.com/pocketbase/pocketbase/core"
 	m "github.com/pocketbase/pocketbase/migrations"
-	"github.com/pocketbase/pocketbase/tools/types"
 )
 
 func init() {
@@ -13,12 +12,17 @@ func init() {
 			return err
 		}
 
+		groups, err := app.FindCollectionByNameOrId("groups")
+		if err != nil {
+			return err
+		}
+
 		guardians := core.NewBaseCollection("guardians")
-		guardians.ListRule = types.Pointer("@request.auth.admin = true || leader = @request.auth.id")
-		guardians.ViewRule = types.Pointer("@request.auth.admin = true || leader = @request.auth.id")
-		guardians.CreateRule = types.Pointer("@request.auth.admin = true || @request.data.leader = @request.auth.id")
-		guardians.UpdateRule = types.Pointer("@request.auth.admin = true || leader = @request.auth.id")
-		guardians.DeleteRule = types.Pointer("@request.auth.admin = true || leader = @request.auth.id")
+		guardians.ListRule = nil
+		guardians.ViewRule = nil
+		guardians.CreateRule = nil
+		guardians.UpdateRule = nil
+		guardians.DeleteRule = nil
 
 		guardians.Fields.Add(
 			&core.AutodateField{
@@ -37,13 +41,13 @@ func init() {
 				MaxSelect:    1,
 			},
 			&core.RelationField{
-				Name:         "guardian",
+				Name:         "group",
 				Required:     true,
-				CollectionId: users.Id,
+				CollectionId: groups.Id,
 				MaxSelect:    1,
 			},
 			&core.RelationField{
-				Name:         "leader",
+				Name:         "guardian",
 				Required:     true,
 				CollectionId: users.Id,
 				MaxSelect:    1,
@@ -51,6 +55,14 @@ func init() {
 			// steps format: { "step1": { "done": true, "at": "2026-01-12T10:00:00Z" }, ... }
 			&core.JSONField{
 				Name:     "steps",
+				Required: false,
+			},
+			&core.DateField{
+				Name:     "leader_approved_at",
+				Required: false,
+			},
+			&core.DateField{
+				Name:     "admin_confirmed_at",
 				Required: false,
 			},
 			&core.TextField{
