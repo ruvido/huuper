@@ -37,7 +37,7 @@ func BindRequestHooks(app *pocketbase.PocketBase) {
 			return e.Next()
 		}
 
-		groupsFilter := "regions ?= {:region} && is_open = true"
+		groupsFilter := "regions:each ?= {:region} && is_open = true"
 		if groupsCollection, err := app.FindCollectionByNameOrId("groups"); err == nil {
 			if groupsCollection.Fields.GetByName("regions") == nil {
 				groupsFilter = "region = {:region} && is_open = true"
