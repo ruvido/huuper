@@ -1,13 +1,12 @@
 package main
 
 import (
-	"log"
-	"os"
-
 	"github.com/joho/godotenv"
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
+	"log"
+	"os"
 
 	"members/api"
 	"members/bot"
@@ -23,7 +22,6 @@ func init() {
 
 func main() {
 	app := pocketbase.New()
-
 	app.OnTerminate().BindFunc(func(e *core.TerminateEvent) error {
 		bot.StopTelegramBot()
 		return e.Next()
@@ -37,6 +35,7 @@ func main() {
 
 		// API routes
 		se.Router.GET("/api/settings/{name}", api.GetSettingsHandler(app))
+		se.Router.POST("/api/signup/check-email", api.CheckSignupEmailHandler(app))
 		se.Router.POST("/api/telegram/generate-token", api.GenerateTelegramTokenHandler(app)).Bind(apis.RequireAuth())
 		se.Router.POST("/api/guardians/leader-approve", api.LeaderApproveGuardianHandler(app)).Bind(apis.RequireAuth())
 		se.Router.POST("/api/guardians/admin-confirm", api.AdminConfirmGuardianHandler(app)).Bind(apis.RequireAuth())
@@ -46,6 +45,8 @@ func main() {
 
 		return se.Next()
 	})
+
+	api.BindRequestHooks(app)
 
 	if err := app.Start(); err != nil {
 		log.Fatal(err)

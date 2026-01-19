@@ -7,7 +7,7 @@
 	import ErrorMessage from '../components/ErrorMessage.svelte';
 
 	// Props configurabili
-	export let defaultStatus = 'pending';
+	export let defaultStatus = 'active';
 	export let showFooter = true;
 	export let pageTitle = 'Sign Up';
 

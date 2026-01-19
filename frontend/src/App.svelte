@@ -5,7 +5,8 @@
 	import Header from './components/Header.svelte';
 	import Menu from './components/Menu.svelte';
 	import Login from './pages/Login.svelte';
-	import Signup from './pages/SignupDirect.svelte';
+	import Signup from './pages/Signup.svelte';
+	import SignupDirect from './pages/SignupDirect.svelte';
 	import PasswordReset from './pages/PasswordReset.svelte';
 	import Onboarding from './pages/Onboarding.svelte';
 	import PendingApproval from './pages/PendingApproval.svelte';
@@ -54,6 +55,12 @@
 	$: if (authReady && !renderReady) {
 		let shouldRedirect = false;
 
+		if ($isAuthenticated && $authRecord?.status === 'suspended') {
+			pb.authStore.clear();
+			navigate('login');
+			shouldRedirect = true;
+		}
+
 		const targetRoute = getTargetRoute($isAuthenticated, $authRecord, $currentRoute);
 		if (targetRoute !== $currentRoute) {
 			navigate(targetRoute);
@@ -94,7 +101,7 @@
 		{:else if $currentRoute === 'signup'}
 			<Signup />
 		{:else if $currentRoute === 'signup-direct'}
-			<Signup defaultStatus="active" showFooter={false} pageTitle="Sign Up (beta direct)" />
+			<SignupDirect defaultStatus="active" showFooter={false} pageTitle="Sign Up (beta direct)" />
 		{:else if $currentRoute === 'password-reset'}
 			<PasswordReset />
 		{:else if $currentRoute === 'onboarding'}

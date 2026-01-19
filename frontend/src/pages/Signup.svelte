@@ -1,45 +1,44 @@
 <script>
 	import { onMount } from 'svelte';
 	import { pb, fetchSetting } from '../lib/pocketbase';
-	import { navigate, defaultAppRoute } from '../lib/router';
+	import { navigate } from '../lib/router';
 	import ProgressBar from '../components/ui/ProgressBar.svelte';
 	import OnboardingNavigation from '../components/onboarding/OnboardingNavigation.svelte';
 	import OnboardingStep from '../components/onboarding/OnboardingStep.svelte';
-	import CropModal from '../components/modals/CropModal.svelte';
 	import ConfirmationPage from '../components/onboarding/ConfirmationPage.svelte';
+	import ErrorMessage from '../components/ErrorMessage.svelte';
 
 	let steps = [];
 	let currentStep = 0;
 	let formData = {};
 	let error = '';
+	let emailError = '';
 	let loading = false;
-	let showConfirmation = false;
+	let submitted = false;
+	let emailCheck = { value: '', status: 'idle' };
 
-	// Separate confirmation step from form steps
 	$: confirmationStep = steps.find(s => s.type === 'confirmation');
 	$: formSteps = steps.filter(s => s.type !== 'confirmation');
+	$: emailStep = formSteps.find(step => step.field === 'email' && step.check_unique);
 
-	// Crop state
-	let showCropModal = false;
-	let cropImage = '';
-	let cropFile = null;
-	let cropField = '';
-	let cropModalRef;
-
-	// Count only non-start steps
 	$: realSteps = formSteps.filter(s => s.type !== 'start');
 	$: realStepIndex = (() => {
 		let count = 0;
 		for (let i = 0; i < currentStep; i++) {
 			if (formSteps[i].type !== 'start') count++;
 		}
-		return count + 1; // 1-indexed
+		return count + 1;
 	})();
 
-	// Progress percentage
 	$: progressPercentage = realSteps.length > 0 ? (realStepIndex / realSteps.length) * 100 : 0;
 
-	// Check if current step is complete
+	$: displayError = (() => {
+		if (emailStep?.field === formSteps[currentStep]?.field && emailStep?.check_unique) {
+			return emailError;
+		}
+		return error;
+	})();
+
 	$: canProceed = (() => {
 		const step = formSteps[currentStep];
 		if (!step) return false;
@@ -47,25 +46,21 @@
 		if (step.type === 'start') {
 			return true;
 		} else if (step.type === 'text') {
-			return !!formData[step.field]?.trim();
+			const value = formData[step.field]?.trim();
+			return !!value;
 		} else if (step.type === 'textarea') {
 			return !!formData[step.field]?.trim();
-		} else if (step.type === 'file') {
-			return !!formData[step.field];
 		} else if (step.type === 'select') {
 			const value = formData[step.field];
 			if (step.min) {
-				// Multiple selection
 				if (!value || value.length < step.min) return false;
-				// Check if any selected option needs custom input
 				const hasInputOption = value.some(v => v.includes(':input'));
 				if (hasInputOption) {
 					return !!formData[step.field + '_custom']?.trim();
 				}
 				return true;
-			} else if (step.max === 1) {
-				// Single selection
-				const needsCustom = value?.includes(':input');
+			} else if (step.max === 1 || !step.max) {
+				const needsCustom = value?.includes?.(':input');
 				if (needsCustom) {
 					return !!formData[step.field + '_custom']?.trim();
 				}
@@ -76,17 +71,16 @@
 	})();
 
 	onMount(async () => {
-		// Fetch onboarding config from settings
 		try {
-			const response = await fetchSetting('onboarding');
+			const response = await fetchSetting('signup');
 			if (response.ok) {
 				const data = await response.json();
 				steps = await hydrateSteps(data.data.steps || []);
 			} else {
-				error = 'Failed to load onboarding configuration';
+				error = 'Failed to load signup configuration';
 			}
 		} catch (err) {
-			error = 'Failed to load onboarding configuration';
+			error = 'Failed to load signup configuration';
 		}
 	});
 
@@ -111,6 +105,7 @@
 	async function loadOptions(source) {
 		let collection = '';
 		let field = 'name';
+		let valueField = 'id';
 		let sort = 'name';
 
 		if (typeof source === 'string') {
@@ -118,6 +113,7 @@
 		} else if (source && typeof source === 'object') {
 			collection = source.collection || '';
 			field = source.field || field;
+			valueField = source.value_field || valueField;
 			sort = source.sort || sort;
 		}
 
@@ -126,8 +122,11 @@
 		try {
 			const records = await pb.collection(collection).getFullList({ sort });
 			return records
-				.map(record => record[field])
-				.filter(option => typeof option === 'string' && option.trim() !== '');
+				.map(record => ({
+					label: record[field],
+					value: record[valueField],
+				}))
+				.filter(option => typeof option.label === 'string' && option.label.trim() !== '');
 		} catch (err) {
 			return [];
 		}
@@ -135,6 +134,11 @@
 
 	function nextStep() {
 		if (currentStep < formSteps.length - 1 && canProceed) {
+			const step = formSteps[currentStep];
+			if (step?.check_unique && step.field === 'email') {
+				handleEmailCheck(step);
+				return;
+			}
 			currentStep++;
 		}
 	}
@@ -157,67 +161,78 @@
 		} else {
 			formData[field] = value;
 		}
+	}
 
-		// If option needs custom input, scroll to show it
-		if (value?.includes(':input')) {
-			setTimeout(() => {
-				const customInput = document.querySelector('.custom-input');
-				if (customInput) {
-					customInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+	function normalizeValue(field, value) {
+		if (Array.isArray(value)) {
+			return value.map(v => {
+				if (v.includes(':input')) {
+					return formData[field + '_custom'] || v.split(':')[0];
 				}
-			}, 350); // After slide transition
+				return v;
+			});
 		}
+
+		if (value?.includes?.(':input')) {
+			return formData[field + '_custom'] || value.split(':')[0];
+		}
+
+		return value;
 	}
 
-	function handleClose() {
-		pb.authStore.clear();
-		navigate('login');
+	function looksLikeEmail(value) {
+		return /.+@.+\..+/.test(value);
 	}
 
-	// Crop helpers
-	function openCropModal(file, field) {
-		cropFile = file;
-		cropField = field;
+	async function handleEmailCheck(step) {
+		const value = formData[step.field]?.trim() || '';
+		if (!value) return;
 
-		const reader = new FileReader();
-		reader.onload = (e) => {
-			cropImage = e.target.result;
-			showCropModal = true;
-		};
-		reader.readAsDataURL(file);
-	}
+		if (!looksLikeEmail(value)) {
+			emailCheck = { value, status: 'invalid' };
+			emailError = step?.error_invalid || '';
+			return;
+		}
 
-	async function handleCropConfirm() {
-		if (!cropModalRef || !cropFile) return;
+		if (emailCheck.value === value && emailCheck.status === 'valid') {
+			currentStep++;
+			return;
+		}
 
 		loading = true;
-		error = '';
+		emailError = '';
+		emailCheck = { value, status: 'checking' };
 
 		try {
-			const croppedFile = await cropModalRef.processCrop(cropFile);
-			formData[cropField] = croppedFile;
+			const response = await fetch('/api/signup/check-email', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ email: value }),
+			});
 
-			showCropModal = false;
-			cropImage = '';
-			cropFile = null;
+			if (!response.ok) {
+				throw new Error('Email check failed');
+			}
 
-			// Auto-advance after crop
-			if (currentStep < formSteps.length - 1) {
+			const data = await response.json();
+			if (data?.unique) {
+				emailCheck = { value, status: 'valid' };
+				emailError = '';
 				currentStep++;
 			} else {
-				showConfirmation = true;
+				const message = step?.error || '';
+				emailCheck = { value, status: 'invalid' };
+				emailError = message;
 			}
 		} catch (err) {
-			error = 'Errore nel processare l\'immagine';
+			const message = step?.error_unavailable || '';
+			emailCheck = { value, status: 'invalid' };
+			emailError = message;
 		} finally {
 			loading = false;
 		}
-	}
-
-	function handleCropCancel() {
-		showCropModal = false;
-		cropImage = '';
-		cropFile = null;
 	}
 
 	async function handleSubmit() {
@@ -225,66 +240,43 @@
 		error = '';
 
 		try {
-			const user = pb.authStore.record;
-			if (!user) {
-				error = 'User not authenticated';
-				return;
-			}
+			const payload = {};
 
-			// Build form data with avatar and data fields
-			const formDataToSend = new FormData();
-
-			// Collect all data fields (excluding avatar and start step)
-			const dataFields = {};
 			formSteps.forEach(step => {
-				if (step.type !== 'start' && step.field !== 'avatar' && formData[step.field]) {
-					const value = formData[step.field];
+				if (step.type === 'start') return;
+				if (!step.field || !formData[step.field]) return;
 
-					// Handle arrays (multiple selection)
-					if (Array.isArray(value)) {
-						dataFields[step.field] = value.map(v => {
-							if (v.includes(':input')) {
-								return formData[step.field + '_custom'] || v.split(':')[0];
-							}
-							return v;
-						});
-					}
-					// Handle single values
-					else if (value.includes?.(':input')) {
-						dataFields[step.field] = formData[step.field + '_custom'] || value.split(':')[0];
-					} else {
-						dataFields[step.field] = value;
-					}
-				}
+				payload[step.field] = normalizeValue(step.field, formData[step.field]);
 			});
 
-			// Add data as JSON
-			if (Object.keys(dataFields).length > 0) {
-				formDataToSend.append('data', JSON.stringify(dataFields));
-			}
+			payload.status = '0-pending';
 
-			// Add avatar if present
-			if (formData.avatar) {
-				formDataToSend.append('avatar', formData.avatar);
-			}
-
-			// Update user record
-			await pb.collection('users').update(user.id, formDataToSend);
-
-			// Refresh auth to get updated user data
-			await pb.collection('users').authRefresh();
-
-			navigate(defaultAppRoute);
+			await pb.collection('requests').create(payload);
+			submitted = true;
 		} catch (err) {
-			error = err.message || 'Failed to save profile';
+			const fieldErrors = err?.data?.data || err?.data || {};
+			const emailStepIndex = formSteps.findIndex(step => step.field === 'email');
+			const emailError = fieldErrors?.email?.message || '';
+
+			if (emailError && emailStepIndex >= 0) {
+				error = formSteps[emailStepIndex]?.error || err.message || '';
+				currentStep = emailStepIndex;
+			} else {
+				error = err.message || 'Failed to send request';
+			}
 		} finally {
 			loading = false;
 		}
 	}
+
+	function handleClose() {
+		navigate('login');
+	}
+
 </script>
 
 <div class="onboarding-page">
-	{#if formSteps[currentStep] && formSteps[currentStep].type !== 'start' && !showConfirmation}
+	{#if formSteps[currentStep] && formSteps[currentStep].type !== 'start' && !submitted}
 		<ProgressBar percentage={progressPercentage} />
 		<OnboardingNavigation
 			isFirstStep={currentStep === 0}
@@ -294,11 +286,11 @@
 			onBack={prevStep}
 			onNext={nextStep}
 			onClose={handleClose}
-			onComplete={() => showConfirmation = true}
+			onComplete={handleSubmit}
 		/>
 	{/if}
 
-	{#if !showConfirmation}
+	{#if !submitted}
 		<div class="step-container"
 		     class:is-start={formSteps[currentStep]?.type === 'start'}
 		     class:is-list={formSteps[currentStep]?.type === 'select'}>
@@ -307,39 +299,27 @@
 					step={formSteps[currentStep]}
 					bind:formData
 					{loading}
-					{error}
+					error={displayError}
 					{canProceed}
 					isLastStep={currentStep === formSteps.length - 1}
 					onNext={nextStep}
-					onComplete={() => showConfirmation = true}
+					onComplete={handleSubmit}
 					onClose={handleClose}
 					onToggleOption={toggleOption}
-					onFileSelect={openCropModal}
 				/>
 			{/if}
 		</div>
 	{/if}
 
-	<!-- Confirmation Page -->
-	{#if showConfirmation && confirmationStep}
+	{#if submitted}
 		<ConfirmationPage
-			title={confirmationStep.title}
-			text={confirmationStep.text}
-			buttonText={confirmationStep.button}
+			title={confirmationStep?.title || 'Request sent'}
+			text={confirmationStep?.text || 'We will review your request and contact you soon.'}
+			showButton={false}
 			{loading}
-			onSubmit={handleSubmit}
 		/>
 	{/if}
 </div>
-
-<!-- Crop Modal -->
-<CropModal
-	bind:this={cropModalRef}
-	show={showCropModal}
-	image={cropImage}
-	onConfirm={handleCropConfirm}
-	onCancel={handleCropCancel}
-/>
 
 <style>
 	.onboarding-page {
