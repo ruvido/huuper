@@ -136,7 +136,9 @@
 	{/if}
 
 	{#if step.type !== 'start'}
-		<ErrorMessage {error} />
+		<div class="error-slot">
+			<ErrorMessage {error} />
+		</div>
 	{/if}
 </div>
 
@@ -152,6 +154,22 @@
 	.step-content.is-start {
 		text-align: center;
 		max-width: 28rem;
+	}
+
+	.error-slot {
+		height: 5.25rem;
+		box-sizing: border-box;
+		overflow: hidden;
+		padding-top: 1rem;
+	}
+
+	.error-slot :global(.error) {
+		margin: 0;
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+		line-height: 1.3;
 	}
 
 	h1 {

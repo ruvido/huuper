@@ -36,12 +36,12 @@ export function getTargetRoute(isAuthenticated, user, currentRoute) {
 	const hasData = user?.data && Object.keys(user.data).length > 0;
 	const hasTelegram = user?.telegram && Object.keys(user.telegram).length > 0;
 
-	if (status === 'pending') {
-		return hasData ? 'pending-approval' : 'onboarding';
-	}
 	if (status === 'active') {
 		if (!hasData) return 'onboarding';
 		if (!hasTelegram) return 'telegram-connect';
+	}
+	if (status === 'suspended') {
+		return 'login';
 	}
 
 	if (currentRoute === 'app') return defaultAppRoute;

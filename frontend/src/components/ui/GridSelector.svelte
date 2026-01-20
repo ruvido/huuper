@@ -8,19 +8,21 @@
 
 <div class="grid-container">
 	{#each options as option}
-		{@const needsInput = option.includes(':input')}
-		{@const displayText = needsInput ? option.split(':')[0] : option}
+		{@const value = typeof option === 'string' ? option : option?.value}
+		{@const label = typeof option === 'string' ? option : option?.label}
+		{@const needsInput = value?.includes(':input')}
+		{@const displayText = needsInput ? value.split(':')[0] : label}
 		{@const isSelected = isMultiple
-			? selected?.includes(option)
-			: selected === option}
+			? selected?.includes(value)
+			: selected === value}
 		<button
 			type="button"
 			class="grid-box"
 			class:selected={isSelected}
-			on:click={() => onToggle(option)}
+			on:click={() => onToggle(value)}
 			{disabled}
 		>
-			{@html displayText.replace(/\n/g, '<br>')}
+			{@html displayText?.replace(/\n/g, '<br>')}
 		</button>
 	{/each}
 </div>

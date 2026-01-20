@@ -10,8 +10,8 @@ import (
 )
 
 type guardianApprovalRequest struct {
-	User  string `json:"user"`
-	Group string `json:"group"`
+	Request string `json:"request"`
+	Group   string `json:"group"`
 }
 
 // LeaderApproveGuardianHandler marks leader approval for a guardian record.
@@ -27,15 +27,15 @@ func LeaderApproveGuardianHandler(app *pocketbase.PocketBase) func(e *core.Reque
 			return apis.NewBadRequestError("Invalid request", err)
 		}
 
-		if payload.User == "" {
-			return apis.NewBadRequestError("Missing user", nil)
+		if payload.Request == "" {
+			return apis.NewBadRequestError("Missing request", nil)
 		}
 
 		record, err := app.FindFirstRecordByFilter(
 			"guardians",
-			"user = {:user}",
+			"request = {:request}",
 			map[string]any{
-				"user": payload.User,
+				"request": payload.Request,
 			},
 		)
 		if err != nil || record == nil {
@@ -66,7 +66,7 @@ func LeaderApproveGuardianHandler(app *pocketbase.PocketBase) func(e *core.Reque
 
 		return e.JSON(http.StatusOK, map[string]any{
 			"id":                 record.Id,
-			"user":               record.GetString("user"),
+			"request":            record.GetString("request"),
 			"group":              record.GetString("group"),
 			"leader_approved_at": record.GetString("leader_approved_at"),
 			"admin_confirmed_at": record.GetString("admin_confirmed_at"),
@@ -91,15 +91,15 @@ func AdminConfirmGuardianHandler(app *pocketbase.PocketBase) func(e *core.Reques
 			return apis.NewBadRequestError("Invalid request", err)
 		}
 
-		if payload.User == "" {
-			return apis.NewBadRequestError("Missing user", nil)
+		if payload.Request == "" {
+			return apis.NewBadRequestError("Missing request", nil)
 		}
 
 		record, err := app.FindFirstRecordByFilter(
 			"guardians",
-			"user = {:user}",
+			"request = {:request}",
 			map[string]any{
-				"user": payload.User,
+				"request": payload.Request,
 			},
 		)
 		if err != nil || record == nil {
@@ -120,7 +120,7 @@ func AdminConfirmGuardianHandler(app *pocketbase.PocketBase) func(e *core.Reques
 
 		return e.JSON(http.StatusOK, map[string]any{
 			"id":                 record.Id,
-			"user":               record.GetString("user"),
+			"request":            record.GetString("request"),
 			"group":              record.GetString("group"),
 			"leader_approved_at": record.GetString("leader_approved_at"),
 			"admin_confirmed_at": record.GetString("admin_confirmed_at"),

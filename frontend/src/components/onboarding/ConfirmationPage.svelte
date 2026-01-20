@@ -5,6 +5,7 @@
 	export let text = '';
 	export let buttonText = 'Continua';
 	export let loading = false;
+	export let showButton = true;
 	export let onSubmit;
 </script>
 
@@ -17,9 +18,11 @@
 	</div>
 	<h1>{title}</h1>
 	<p class="confirmation-text">{@html text.replace(/\n/g, '<br>')}</p>
-	<Button variant="submit" on:click={onSubmit} disabled={loading}>
-		{loading ? 'Invio...' : buttonText}
-	</Button>
+	{#if showButton}
+		<Button variant="submit" on:click={onSubmit} disabled={loading}>
+			{loading ? 'Invio...' : buttonText}
+		</Button>
+	{/if}
 </div>
 
 <style>

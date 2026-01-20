@@ -16,6 +16,7 @@ func GetSettingsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) e
 		publicNames := map[string]bool{
 			"title":          true,
 			"password_reset": true,
+			"signup":         true,
 		}
 		authNames := map[string]bool{
 			"onboarding":       true,
