@@ -38,8 +38,20 @@ func CheckSignupEmailHandler(app *pocketbase.PocketBase) func(e *core.RequestEve
 			return apis.NewBadRequestError("Failed to check email", err)
 		}
 
+		users, err := app.FindRecordsByFilter(
+			"users",
+			"email = {:email}",
+			"",
+			1,
+			0,
+			map[string]any{"email": email},
+		)
+		if err != nil {
+			return apis.NewBadRequestError("Failed to check email", err)
+		}
+
 		return e.JSON(http.StatusOK, map[string]any{
-			"unique": len(records) == 0,
+			"unique": len(records) == 0 && len(users) == 0,
 		})
 	}
 }

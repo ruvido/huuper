@@ -10,7 +10,19 @@ import (
 )
 
 func BindRequestHooks(app *pocketbase.PocketBase) {
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	rand.Seed(time.Now().UnixNano())
+
+	app.OnRecordCreateRequest("requests").BindFunc(func(e *core.RecordRequestEvent) error {
+		record := e.Record
+		if record == nil {
+			return e.Next()
+		}
+
+		record.Set("status", "0-pending")
+		record.Set("group", "")
+
+		return e.Next()
+	})
 
 	app.OnRecordUpdateRequest("requests").BindFunc(func(e *core.RecordRequestEvent) error {
 		record := e.Record
@@ -57,7 +69,7 @@ func BindRequestHooks(app *pocketbase.PocketBase) {
 			return e.Next()
 		}
 
-		groupID := groups[rng.Intn(len(groups))].Id
+		groupID := groups[rand.Intn(len(groups))].Id
 		log.Printf("requests hook: assigning group (id=%s region=%s group=%s matches=%d)", record.Id, regionID, groupID, len(groups))
 		record.Set("group", groupID)
 
