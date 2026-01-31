@@ -9,6 +9,7 @@
 	import PasswordReset from './pages/PasswordReset.svelte';
 	import Onboarding from './pages/Onboarding.svelte';
 	import PendingApproval from './pages/PendingApproval.svelte';
+	import EventAccept from './pages/EventAccept.svelte';
 	import TelegramConnect from './pages/TelegramConnect.svelte';
 	import Profile from './pages/Profile.svelte';
 	import Groups from './pages/Groups.svelte';
@@ -101,6 +102,8 @@
 			<Onboarding />
 		{:else if $currentRoute === 'pending-approval'}
 			<PendingApproval />
+		{:else if $currentRoute === 'event-accept'}
+			<EventAccept />
 		{:else if $currentRoute === 'telegram-connect'}
 			<TelegramConnect />
 		{:else if $currentRoute === 'app/profile'}

@@ -3,7 +3,7 @@ import { writable } from 'svelte/store';
 export const currentRoute = writable('login');
 export const queryParams = writable({});
 
-const publicRoutes = ['login', 'signup', 'signup-direct', 'password-reset'];
+const publicRoutes = ['login', 'signup', 'signup-direct', 'password-reset', 'event-accept'];
 const authOnlyRoutes = ['onboarding', 'pending-approval', 'telegram-connect'];
 const appPrefix = 'app/';
 export const defaultAppRoute = 'app/profile';
@@ -28,6 +28,10 @@ export function navigate(route) {
 }
 
 export function getTargetRoute(isAuthenticated, user, currentRoute) {
+	if (currentRoute === 'event-accept') {
+		return 'event-accept';
+	}
+
 	if (!isAuthenticated) {
 		return publicRoutes.includes(currentRoute) ? currentRoute : 'login';
 	}

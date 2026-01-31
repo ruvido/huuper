@@ -6,20 +6,26 @@
 	export let buttonText = 'Continua';
 	export let loading = false;
 	export let onSubmit;
+	export let showButton = true;
+	export let showCheckmark = true;
 </script>
 
 <div class="confirmation-page">
-	<div class="checkmark-container">
-		<svg class="checkmark" viewBox="0 0 52 52">
-			<circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
-			<path class="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
-		</svg>
-	</div>
+	{#if showCheckmark}
+		<div class="checkmark-container">
+			<svg class="checkmark" viewBox="0 0 52 52">
+				<circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
+				<path class="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+			</svg>
+		</div>
+	{/if}
 	<h1>{title}</h1>
 	<p class="confirmation-text">{@html text.replace(/\n/g, '<br>')}</p>
-	<Button variant="submit" on:click={onSubmit} disabled={loading}>
-		{loading ? 'Invio...' : buttonText}
-	</Button>
+	{#if showButton}
+		<Button variant="submit" on:click={onSubmit} disabled={loading}>
+			{loading ? 'Invio...' : buttonText}
+		</Button>
+	{/if}
 </div>
 
 <style>
