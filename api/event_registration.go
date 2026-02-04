@@ -117,6 +117,9 @@ func RegisterEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		record.Set("accept_token", acceptToken)
 		record.Set("accept_expires_at", time.Now().UTC().Add(7*24*time.Hour))
 		record.Set("event", event.Id)
+		if e.Auth != nil {
+			record.Set("user", e.Auth.Id)
+		}
 		record.Set("email", recipient)
 		record.Set("accepted", false)
 		record.Set("data", payload.Data)

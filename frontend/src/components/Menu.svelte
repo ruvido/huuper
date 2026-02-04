@@ -29,6 +29,9 @@
 
 	<ul class="menu-list">
 		<li>
+			<button on:click={() => handleNavigate('app/home')}>Home</button>
+		</li>
+		<li>
 			<button on:click={() => handleNavigate('app/profile')}>Profile</button>
 		</li>
 		<li>

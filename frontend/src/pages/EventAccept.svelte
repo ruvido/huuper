@@ -4,29 +4,29 @@
 	import ConfirmationPage from '../components/onboarding/ConfirmationPage.svelte';
 
 	let status = 'loading'; // loading | accepted | already_accepted | expired | invalid | missing
-	let title = 'Caricamento...';
-	let text = 'Attendi un momento.';
+	let title = 'Loading...';
+	let text = 'Please wait.';
 
 	const copy = {
 		accepted: {
-			title: 'Accettato.',
-			text: 'La richiesta è stata confermata.'
+			title: 'Accepted.',
+			text: 'The request has been confirmed.'
 		},
 		already_accepted: {
-			title: 'Già accettato.',
-			text: 'Questa richiesta era già stata confermata.'
+			title: 'Already accepted.',
+			text: 'This request was already confirmed.'
 		},
 		expired: {
-			title: 'Link scaduto.',
-			text: 'Il link non è più valido.'
+			title: 'Link expired.',
+			text: 'The link is no longer valid.'
 		},
 		invalid: {
-			title: 'Link non valido.',
-			text: 'Il link non è valido o è scaduto.'
+			title: 'Invalid link.',
+			text: 'The link is invalid or expired.'
 		},
 		missing: {
-			title: 'Token mancante.',
-			text: 'Il link non è completo.'
+			title: 'Missing token.',
+			text: 'The link is incomplete.'
 		}
 	};
 
@@ -88,7 +88,7 @@
 <ConfirmationPage
 	{title}
 	{text}
-	buttonText="Vai al login"
+	buttonText="Go to login"
 	onSubmit={goToLogin}
 	showButton={status !== 'loading'}
 	showCheckmark={status === 'accepted' || status === 'already_accepted'}

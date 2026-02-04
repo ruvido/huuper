@@ -31,6 +31,7 @@ func init() {
 		} else {
 			templateRecord = core.NewRecord(templates)
 			templateRecord.Set("name", templateName)
+			templateRecord.Set("slug", "event-registration-reply-test")
 			templateRecord.Set("data", map[string]any{
 				"subject": "Sei dei nostri!",
 				"body":    "md: Ciao!<br><br>Abbiamo ricevuto la tua iscrizione.<br>A presto!",
@@ -59,8 +60,10 @@ func init() {
 		eventRecord.Set("data", map[string]any{
 			"messages": map[string]any{
 				"invalid_event":      "Evento non valido.",
+				"invalid_email":      "Email non valida.",
 				"error_generic":      "Registrazione non riuscita.",
 				"event_closed":       "Mi dispiace, le iscrizioni sono chiuse per questo evento.",
+				"already_submitted":  "Registrazione fallita, questa email è già stata usata.",
 				"success_with_email": "Controlla la tua email per la conferma.",
 				"success_no_email":   "Grazie, abbiamo ricevuto la tua iscrizione.",
 			},

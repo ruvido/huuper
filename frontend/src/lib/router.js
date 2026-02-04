@@ -6,8 +6,8 @@ export const queryParams = writable({});
 const publicRoutes = ['login', 'signup', 'signup-direct', 'password-reset', 'event-accept'];
 const authOnlyRoutes = ['onboarding', 'pending-approval', 'telegram-connect'];
 const appPrefix = 'app/';
-export const defaultAppRoute = 'app/profile';
-const appRoutes = [defaultAppRoute, 'app/groups'];
+export const defaultAppRoute = 'app/home';
+const appRoutes = [defaultAppRoute, 'app/groups', 'app/profile'];
 
 function updateRoute() {
 	const hash = window.location.hash.slice(1) || 'login'; // Remove #
@@ -27,13 +27,21 @@ export function navigate(route) {
 	window.location.hash = route;
 }
 
+export function resolveNextRoute(next) {
+	if (!next || typeof next !== 'string') return defaultAppRoute;
+	if (next === 'app') return defaultAppRoute;
+	if (next.startsWith(appPrefix) && appRoutes.includes(next)) return next;
+	return defaultAppRoute;
+}
+
 export function getTargetRoute(isAuthenticated, user, currentRoute) {
 	if (currentRoute === 'event-accept') {
 		return 'event-accept';
 	}
 
 	if (!isAuthenticated) {
-		return publicRoutes.includes(currentRoute) ? currentRoute : 'login';
+		if (publicRoutes.includes(currentRoute)) return currentRoute;
+		return `login?next=${encodeURIComponent(currentRoute)}`;
 	}
 
 	const status = user?.status;
