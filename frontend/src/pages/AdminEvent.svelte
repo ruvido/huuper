@@ -1,5 +1,5 @@
 <script>
-	import { onMount } from 'svelte';
+import { onMount, tick } from 'svelte';
 	import { pb } from '../lib/pocketbase';
 	import { queryParams, navigate } from '../lib/router';
 	import DashboardLayout from '../components/DashboardLayout.svelte';
@@ -37,7 +37,14 @@ function displayName(registration) {
 	const data = registration?.data || {};
 	const fullName = typeof data.full_name === 'string' ? data.full_name.trim() : '';
 	if (fullName) return fullName;
-	return registration?.email || 'Unknown';
+	return 'Unknown';
+}
+
+function displayRegion(registration) {
+	const data = registration?.data || {};
+	const region = typeof data.region === 'string' ? data.region.trim() : '';
+	if (region) return region;
+	return 'Unknown';
 }
 
 $: pendingItems = registrations.filter((r) => !r.accepted);
@@ -82,6 +89,8 @@ $: totalCount = pendingCount + approvedCount;
 	async function confirmApprove() {
 		if (!confirmTarget) return;
 		confirmLoading = true;
+		await tick();
+		const startedAt = Date.now();
 		try {
 			const response = await fetch(`/api/admin/registrations/${encodeURIComponent(confirmTarget.id)}/approve`, {
 				method: 'POST',
@@ -91,6 +100,10 @@ $: totalCount = pendingCount + approvedCount;
 			});
 			if (!response.ok) {
 				throw new Error('Failed to approve');
+			}
+			const elapsed = Date.now() - startedAt;
+			if (elapsed < 300) {
+				await new Promise((resolve) => setTimeout(resolve, 300 - elapsed));
 			}
 			registrations = registrations.map((item) =>
 				item.id === confirmTarget.id ? { ...item, accepted: true } : item
@@ -149,9 +162,9 @@ onMount(() => {
 					{:else}
 						{#each pendingItems as reg}
 							<div class="row">
-								<div>
+								<div class="row-info">
 									<p class="name">{displayName(reg)}</p>
-									<p class="email">{reg.email}</p>
+									<p class="email">{displayRegion(reg)}</p>
 								</div>
 								<div class="row-actions">
 									<button class="approve" on:click={() => openConfirm(reg)}>Approve</button>
@@ -163,6 +176,11 @@ onMount(() => {
 						{/each}
 					{/if}
 				</div>
+			</div>
+		</AdminCard>
+
+		<AdminCard>
+			<div class="list">
 				<div class="list-section">
 					<h2>Approved</h2>
 					{#if approvedCount === 0}
@@ -170,13 +188,15 @@ onMount(() => {
 					{:else}
 						{#each approvedItems as reg}
 							<div class="row">
-								<div>
+								<div class="row-info">
 									<p class="name">{displayName(reg)}</p>
-									<p class="email">{reg.email}</p>
+									<p class="email">{displayRegion(reg)}</p>
 								</div>
-								{#if reg.hasUser}
-									<span class="dot" aria-label="Registered user"></span>
-								{/if}
+								<div class="row-actions">
+									{#if reg.hasUser}
+										<span class="dot" aria-label="Registered user"></span>
+									{/if}
+								</div>
 							</div>
 						{/each}
 					{/if}
@@ -237,17 +257,17 @@ onMount(() => {
 	}
 
 	.row {
-		display: flex;
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
 		align-items: center;
-		justify-content: space-between;
 		gap: 1rem;
 		padding: 0.75rem 0;
 		border-top: 1px solid #000;
-		flex-wrap: nowrap;
 	}
 
-	.row > div {
+	.row-info {
 		min-width: 0;
+		overflow: hidden;
 	}
 
 	.row-actions {
@@ -255,7 +275,7 @@ onMount(() => {
 		align-items: center;
 		gap: 0.5rem;
 		justify-content: flex-end;
-		flex-shrink: 0;
+		min-width: 8.5rem;
 	}
 
 	.dot {
@@ -320,6 +340,9 @@ onMount(() => {
 	@media (max-width: 480px) {
 		.row {
 			gap: 0.5rem;
+		}
+		.row-actions {
+			min-width: 6.5rem;
 		}
 	}
 </style>

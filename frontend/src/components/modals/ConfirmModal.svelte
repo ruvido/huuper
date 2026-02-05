@@ -8,10 +8,12 @@
 	export let onCancel;
 
 	function handleOverlayClick() {
+		if (loading) return;
 		onCancel?.();
 	}
 
 	function handleKeydown(event) {
+		if (loading) return;
 		if (event.key === 'Escape') onCancel?.();
 	}
 </script>
@@ -26,7 +28,7 @@
 			on:click|stopPropagation
 			on:keydown={handleKeydown}
 		>
-			<button class="btn-close" on:click={onCancel} aria-label="Close">×</button>
+			<button class="btn-close" on:click={onCancel} aria-label="Close" disabled={loading}>×</button>
 			<h3 class="confirm-title">{title}</h3>
 			{#if message}
 				<p class="confirm-message">{message}</p>

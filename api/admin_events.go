@@ -1,11 +1,13 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/tools/types"
 )
 
 type adminRegistrationItem struct {
@@ -20,12 +22,8 @@ type adminRegistrationItem struct {
 // AdminEventDetailsHandler returns the event and its registrations.
 func AdminEventDetailsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		authRecord := e.Auth
-		if authRecord == nil {
-			return apis.NewUnauthorizedError("Unauthorized", nil)
-		}
-		if !authRecord.GetBool("admin") {
-			return apis.NewForbiddenError("Forbidden", nil)
+		if _, err := requireAdmin(e); err != nil {
+			return err
 		}
 
 		eventId := e.Request.PathValue("id")
@@ -84,12 +82,8 @@ func AdminEventDetailsHandler(app *pocketbase.PocketBase) func(e *core.RequestEv
 // AdminApproveRegistrationHandler marks a registration as accepted.
 func AdminApproveRegistrationHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		authRecord := e.Auth
-		if authRecord == nil {
-			return apis.NewUnauthorizedError("Unauthorized", nil)
-		}
-		if !authRecord.GetBool("admin") {
-			return apis.NewForbiddenError("Forbidden", nil)
+		if _, err := requireAdmin(e); err != nil {
+			return err
 		}
 
 		regId := e.Request.PathValue("id")
@@ -118,8 +112,19 @@ func AdminApproveRegistrationHandler(app *pocketbase.PocketBase) func(e *core.Re
 func mapRegistration(record *core.Record) adminRegistrationItem {
 	data := map[string]any{}
 	if raw := record.Get("data"); raw != nil {
-		if typed, ok := raw.(map[string]any); ok {
+		switch typed := raw.(type) {
+		case map[string]any:
 			data = typed
+		case types.JSONRaw:
+			_ = json.Unmarshal(typed, &data)
+		case string:
+			_ = json.Unmarshal([]byte(typed), &data)
+		case []byte:
+			_ = json.Unmarshal(typed, &data)
+		default:
+			if payload, err := json.Marshal(typed); err == nil {
+				_ = json.Unmarshal(payload, &data)
+			}
 		}
 	}
 

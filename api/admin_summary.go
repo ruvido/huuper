@@ -25,12 +25,8 @@ type adminEventNext struct {
 // AdminSummaryHandler returns compact stats for the admin dashboard.
 func AdminSummaryHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		authRecord := e.Auth
-		if authRecord == nil {
-			return apis.NewUnauthorizedError("Unauthorized", nil)
-		}
-		if !authRecord.GetBool("admin") {
-			return apis.NewForbiddenError("Forbidden", nil)
+		if _, err := requireAdmin(e); err != nil {
+			return err
 		}
 
 		users, err := app.FindRecordsByFilter("users", "", "", 0, 0)
