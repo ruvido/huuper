@@ -56,6 +56,13 @@ function displayRegion(registration) {
 	return 'Unknown';
 }
 
+function displayPhone(registration) {
+	const data = registration?.data || {};
+	const phone = typeof data.mobile === 'string' ? data.mobile.trim() : '';
+	if (phone) return phone;
+	return '';
+}
+
 function resolveStatus(registration) {
 	if (registration?.status) return registration.status;
 	return 'pending';
@@ -83,7 +90,7 @@ function formatShortDate(raw) {
 
 $: pendingItems = registrations
 	.filter((r) => resolveStatus(r) === 'pending')
-	.sort((a, b) => parseCreated(a) - parseCreated(b));
+	.sort((a, b) => parseCreated(b) - parseCreated(a));
 $: approvedItems = registrations
 	.filter((r) => resolveStatus(r) === 'active')
 	.sort((a, b) => parseCreated(b) - parseCreated(a));
@@ -248,6 +255,9 @@ onMount(() => {
 									<p class="meta">{formatShortDate(reg.created)}</p>
 									<p class="name">{displayName(reg)}</p>
 									<p class="email">{displayRegion(reg)}</p>
+									{#if displayPhone(reg)}
+										<p class="phone">{displayPhone(reg)}</p>
+									{/if}
 								</div>
 								<div class="row-actions">
 									<button class="approve" on:click={() => openConfirm(reg)}>Approve</button>
@@ -429,6 +439,15 @@ onMount(() => {
 	}
 
 	.email {
+		margin: 0.25rem 0 0 0;
+		font-size: 0.9rem;
+		color: #333;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.phone {
 		margin: 0.25rem 0 0 0;
 		font-size: 0.9rem;
 		color: #333;

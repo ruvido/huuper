@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
@@ -80,12 +81,13 @@ func RegisterEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		if err := e.BindBody(&payload); err != nil {
 			return apis.NewBadRequestError(errGeneric, err)
 		}
-		if payload.Data == nil {
-			payload.Data = map[string]any{}
-		}
-		if !isDataSizeOk(payload.Data) {
-			return apis.NewBadRequestError(errGeneric, nil)
-		}
+	if payload.Data == nil {
+		payload.Data = map[string]any{}
+	}
+	normalizeRegistrationNames(payload.Data)
+	if !isDataSizeOk(payload.Data) {
+		return apis.NewBadRequestError(errGeneric, nil)
+	}
 		recipient, err := normalizeEmail(payload.Email)
 		if err != nil {
 			return apis.NewBadRequestError(errInvalidEmail, nil)
@@ -594,12 +596,44 @@ func templateVars(event *core.Record, registrantEmail string, data map[string]an
 	}
 	name := ""
 	if data != nil {
-		if value, ok := data["name"].(string); ok {
-			name = strings.TrimSpace(value)
+		if value, ok := data["full_name"].(string); ok {
+			name = normalizePersonName(value)
 		}
 	}
 	email := strings.TrimSpace(registrantEmail)
 	return eventTitle, name, email
+}
+
+func normalizeRegistrationNames(data map[string]any) {
+	if data == nil {
+		return
+	}
+	if value, ok := data["full_name"].(string); ok {
+		normalized := normalizePersonName(value)
+		if normalized != "" {
+			data["full_name"] = normalized
+		}
+	}
+}
+
+func normalizePersonName(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return ""
+	}
+	parts := strings.Fields(strings.ToLower(trimmed))
+	for i, part := range parts {
+		runes := []rune(part)
+		if len(runes) == 0 {
+			continue
+		}
+		runes[0] = unicode.ToUpper(runes[0])
+		for j := 1; j < len(runes); j++ {
+			runes[j] = unicode.ToLower(runes[j])
+		}
+		parts[i] = string(runes)
+	}
+	return strings.Join(parts, " ")
 }
 
 func safeHTML(value string) string {
