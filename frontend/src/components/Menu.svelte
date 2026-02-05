@@ -1,5 +1,5 @@
 <script>
-	import { pb } from '../lib/pocketbase';
+	import { pb, authRecord } from '../lib/pocketbase';
 	import { navigate } from '../lib/router';
 	import { X } from 'lucide-svelte';
 
@@ -16,6 +16,8 @@
 		navigate('login');
 		onClose();
 	}
+
+	$: isAdmin = $authRecord?.admin;
 </script>
 
 <!-- Backdrop -->
@@ -28,9 +30,16 @@
 	<button class="close-btn" on:click={onClose} aria-label="Close menu"><X size={24} /></button>
 
 	<ul class="menu-list">
-		<li>
-			<button on:click={() => handleNavigate('app/home')}>Home</button>
-		</li>
+		{#if isAdmin}
+			<li>
+				<button on:click={() => handleNavigate('app/admin')}>Admin</button>
+			</li>
+		{/if}
+		{#if !isAdmin}
+			<li>
+				<button on:click={() => handleNavigate('app/home')}>Home</button>
+			</li>
+		{/if}
 		<li>
 			<button on:click={() => handleNavigate('app/profile')}>Profile</button>
 		</li>

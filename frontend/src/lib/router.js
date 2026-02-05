@@ -7,7 +7,8 @@ const publicRoutes = ['login', 'signup', 'signup-direct', 'password-reset', 'eve
 const authOnlyRoutes = ['onboarding', 'pending-approval', 'telegram-connect'];
 const appPrefix = 'app/';
 export const defaultAppRoute = 'app/home';
-const appRoutes = [defaultAppRoute, 'app/groups', 'app/profile'];
+const adminRoute = 'app/admin';
+const appRoutes = [defaultAppRoute, 'app/groups', 'app/profile', adminRoute];
 
 function updateRoute() {
 	const hash = window.location.hash.slice(1) || 'login'; // Remove #
@@ -56,12 +57,17 @@ export function getTargetRoute(isAuthenticated, user, currentRoute) {
 		if (!hasTelegram) return 'telegram-connect';
 	}
 
-	if (currentRoute === 'app') return defaultAppRoute;
+	const isAdmin = !!user?.admin;
+
+	if (currentRoute === adminRoute && !isAdmin) return defaultAppRoute;
+	if (isAdmin && currentRoute === defaultAppRoute) return adminRoute;
+	if (currentRoute === 'app') return isAdmin ? adminRoute : defaultAppRoute;
 	if (currentRoute.startsWith(appPrefix)) {
-		return appRoutes.includes(currentRoute) ? currentRoute : defaultAppRoute;
+		if (appRoutes.includes(currentRoute)) return currentRoute;
+		return isAdmin ? adminRoute : defaultAppRoute;
 	}
-	if (authOnlyRoutes.includes(currentRoute)) return defaultAppRoute;
-	if (publicRoutes.includes(currentRoute)) return defaultAppRoute;
+	if (authOnlyRoutes.includes(currentRoute)) return isAdmin ? adminRoute : defaultAppRoute;
+	if (publicRoutes.includes(currentRoute)) return isAdmin ? adminRoute : defaultAppRoute;
 
 	return defaultAppRoute;
 }
