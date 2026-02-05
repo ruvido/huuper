@@ -121,7 +121,11 @@ func RegisterEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 			record.Set("user", e.Auth.Id)
 		}
 		record.Set("email", recipient)
-		record.Set("accepted", e.Auth != nil)
+		if e.Auth != nil {
+			record.Set("status", "active")
+		} else {
+			record.Set("status", "pending")
+		}
 		record.Set("data", payload.Data)
 
 		if err := app.Save(record); err != nil {

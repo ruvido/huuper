@@ -22,20 +22,20 @@ func AcceptEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) e
 			"accept_token = {:token}",
 			map[string]any{"token": token},
 		)
-	if err != nil || record == nil {
-		return apis.NewNotFoundError("Registrazione non trovata", err)
-	}
+		if err != nil || record == nil {
+			return apis.NewNotFoundError("Registrazione non trovata", err)
+		}
 
-	expiresAt := record.GetDateTime("accept_expires_at")
-	if !expiresAt.IsZero() && time.Now().After(expiresAt.Time()) {
-		return apis.NewBadRequestError("token_expired", nil)
-	}
+		expiresAt := record.GetDateTime("accept_expires_at")
+		if !expiresAt.IsZero() && time.Now().After(expiresAt.Time()) {
+			return apis.NewBadRequestError("token_expired", nil)
+		}
 
-	if record.GetBool("accepted") {
-		return e.JSON(http.StatusOK, map[string]any{"status": "already_accepted"})
-	}
+		if record.GetString("status") == "active" {
+			return e.JSON(http.StatusOK, map[string]any{"status": "already_accepted"})
+		}
 
-		record.Set("accepted", true)
+		record.Set("status", "active")
 		if err := app.Save(record); err != nil {
 			return apis.NewBadRequestError("Aggiornamento fallito", err)
 		}

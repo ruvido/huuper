@@ -13,7 +13,7 @@ import (
 type adminRegistrationItem struct {
 	ID       string         `json:"id"`
 	Email    string         `json:"email"`
-	Accepted bool           `json:"accepted"`
+	Status   string         `json:"status"`
 	Created  string         `json:"created"`
 	HasUser  bool           `json:"hasUser"`
 	Data     map[string]any `json:"data"`
@@ -36,9 +36,9 @@ func AdminEventDetailsHandler(app *pocketbase.PocketBase) func(e *core.RequestEv
 			return apis.NewNotFoundError("invalid_event", err)
 		}
 
-		pending, err := app.FindRecordsByFilter(
+		registrations, err := app.FindRecordsByFilter(
 			"event_registrations",
-			"event = {:event} && accepted = false",
+			"event = {:event}",
 			"created",
 			0,
 			0,
@@ -48,31 +48,19 @@ func AdminEventDetailsHandler(app *pocketbase.PocketBase) func(e *core.RequestEv
 			return apis.NewBadRequestError("failed_registrations", err)
 		}
 
-		approved, err := app.FindRecordsByFilter(
-			"event_registrations",
-			"event = {:event} && accepted = true",
-			"created",
-			0,
-			0,
-			map[string]any{"event": eventId},
-		)
-		if err != nil {
-			return apis.NewBadRequestError("failed_registrations", err)
+		items := make([]adminRegistrationItem, 0, len(registrations))
+		for _, record := range registrations {
+			items = append(items, mapRegistration(record))
 		}
 
-		items := make([]adminRegistrationItem, 0, len(pending)+len(approved))
-		for _, record := range pending {
-			items = append(items, mapRegistration(record))
-		}
-		for _, record := range approved {
-			items = append(items, mapRegistration(record))
-		}
+		eventData := parseJSONMap(event.Get("data"))
 
 		return e.JSON(http.StatusOK, map[string]any{
 			"event": map[string]any{
 				"id":         event.Id,
 				"title":      event.GetString("title"),
 				"event_date": event.GetString("event_date"),
+				"data":       eventData,
 			},
 			"registrations": items,
 		})
@@ -96,11 +84,11 @@ func AdminApproveRegistrationHandler(app *pocketbase.PocketBase) func(e *core.Re
 			return apis.NewNotFoundError("invalid_registration", err)
 		}
 
-		if record.GetBool("accepted") {
+		if record.GetString("status") == "active" {
 			return e.JSON(http.StatusOK, map[string]any{"status": "already_accepted"})
 		}
 
-		record.Set("accepted", true)
+		record.Set("status", "active")
 		if err := app.Save(record); err != nil {
 			return apis.NewBadRequestError("failed_update", err)
 		}
@@ -109,33 +97,71 @@ func AdminApproveRegistrationHandler(app *pocketbase.PocketBase) func(e *core.Re
 	}
 }
 
-func mapRegistration(record *core.Record) adminRegistrationItem {
-	data := map[string]any{}
-	if raw := record.Get("data"); raw != nil {
-		switch typed := raw.(type) {
-		case map[string]any:
-			data = typed
-		case types.JSONRaw:
-			_ = json.Unmarshal(typed, &data)
-		case string:
-			_ = json.Unmarshal([]byte(typed), &data)
-		case []byte:
-			_ = json.Unmarshal(typed, &data)
-		default:
-			if payload, err := json.Marshal(typed); err == nil {
-				_ = json.Unmarshal(payload, &data)
-			}
+// AdminCancelRegistrationHandler marks a registration as cancelled.
+func AdminCancelRegistrationHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		if _, err := requireAdmin(e); err != nil {
+			return err
 		}
+
+		regId := e.Request.PathValue("id")
+		if regId == "" {
+			return apis.NewBadRequestError("invalid_registration", nil)
+		}
+
+		record, err := app.FindRecordById("event_registrations", regId)
+		if err != nil || record == nil {
+			return apis.NewNotFoundError("invalid_registration", err)
+		}
+
+		if record.GetString("status") == "cancelled" {
+			return e.JSON(http.StatusOK, map[string]any{"status": "already_cancelled"})
+		}
+
+		record.Set("status", "cancelled")
+		if err := app.Save(record); err != nil {
+			return apis.NewBadRequestError("failed_update", err)
+		}
+
+		return e.JSON(http.StatusOK, map[string]any{"status": "cancelled"})
 	}
+}
+
+func mapRegistration(record *core.Record) adminRegistrationItem {
+	data := parseJSONMap(record.Get("data"))
 
 	userId := record.GetString("user")
 
 	return adminRegistrationItem{
 		ID:       record.Id,
 		Email:    record.GetString("email"),
-		Accepted: record.GetBool("accepted"),
+		Status:   record.GetString("status"),
 		Created:  record.GetString("created"),
 		HasUser:  userId != "",
 		Data:     data,
 	}
+}
+
+func parseJSONMap(raw any) map[string]any {
+	data := map[string]any{}
+	if raw == nil {
+		return data
+	}
+
+	switch typed := raw.(type) {
+	case map[string]any:
+		data = typed
+	case types.JSONRaw:
+		_ = json.Unmarshal(typed, &data)
+	case string:
+		_ = json.Unmarshal([]byte(typed), &data)
+	case []byte:
+		_ = json.Unmarshal(typed, &data)
+	default:
+		if payload, err := json.Marshal(typed); err == nil {
+			_ = json.Unmarshal(payload, &data)
+		}
+	}
+
+	return data
 }

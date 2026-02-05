@@ -15,7 +15,10 @@ import StatRow from '../components/StatRow.svelte';
 let confirmOpen = false;
 let confirmLoading = false;
 let confirmTarget = null;
+let cancelConfirmOpen = false;
+let cancelConfirmTarget = null;
 let lastEventId = null;
+let cancelingId = null;
 
 	$: eventId = $queryParams?.id;
 
@@ -33,6 +36,12 @@ let lastEventId = null;
 		return formatDatePart(dateRaw);
 	}
 
+	function stringValue(value) {
+		if (Array.isArray(value)) return value.filter(Boolean).join(', ');
+		if (typeof value === 'string') return value.trim();
+		return '';
+	}
+
 function displayName(registration) {
 	const data = registration?.data || {};
 	const fullName = typeof data.full_name === 'string' ? data.full_name.trim() : '';
@@ -47,11 +56,44 @@ function displayRegion(registration) {
 	return 'Unknown';
 }
 
-$: pendingItems = registrations.filter((r) => !r.accepted);
-$: approvedItems = registrations.filter((r) => r.accepted);
+function resolveStatus(registration) {
+	if (registration?.status) return registration.status;
+	return 'pending';
+}
+
+$: eventData = eventInfo?.data && typeof eventInfo.data === 'object' ? eventInfo.data : {};
+$: locationText = stringValue(eventData?.location);
+$: dateLine = [formatEventDate(eventInfo?.event_date), locationText].filter(Boolean).join(' · ');
+
+function parseCreated(registration) {
+	const raw = registration?.created;
+	if (!raw || typeof raw !== 'string') return 0;
+	const parsed = Date.parse(raw);
+	return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function formatShortDate(raw) {
+	if (!raw || typeof raw !== 'string') return '';
+	const parsed = new Date(raw);
+	if (Number.isNaN(parsed.getTime())) return '';
+	const day = String(parsed.getDate()).padStart(2, '0');
+	const month = parsed.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+	return `${day} ${month}`;
+}
+
+$: pendingItems = registrations
+	.filter((r) => resolveStatus(r) === 'pending')
+	.sort((a, b) => parseCreated(a) - parseCreated(b));
+$: approvedItems = registrations
+	.filter((r) => resolveStatus(r) === 'active')
+	.sort((a, b) => parseCreated(b) - parseCreated(a));
+$: cancelledItems = registrations
+	.filter((r) => resolveStatus(r) === 'cancelled')
+	.sort((a, b) => parseCreated(a) - parseCreated(b));
 $: pendingCount = pendingItems.length;
 $: approvedCount = approvedItems.length;
-$: totalCount = pendingCount + approvedCount;
+$: cancelledCount = cancelledItems.length;
+$: totalCount = pendingCount + approvedCount + cancelledCount;
 
 	async function loadDetails() {
 		if (!eventId) return;
@@ -86,6 +128,16 @@ $: totalCount = pendingCount + approvedCount;
 		confirmTarget = null;
 	}
 
+	function openCancelConfirm(registration) {
+		cancelConfirmTarget = registration;
+		cancelConfirmOpen = true;
+	}
+
+	function closeCancelConfirm() {
+		cancelConfirmOpen = false;
+		cancelConfirmTarget = null;
+	}
+
 	async function confirmApprove() {
 		if (!confirmTarget) return;
 		confirmLoading = true;
@@ -106,13 +158,41 @@ $: totalCount = pendingCount + approvedCount;
 				await new Promise((resolve) => setTimeout(resolve, 300 - elapsed));
 			}
 			registrations = registrations.map((item) =>
-				item.id === confirmTarget.id ? { ...item, accepted: true } : item
+				item.id === confirmTarget.id ? { ...item, status: 'active' } : item
 			);
 			closeConfirm();
 		} catch (err) {
 			error = err.message || err.toString() || 'Failed to approve';
 		} finally {
 			confirmLoading = false;
+		}
+	}
+
+	async function cancelRegistration() {
+		if (!cancelConfirmTarget || cancelingId) return;
+		cancelingId = cancelConfirmTarget.id;
+		error = '';
+		try {
+			const response = await fetch(
+				`/api/admin/registrations/${encodeURIComponent(cancelConfirmTarget.id)}/cancel`,
+				{
+					method: 'POST',
+					headers: {
+						Authorization: pb.authStore.token,
+					},
+				}
+			);
+			if (!response.ok) {
+				throw new Error('Failed to cancel');
+			}
+			registrations = registrations.map((item) =>
+				item.id === cancelConfirmTarget.id ? { ...item, status: 'cancelled' } : item
+			);
+			closeCancelConfirm();
+		} catch (err) {
+			error = err.message || err.toString() || 'Failed to cancel';
+		} finally {
+			cancelingId = null;
 		}
 	}
 
@@ -143,7 +223,9 @@ onMount(() => {
 	{:else}
 		<div class="header">
 			<h1>{eventInfo?.title}</h1>
-			<p class="date">{formatEventDate(eventInfo?.event_date)}</p>
+			{#if dateLine}
+				<p class="date">{dateLine}</p>
+			{/if}
 			<StatRow
 				center
 				items={[
@@ -163,14 +245,12 @@ onMount(() => {
 						{#each pendingItems as reg}
 							<div class="row">
 								<div class="row-info">
+									<p class="meta">{formatShortDate(reg.created)}</p>
 									<p class="name">{displayName(reg)}</p>
 									<p class="email">{displayRegion(reg)}</p>
 								</div>
 								<div class="row-actions">
 									<button class="approve" on:click={() => openConfirm(reg)}>Approve</button>
-									{#if reg.hasUser}
-										<span class="dot" aria-label="Registered user"></span>
-									{/if}
 								</div>
 							</div>
 						{/each}
@@ -194,9 +274,44 @@ onMount(() => {
 								</div>
 								<div class="row-actions">
 									{#if reg.hasUser}
-										<span class="dot" aria-label="Registered user"></span>
+										<span class="user-badge" aria-label="Registered user">
+											<svg viewBox="0 0 24 24" aria-hidden="true">
+												<path
+													d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-3.33 0-7 1.67-7 5v1h14v-1c0-3.33-3.67-5-7-5Z"
+												/>
+											</svg>
+										</span>
 									{/if}
+									<button
+										class="remove"
+										disabled={cancelingId === reg.id}
+										aria-label="Remove registration"
+										on:click={() => openCancelConfirm(reg)}
+									>
+										x
+									</button>
 								</div>
+							</div>
+						{/each}
+					{/if}
+				</div>
+			</div>
+		</AdminCard>
+
+		<AdminCard>
+			<div class="list">
+				<div class="list-section">
+					<h2>Cancelled</h2>
+					{#if cancelledCount === 0}
+						<p class="empty">No cancelled registrations.</p>
+					{:else}
+						{#each cancelledItems as reg}
+							<div class="row">
+								<div class="row-info">
+									<p class="name">{displayName(reg)}</p>
+									<p class="email">{displayRegion(reg)}</p>
+								</div>
+								<div class="row-actions"></div>
 							</div>
 						{/each}
 					{/if}
@@ -216,6 +331,16 @@ onMount(() => {
 	loading={confirmLoading}
 	onConfirm={confirmApprove}
 	onCancel={closeConfirm}
+/>
+
+<ConfirmModal
+	show={cancelConfirmOpen}
+	title="Cancel registration"
+	message="Are you sure you want to cancel this registration?"
+	confirmLabel="Cancel"
+	loading={cancelingId !== null}
+	onConfirm={cancelRegistration}
+	onCancel={closeCancelConfirm}
 />
 
 <style>
@@ -278,12 +403,21 @@ onMount(() => {
 		min-width: 8.5rem;
 	}
 
-	.dot {
-		width: 0.55rem;
-		height: 0.55rem;
+	.user-badge {
+		width: 1.4rem;
+		height: 1.4rem;
 		border-radius: 999px;
-		background: #000;
-		display: inline-block;
+		border: 2px solid #000;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.user-badge svg {
+		width: 0.85rem;
+		height: 0.85rem;
+		fill: #000;
+		display: block;
 	}
 
 	.name {
@@ -303,6 +437,14 @@ onMount(() => {
 		text-overflow: ellipsis;
 	}
 
+	.meta {
+		margin: 0 0 0.2rem 0;
+		font-size: 0.7rem;
+		color: #999;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+	}
+
 	.approve {
 		border: 2px solid #000;
 		background: #000;
@@ -314,6 +456,26 @@ onMount(() => {
 
 	.approve:hover {
 		background: #333;
+	}
+
+	.remove {
+		border: none;
+		background: #fff;
+		color: #000;
+		width: 2.1rem;
+		height: 2.1rem;
+		font-weight: 700;
+		cursor: pointer;
+		padding: 0;
+	}
+
+	.remove:disabled {
+		opacity: 0.5;
+		cursor: default;
+	}
+
+	.remove:hover:enabled {
+		background: #f1f1f1;
 	}
 
 	.back {

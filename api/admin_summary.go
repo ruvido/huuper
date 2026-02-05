@@ -77,7 +77,7 @@ func AdminSummaryHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) 
 
 			pending, err := app.FindRecordsByFilter(
 				"event_registrations",
-				fmt.Sprintf("event = '%s' && accepted = false", eventID),
+				fmt.Sprintf("event = '%s' && status = 'pending'", eventID),
 				"",
 				0,
 				0,
