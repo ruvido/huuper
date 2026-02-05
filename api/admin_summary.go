@@ -15,6 +15,7 @@ import (
 )
 
 type adminEventNext struct {
+	ID            string `json:"id"`
 	Title         string `json:"title"`
 	EventDate     string `json:"event_date"`
 	Registrations int    `json:"registrations"`
@@ -63,7 +64,7 @@ func AdminSummaryHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) 
 			return apis.NewBadRequestError("failed_events", err)
 		}
 
-		var next adminEventNext
+		var next *adminEventNext
 		if len(events) > 0 {
 			event := events[0]
 			eventID := event.Id
@@ -89,7 +90,8 @@ func AdminSummaryHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) 
 				return apis.NewBadRequestError("failed_pending", err)
 			}
 
-			next = adminEventNext{
+			next = &adminEventNext{
+				ID:            eventID,
 				Title:         event.GetString("title"),
 				EventDate:     event.GetString("event_date"),
 				Registrations: len(registrations),

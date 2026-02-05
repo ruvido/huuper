@@ -38,6 +38,8 @@ func main() {
 		// API routes
 		se.Router.GET("/api/settings/{name}", api.GetSettingsHandler(app))
 		se.Router.GET("/api/admin/summary", api.AdminSummaryHandler(app)).Bind(apis.RequireAuth())
+		se.Router.GET("/api/admin/events/{id}", api.AdminEventDetailsHandler(app)).Bind(apis.RequireAuth())
+		se.Router.POST("/api/admin/registrations/{id}/approve", api.AdminApproveRegistrationHandler(app)).Bind(apis.RequireAuth())
 		se.Router.POST("/api/events/{slug}/register", api.RegisterEventHandler(app))
 		se.Router.GET("/api/events/{slug}/status", api.EventStatusHandler(app)).Bind(apis.RequireAuth())
 		se.Router.POST("/api/events/{slug}/unsubscribe", api.EventUnsubscribeHandler(app)).Bind(apis.RequireAuth())

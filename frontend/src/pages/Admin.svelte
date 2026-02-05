@@ -1,6 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
 	import { pb } from '../lib/pocketbase';
+	import { navigate } from '../lib/router';
 	import DashboardLayout from '../components/DashboardLayout.svelte';
 	import StateCard from '../components/StateCard.svelte';
 	import AdminCard from '../components/AdminCard.svelte';
@@ -26,6 +27,11 @@
 		const normalized = value.replace('T', ' ');
 		const [dateRaw] = normalized.split(' ');
 		return formatDatePart(dateRaw);
+	}
+
+	function goToNextEvent() {
+		if (!summary?.events?.next?.id) return;
+		navigate(`app/events?id=${encodeURIComponent(summary.events.next.id)}`);
 	}
 
 	async function loadSummary() {
@@ -73,21 +79,23 @@
 			<StateCard>Caricamento...</StateCard>
 		{:else}
 			<AdminCard>
-				<div class="title-row">
-					<p class="title">{summary.events?.next?.title || 'Nessun evento'}</p>
-					<p class="date">{formatEventDate(summary.events?.next?.event_date)}</p>
-				</div>
-				{#if summary.events?.next}
-					<div class="center-row">
-						<StatRow
-							center
-							items={[
-								{ label: 'Iscritti', value: summary.events.next.registrations ?? '—' },
-								{ label: 'Da approvare', value: summary.events.next.pending ?? '—' },
-							]}
-						/>
+				<button class="event-card" on:click={goToNextEvent} disabled={!summary.events?.next?.id}>
+					<div class="title-row">
+						<p class="title">{summary.events?.next?.title || 'Nessun evento'}</p>
+						<p class="date">{formatEventDate(summary.events?.next?.event_date)}</p>
 					</div>
-				{/if}
+					{#if summary.events?.next}
+						<div class="center-row">
+							<StatRow
+								center
+								items={[
+									{ label: 'Iscritti', value: summary.events.next.registrations ?? '—' },
+									{ label: 'Da approvare', value: summary.events.next.pending ?? '—' },
+								]}
+							/>
+						</div>
+					{/if}
+				</button>
 			</AdminCard>
 		{/if}
 	</section>
@@ -120,6 +128,19 @@
 	.section {
 		display: grid;
 		gap: 0.75rem;
+	}
+
+	.event-card {
+		border: none;
+		background: transparent;
+		padding: 0;
+		width: 100%;
+		text-align: left;
+		cursor: pointer;
+	}
+
+	.event-card:disabled {
+		cursor: default;
 	}
 
 	.title-row {

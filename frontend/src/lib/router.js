@@ -8,7 +8,7 @@ const authOnlyRoutes = ['onboarding', 'pending-approval', 'telegram-connect'];
 const appPrefix = 'app/';
 export const defaultAppRoute = 'app/home';
 const adminRoute = 'app/admin';
-const appRoutes = [defaultAppRoute, 'app/groups', 'app/profile', adminRoute];
+const appRoutes = [defaultAppRoute, 'app/groups', 'app/profile', adminRoute, 'app/events'];
 
 function updateRoute() {
 	const hash = window.location.hash.slice(1) || 'login'; // Remove #

@@ -15,6 +15,7 @@
 	import Profile from './pages/Profile.svelte';
 	import Groups from './pages/Groups.svelte';
 	import Admin from './pages/Admin.svelte';
+	import AdminEvent from './pages/AdminEvent.svelte';
 
 	let menuOpen = false;
 	let authReady = false;
@@ -116,6 +117,8 @@
 			<Groups />
 		{:else if $currentRoute === 'app/admin'}
 			<Admin />
+		{:else if $currentRoute === 'app/events'}
+			<AdminEvent />
 		{:else}
 			<Login />
 		{/if}
