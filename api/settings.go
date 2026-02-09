@@ -17,12 +17,14 @@ func GetSettingsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) e
 			"title":          true,
 			"password_reset": true,
 		}
-		authNames := map[string]bool{
-			"onboarding":       true,
-			"telegram":         true,
-			"telegram_connect": true,
-			"welcome":          true,
-		}
+	authNames := map[string]bool{
+		"onboarding":       true,
+		"requests_flow":    true,
+		"telegram":         true,
+		"telegram_connect": true,
+		"users":            true,
+		"welcome":          true,
+	}
 
 		if !publicNames[name] && !authNames[name] {
 			return apis.NewNotFoundError("Setting not found", nil)

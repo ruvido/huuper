@@ -46,6 +46,8 @@ func main() {
 		se.Router.POST("/api/events/{slug}/unsubscribe", api.EventUnsubscribeHandler(app)).Bind(apis.RequireAuth())
 		se.Router.GET("/api/events/accept", api.AcceptEventHandler(app))
 		se.Router.POST("/api/telegram/generate-token", api.GenerateTelegramTokenHandler(app)).Bind(apis.RequireAuth())
+		se.Router.POST("/api/requests/submit", api.SubmitRequestHandler(app))
+		se.Router.POST("/api/requests/{id}/action", api.RequestActionHandler(app)).Bind(apis.RequireAuth())
 
 		// Serve frontend
 		se.Router.GET("/{path...}", apis.Static(os.DirFS("./pb_public"), false))
