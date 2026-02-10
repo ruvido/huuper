@@ -46,7 +46,7 @@ func SubmitRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		}
 
 		input := normalizeSubmitInput(raw)
-		data, err := validateAndBuildRequestData(input, signup)
+		data, rejected, err := validateAndBuildRequestData(input, signup)
 		if err != nil {
 			return apis.NewBadRequestError("invalid_request_data", err)
 		}
@@ -58,13 +58,15 @@ func SubmitRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 
 		record := core.NewRecord(requests)
 		record.Set("data", data)
+		record.Set("rejected", rejected)
 		if err := app.Save(record); err != nil {
 			return apis.NewBadRequestError("failed_to_create_request", err)
 		}
 
 		return e.JSON(http.StatusCreated, map[string]any{
-			"id":   record.Id,
-			"data": data,
+			"id":       record.Id,
+			"rejected": record.GetBool("rejected"),
+			"data":     data,
 		})
 	}
 }
@@ -116,8 +118,9 @@ func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		}
 
 		return e.JSON(http.StatusOK, map[string]any{
-			"id":   record.Id,
-			"data": record.Get("data"),
+			"id":       record.Id,
+			"rejected": record.GetBool("rejected"),
+			"data":     record.Get("data"),
 		})
 	}
 }
@@ -127,7 +130,7 @@ func applyTransitionAction(app *pocketbase.PocketBase, actor *core.Record, recor
 		return apis.NewBadRequestError("missing_target_status", nil)
 	}
 
-	if toBool(data["rejected"]) {
+	if record.GetBool("rejected") {
 		return apis.NewBadRequestError("request_rejected", nil)
 	}
 
@@ -181,10 +184,10 @@ func applyRejectAction(app *pocketbase.PocketBase, actor *core.Record, record *c
 		return apis.NewForbiddenError("forbidden_reject", nil)
 	}
 
-	data["rejected"] = true
 	data["reject_reason"] = reason
 	data["rejected_at"] = time.Now().UTC().Format(time.RFC3339)
 	data["rejected_by"] = actor.Id
+	record.Set("rejected", true)
 	record.Set("data", data)
 	return nil
 }
@@ -236,7 +239,7 @@ func normalizeSubmitInput(raw map[string]any) map[string]any {
 	return raw
 }
 
-func validateAndBuildRequestData(input map[string]any, signup signupSettingsConfig) (map[string]any, error) {
+func validateAndBuildRequestData(input map[string]any, signup signupSettingsConfig) (map[string]any, bool, error) {
 	allowed := make(map[string]signupFieldConfig, len(signup.Fields))
 	for _, field := range signup.Fields {
 		key := strings.TrimSpace(field.Key)
@@ -246,12 +249,12 @@ func validateAndBuildRequestData(input map[string]any, signup signupSettingsConf
 		allowed[key] = field
 	}
 	if len(allowed) == 0 {
-		return nil, fmt.Errorf("signup fields not configured")
+		return nil, false, fmt.Errorf("signup fields not configured")
 	}
 
 	for key := range input {
 		if _, ok := allowed[key]; !ok {
-			return nil, fmt.Errorf("unknown field: %s", key)
+			return nil, false, fmt.Errorf("unknown field: %s", key)
 		}
 	}
 
@@ -267,7 +270,7 @@ func validateAndBuildRequestData(input map[string]any, signup signupSettingsConf
 			continue
 		}
 		if !hasNonEmptyValue(out[key]) {
-			return nil, fmt.Errorf("missing required field: %s", key)
+			return nil, false, fmt.Errorf("missing required field: %s", key)
 		}
 	}
 
@@ -283,8 +286,7 @@ func validateAndBuildRequestData(input map[string]any, signup signupSettingsConf
 	}
 
 	out["status"] = status
-	out["rejected"] = rejected
-	return out, nil
+	return out, rejected, nil
 }
 
 func hasNonEmptyValue(value any) bool {
@@ -339,14 +341,5 @@ func asString(value any) string {
 		return typed
 	default:
 		return ""
-	}
-}
-
-func toBool(value any) bool {
-	switch typed := value.(type) {
-	case bool:
-		return typed
-	default:
-		return false
 	}
 }
