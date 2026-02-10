@@ -30,6 +30,8 @@ type requestActionPayload struct {
 	Action       string `json:"action"`
 	TargetStatus string `json:"target_status"`
 	Reason       string `json:"reason"`
+	GroupID      string `json:"group"`
+	GuardianID   string `json:"guardian"`
 }
 
 // SubmitRequestHandler creates a request from public signup config.
@@ -46,9 +48,12 @@ func SubmitRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		}
 
 		input := normalizeSubmitInput(raw)
-		data, rejected, err := validateAndBuildRequestData(input, signup)
+		data, rejected, email, err := validateAndBuildRequestData(input, signup)
 		if err != nil {
 			return apis.NewBadRequestError("invalid_request_data", err)
+		}
+		if err := ensureSubmitEmailAvailable(app, email); err != nil {
+			return err
 		}
 
 		requests, err := app.FindCollectionByNameOrId("requests")
@@ -57,6 +62,7 @@ func SubmitRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		}
 
 		record := core.NewRecord(requests)
+		record.Set("email", email)
 		record.Set("data", data)
 		record.Set("rejected", rejected)
 		if err := app.Save(record); err != nil {
@@ -65,6 +71,7 @@ func SubmitRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 
 		return e.JSON(http.StatusCreated, map[string]any{
 			"id":       record.Id,
+			"email":    record.GetString("email"),
 			"rejected": record.GetBool("rejected"),
 			"data":     data,
 		})
@@ -100,17 +107,37 @@ func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 
 		data := parseJSONMap(record.Get("data"))
 
+		deleteRequest := false
+		promotedUserID := ""
 		switch action {
 		case "transition":
-			if err := applyTransitionAction(app, e.Auth, record, data, strings.TrimSpace(payload.TargetStatus)); err != nil {
+			if err := applyTransitionAction(app, e.Auth, record, data, payload, strings.TrimSpace(payload.TargetStatus)); err != nil {
 				return err
 			}
 		case "reject":
 			if err := applyRejectAction(app, e.Auth, record, data, strings.TrimSpace(payload.Reason)); err != nil {
 				return err
 			}
+		case "promote":
+			userID, err := applyPromoteAction(app, e.Auth, record, data)
+			if err != nil {
+				return err
+			}
+			deleteRequest = true
+			promotedUserID = userID
 		default:
 			return apis.NewBadRequestError("unsupported_action", nil)
+		}
+
+		if deleteRequest {
+			if err := app.Delete(record); err != nil {
+				return apis.NewBadRequestError("failed_to_delete_request", err)
+			}
+			return e.JSON(http.StatusOK, map[string]any{
+				"id":       id,
+				"promoted": true,
+				"user_id":  promotedUserID,
+			})
 		}
 
 		if err := app.Save(record); err != nil {
@@ -125,7 +152,7 @@ func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 	}
 }
 
-func applyTransitionAction(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any, target string) error {
+func applyTransitionAction(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any, payload requestActionPayload, target string) error {
 	if target == "" {
 		return apis.NewBadRequestError("missing_target_status", nil)
 	}
@@ -165,6 +192,55 @@ func applyTransitionAction(app *pocketbase.PocketBase, actor *core.Record, recor
 		return apis.NewForbiddenError("forbidden_transition", nil)
 	}
 
+	if target == "2-group_assigned" {
+		groupID := strings.TrimSpace(payload.GroupID)
+		if groupID == "" {
+			return apis.NewBadRequestError("missing_group", nil)
+		}
+		group, err := app.FindRecordById("groups", groupID)
+		if err != nil || group == nil {
+			return apis.NewBadRequestError("invalid_group", err)
+		}
+		record.Set("group", groupID)
+	}
+
+	if target == "3-guardian_assigned" {
+		groupID := strings.TrimSpace(record.GetString("group"))
+		if groupID == "" {
+			return apis.NewBadRequestError("missing_group_assignment", nil)
+		}
+
+		guardianID := strings.TrimSpace(payload.GuardianID)
+		if guardianID == "" {
+			return apis.NewBadRequestError("missing_guardian", nil)
+		}
+
+		guardian, err := app.FindRecordById("users", guardianID)
+		if err != nil || guardian == nil {
+			return apis.NewBadRequestError("invalid_guardian", err)
+		}
+
+		guardianMemberships, err := app.FindRecordsByFilter(
+			"user_groups",
+			"user = {:user} && group = {:group}",
+			"",
+			1,
+			0,
+			map[string]any{
+				"user":  guardianID,
+				"group": groupID,
+			},
+		)
+		if err != nil {
+			return apis.NewBadRequestError("guardian_membership_check_failed", err)
+		}
+		if len(guardianMemberships) == 0 {
+			return apis.NewBadRequestError("guardian_not_in_group", nil)
+		}
+
+		record.Set("guardian", guardianID)
+	}
+
 	data["status"] = target
 	record.Set("data", data)
 	return nil
@@ -175,21 +251,91 @@ func applyRejectAction(app *pocketbase.PocketBase, actor *core.Record, record *c
 		return apis.NewBadRequestError("missing_reject_reason", nil)
 	}
 
-	isAdmin := actor.GetBool("admin")
-	isAssistant, err := hasRoleForRequest(app, actor, record, data, "assistant")
-	if err != nil {
-		return apis.NewBadRequestError("role_resolution_failed", err)
-	}
-	if !isAdmin && !isAssistant {
+	if !actor.GetBool("admin") {
 		return apis.NewForbiddenError("forbidden_reject", nil)
 	}
 
 	data["reject_reason"] = reason
 	data["rejected_at"] = time.Now().UTC().Format(time.RFC3339)
-	data["rejected_by"] = actor.Id
+	data["rejected_by"] = adminDisplayName(actor)
 	record.Set("rejected", true)
 	record.Set("data", data)
 	return nil
+}
+
+func adminDisplayName(actor *core.Record) string {
+	if actor == nil {
+		return ""
+	}
+
+	data := parseJSONMap(actor.Get("data"))
+	if fullName, ok := data["full_name"].(string); ok && strings.TrimSpace(fullName) != "" {
+		return strings.TrimSpace(fullName)
+	}
+	if name, ok := data["name"].(string); ok && strings.TrimSpace(name) != "" {
+		return strings.TrimSpace(name)
+	}
+
+	email := strings.TrimSpace(actor.GetString("email"))
+	if email != "" {
+		return email
+	}
+
+	return actor.Id
+}
+
+func applyPromoteAction(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any) (string, error) {
+	if !actor.GetBool("admin") {
+		return "", apis.NewForbiddenError("forbidden_promote", nil)
+	}
+	if record.GetBool("rejected") {
+		return "", apis.NewBadRequestError("request_rejected", nil)
+	}
+
+	current := asString(data["status"])
+	if current != "6-admin_approved" {
+		return "", apis.NewBadRequestError("invalid_promote_status", nil)
+	}
+
+	email, err := normalizeEmail(record.GetString("email"))
+	if err != nil {
+		return "", apis.NewBadRequestError("invalid_email", nil)
+	}
+
+	existing, err := app.FindFirstRecordByFilter(
+		"users",
+		"email = {:email}",
+		map[string]any{"email": email},
+	)
+	if err == nil && existing != nil {
+		return "", apis.NewBadRequestError("user_already_exists", nil)
+	}
+
+	users, err := app.FindCollectionByNameOrId("users")
+	if err != nil {
+		return "", apis.NewNotFoundError("users_collection_not_found", err)
+	}
+
+	user := core.NewRecord(users)
+	tempPassword := randomToken()
+	if tempPassword == "" {
+		return "", apis.NewBadRequestError("failed_to_generate_password", nil)
+	}
+	user.Set("email", email)
+	user.Set("password", tempPassword)
+	user.Set("passwordConfirm", tempPassword)
+	user.Set("status", "active")
+
+	userData := buildUserDataFromRequest(data)
+	if len(userData) > 0 {
+		user.Set("data", userData)
+	}
+
+	if err := app.Save(user); err != nil {
+		return "", apis.NewBadRequestError("failed_to_create_user", err)
+	}
+
+	return user.Id, nil
 }
 
 func loadSignupSettings(app *pocketbase.PocketBase) (signupSettingsConfig, error) {
@@ -239,7 +385,7 @@ func normalizeSubmitInput(raw map[string]any) map[string]any {
 	return raw
 }
 
-func validateAndBuildRequestData(input map[string]any, signup signupSettingsConfig) (map[string]any, bool, error) {
+func validateAndBuildRequestData(input map[string]any, signup signupSettingsConfig) (map[string]any, bool, string, error) {
 	allowed := make(map[string]signupFieldConfig, len(signup.Fields))
 	for _, field := range signup.Fields {
 		key := strings.TrimSpace(field.Key)
@@ -249,12 +395,12 @@ func validateAndBuildRequestData(input map[string]any, signup signupSettingsConf
 		allowed[key] = field
 	}
 	if len(allowed) == 0 {
-		return nil, false, fmt.Errorf("signup fields not configured")
+		return nil, false, "", fmt.Errorf("signup fields not configured")
 	}
 
 	for key := range input {
 		if _, ok := allowed[key]; !ok {
-			return nil, false, fmt.Errorf("unknown field: %s", key)
+			return nil, false, "", fmt.Errorf("unknown field: %s", key)
 		}
 	}
 
@@ -270,9 +416,19 @@ func validateAndBuildRequestData(input map[string]any, signup signupSettingsConf
 			continue
 		}
 		if !hasNonEmptyValue(out[key]) {
-			return nil, false, fmt.Errorf("missing required field: %s", key)
+			return nil, false, "", fmt.Errorf("missing required field: %s", key)
 		}
 	}
+
+	email, ok := out["email"].(string)
+	if !ok || strings.TrimSpace(email) == "" {
+		return nil, false, "", fmt.Errorf("missing required field: email")
+	}
+	normalizedEmail, err := normalizeEmail(email)
+	if err != nil {
+		return nil, false, "", fmt.Errorf("invalid email")
+	}
+	delete(out, "email")
 
 	status := "1-submitted"
 	rejected := false
@@ -286,7 +442,7 @@ func validateAndBuildRequestData(input map[string]any, signup signupSettingsConf
 	}
 
 	out["status"] = status
-	return out, rejected, nil
+	return out, rejected, normalizedEmail, nil
 }
 
 func hasNonEmptyValue(value any) bool {
@@ -321,7 +477,7 @@ func hasRoleForRequest(app *pocketbase.PocketBase, actor *core.Record, record *c
 	case "guardian":
 		return strings.TrimSpace(record.GetString("guardian")) == actor.Id, nil
 	case "assistant":
-		groupID := strings.TrimSpace(asString(data["group_id"]))
+		groupID := strings.TrimSpace(record.GetString("group"))
 		if groupID == "" {
 			return false, nil
 		}
@@ -333,6 +489,46 @@ func hasRoleForRequest(app *pocketbase.PocketBase, actor *core.Record, record *c
 	default:
 		return false, nil
 	}
+}
+
+func ensureSubmitEmailAvailable(app *pocketbase.PocketBase, email string) error {
+	existingUser, err := app.FindFirstRecordByFilter(
+		"users",
+		"email = {:email}",
+		map[string]any{"email": email},
+	)
+	if err == nil && existingUser != nil {
+		return apis.NewBadRequestError("email_exists_user", nil)
+	}
+
+	existingRequest, err := app.FindFirstRecordByFilter(
+		"requests",
+		"email = {:email}",
+		map[string]any{"email": email},
+	)
+	if err == nil && existingRequest != nil {
+		return apis.NewBadRequestError("email_exists_request", nil)
+	}
+
+	return nil
+}
+
+func buildUserDataFromRequest(data map[string]any) map[string]any {
+	if data == nil {
+		return map[string]any{}
+	}
+
+	out := map[string]any{}
+	for key, value := range data {
+		switch key {
+		case "status", "reject_reason", "rejected_at", "rejected_by":
+			continue
+		default:
+			out[key] = value
+		}
+	}
+
+	return out
 }
 
 func asString(value any) string {
