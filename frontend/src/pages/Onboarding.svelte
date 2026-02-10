@@ -9,15 +9,14 @@
 	import ConfirmationPage from '../components/onboarding/ConfirmationPage.svelte';
 
 	let steps = [];
+	let confirmation = null;
 	let currentStep = 0;
 	let formData = {};
 	let error = '';
 	let loading = false;
 	let showConfirmation = false;
 
-	// Separate confirmation step from form steps
-	$: confirmationStep = steps.find(s => s.type === 'confirmation');
-	$: formSteps = steps.filter(s => s.type !== 'confirmation');
+	$: formSteps = steps;
 
 	// Crop state
 	let showCropModal = false;
@@ -77,24 +76,98 @@
 	})();
 
 	onMount(async () => {
-		// Fetch onboarding config from settings
 		try {
-			const response = await fetchSetting('onboarding');
-			if (response.ok) {
-				const data = await response.json();
-				steps = data.data.steps || [];
-			} else {
+			const [onboardingResponse, profileResponse] = await Promise.all([
+				fetchSetting('onboarding'),
+				fetchSetting('profile_schema'),
+			]);
+
+			if (!onboardingResponse.ok || !profileResponse.ok) {
 				error = 'Failed to load onboarding configuration';
+				return;
 			}
-		} catch (err) {
+
+			const onboardingPayload = await onboardingResponse.json();
+			const profilePayload = await profileResponse.json();
+
+			const onboardingData = onboardingPayload?.data || {};
+			const profileData = profilePayload?.data || {};
+			steps = buildOnboardingSteps(onboardingData, profileData);
+			confirmation = onboardingData.confirmation || null;
+
+			if (steps.length === 0) {
+				error = 'Onboarding configuration has no steps';
+			}
+		} catch {
 			error = 'Failed to load onboarding configuration';
 		}
 	});
+
+	function normalizeFieldType(type) {
+		const value = (type || '').toLowerCase();
+		if (value === 'phone') return 'text';
+		if (value === 'email') return 'text';
+		return value;
+	}
+
+	function buildOnboardingSteps(onboardingData, profileData) {
+		const out = [];
+		const profileFields = Array.isArray(profileData?.fields) ? profileData.fields : [];
+		const byKey = new Map();
+		for (const field of profileFields) {
+			const key = field?.key;
+			if (typeof key === 'string' && key.trim() !== '') {
+				byKey.set(key, field);
+			}
+		}
+
+		const startPage = onboardingData?.start_page;
+		if (startPage && typeof startPage === 'object') {
+			out.push({
+				id: 'start',
+				type: 'start',
+				title: startPage.title || '',
+				text: startPage.text || '',
+				button: startPage.button || 'Inizia',
+			});
+		}
+
+		const rawSteps = Array.isArray(onboardingData?.steps) ? onboardingData.steps : [];
+		for (const rawStep of rawSteps) {
+			const key = typeof rawStep?.field === 'string' ? rawStep.field.trim() : '';
+			if (!key) continue;
+
+			const field = byKey.get(key);
+			if (!field) continue;
+
+			out.push({
+				id: key,
+				field: key,
+				type: normalizeFieldType(field.type),
+				title: rawStep.title || field.title || field.label || '',
+				label: rawStep.label || field.label || '',
+				options: Array.isArray(field.options) ? field.options : [],
+				min: Number.isFinite(field.min) ? field.min : undefined,
+				max: Number.isFinite(field.max) ? field.max : undefined,
+			});
+		}
+
+		return out;
+	}
 
 	function nextStep() {
 		if (currentStep < formSteps.length - 1 && canProceed) {
 			currentStep++;
 		}
+	}
+
+	async function completeStep() {
+		if (!canProceed || loading) return;
+		if (confirmation) {
+			showConfirmation = true;
+			return;
+		}
+		await handleSubmit();
 	}
 
 	function prevStep() {
@@ -170,12 +243,12 @@
 			cropImage = '';
 			cropFile = null;
 
-			// Auto-advance after crop
-			if (currentStep < formSteps.length - 1) {
-				currentStep++;
-			} else {
-				showConfirmation = true;
-			}
+				// Auto-advance after crop
+				if (currentStep < formSteps.length - 1) {
+					currentStep++;
+				} else {
+					await completeStep();
+				}
 		} catch (err) {
 			error = 'Errore nel processare l\'immagine';
 		} finally {
@@ -275,9 +348,9 @@
 			{loading}
 			onBack={prevStep}
 			onNext={nextStep}
-			onClose={handleClose}
-			onComplete={() => showConfirmation = true}
-		/>
+				onClose={handleClose}
+				onComplete={completeStep}
+			/>
 	{/if}
 
 	{#if !showConfirmation}
@@ -292,22 +365,22 @@
 					{error}
 					{canProceed}
 					isLastStep={currentStep === formSteps.length - 1}
-					onNext={nextStep}
-					onComplete={() => showConfirmation = true}
-					onClose={handleClose}
-					onToggleOption={toggleOption}
-					onFileSelect={openCropModal}
+						onNext={nextStep}
+						onComplete={completeStep}
+						onClose={handleClose}
+						onToggleOption={toggleOption}
+						onFileSelect={openCropModal}
 				/>
 			{/if}
 		</div>
 	{/if}
 
 	<!-- Confirmation Page -->
-	{#if showConfirmation && confirmationStep}
+	{#if showConfirmation && confirmation}
 		<ConfirmationPage
-			title={confirmationStep.title}
-			text={confirmationStep.text}
-			buttonText={confirmationStep.button}
+			title={confirmation.title}
+			text={confirmation.text}
+			buttonText={confirmation.button}
 			{loading}
 			onSubmit={handleSubmit}
 		/>

@@ -23,6 +23,7 @@ func init() {
 
 func main() {
 	app := pocketbase.New()
+	api.RegisterSettingsValidationHooks(app)
 
 	app.OnTerminate().BindFunc(func(e *core.TerminateEvent) error {
 		bot.StopTelegramBot()

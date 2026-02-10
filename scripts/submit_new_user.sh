@@ -1,8 +1,8 @@
 curl -X POST "http://localhost:8090/api/requests/submit" \
     -H "Content-Type: application/json" \
     -d '{
-      "name": "Mario Rossi",
-      "email": "ruvido@realmen.it",
+      "full_name": "Antonello",
+      "email": "antonello@venditti.it",
       "mobile": "+393331112233",
       "region": "Lombardia",
       "birth_year": "1990",

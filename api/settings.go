@@ -8,29 +8,29 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
+func unwrapSettingData(raw any) map[string]any {
+	data := parseJSONMap(raw)
+	if nested, ok := data["data"].(map[string]any); ok && nested != nil {
+		return nested
+	}
+	return data
+}
+
 // GetSettingsHandler returns settings by name
 func GetSettingsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		name := e.Request.PathValue("name")
+		if name == "" {
+			return apis.NewNotFoundError("Setting not found", nil)
+		}
 
 		publicNames := map[string]bool{
 			"title":          true,
 			"password_reset": true,
-		}
-	authNames := map[string]bool{
-		"onboarding":       true,
-		"requests_flow":    true,
-		"telegram":         true,
-		"telegram_connect": true,
-		"users":            true,
-		"welcome":          true,
-	}
-
-		if !publicNames[name] && !authNames[name] {
-			return apis.NewNotFoundError("Setting not found", nil)
+			"signup":         true,
 		}
 
-		if authNames[name] && e.Auth == nil {
+		if !publicNames[name] && e.Auth == nil {
 			return apis.NewUnauthorizedError("Unauthorized", nil)
 		}
 
@@ -46,12 +46,14 @@ func GetSettingsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) e
 			return apis.NewNotFoundError("Setting not found", err)
 		}
 
+		settingData := unwrapSettingData(record.Get("data"))
+
 		if name == "telegram" {
 			var telegramData struct {
 				Name string `json:"name"`
 			}
-			if err := record.UnmarshalJSONField("data", &telegramData); err != nil {
-				return apis.NewBadRequestError("Invalid setting data", err)
+			if value, ok := settingData["name"].(string); ok {
+				telegramData.Name = value
 			}
 
 			return e.JSON(http.StatusOK, map[string]interface{}{
@@ -64,7 +66,7 @@ func GetSettingsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) e
 
 		return e.JSON(http.StatusOK, map[string]interface{}{
 			"name": record.GetString("name"),
-			"data": record.Get("data"),
+			"data": settingData,
 		})
 	}
 }

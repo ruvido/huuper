@@ -12,13 +12,20 @@ import (
 )
 
 type signupFieldConfig struct {
+	Field string `json:"field"`
+}
+
+type signupSettingsConfig struct {
+	Steps []signupFieldConfig `json:"steps"`
+}
+
+type profileFieldConfig struct {
 	Key      string `json:"key"`
 	Required bool   `json:"required"`
 }
 
-type signupSettingsConfig struct {
-	Fields          []signupFieldConfig `json:"fields"`
-	RequestDefaults map[string]any      `json:"request_defaults"`
+type profileSchemaConfig struct {
+	Fields []profileFieldConfig `json:"fields"`
 }
 
 type requestsFlowConfig struct {
@@ -41,6 +48,18 @@ func SubmitRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		if err != nil {
 			return apis.NewBadRequestError("invalid_signup_settings", err)
 		}
+		profileSchema, err := loadProfileSchemaSettings(app)
+		if err != nil {
+			return apis.NewBadRequestError("invalid_profile_schema", err)
+		}
+		flow, err := loadRequestsFlowSettings(app)
+		if err != nil {
+			return apis.NewBadRequestError("invalid_requests_flow_settings", err)
+		}
+		initialStatus := strings.TrimSpace(flow.Statuses[0])
+		if initialStatus == "" {
+			return apis.NewBadRequestError("invalid_requests_flow_settings", nil)
+		}
 
 		var raw map[string]any
 		if err := e.BindBody(&raw); err != nil {
@@ -48,7 +67,7 @@ func SubmitRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		}
 
 		input := normalizeSubmitInput(raw)
-		data, rejected, email, err := validateAndBuildRequestData(input, signup)
+		data, email, err := validateAndBuildRequestData(input, signup, profileSchema, initialStatus)
 		if err != nil {
 			return apis.NewBadRequestError("invalid_request_data", err)
 		}
@@ -64,7 +83,7 @@ func SubmitRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		record := core.NewRecord(requests)
 		record.Set("email", email)
 		record.Set("data", data)
-		record.Set("rejected", rejected)
+		record.Set("rejected", false)
 		if err := app.Save(record); err != nil {
 			return apis.NewBadRequestError("failed_to_create_request", err)
 		}
@@ -72,7 +91,7 @@ func SubmitRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		return e.JSON(http.StatusCreated, map[string]any{
 			"id":       record.Id,
 			"email":    record.GetString("email"),
-			"rejected": record.GetBool("rejected"),
+			"rejected": false,
 			"data":     data,
 		})
 	}
@@ -171,25 +190,31 @@ func applyTransitionAction(app *pocketbase.PocketBase, actor *core.Record, recor
 		return apis.NewBadRequestError("missing_current_status", nil)
 	}
 
-	next, err := nextStatus(flow.Statuses, current)
-	if err != nil {
-		return apis.NewBadRequestError("invalid_current_status", err)
-	}
-	if target != next {
+	if !statusInFlow(flow.Statuses, target) {
 		return apis.NewBadRequestError("invalid_transition", nil)
 	}
 
-	requiredRole := strings.TrimSpace(flow.SetStatusBy[target])
-	if requiredRole == "" {
-		return apis.NewBadRequestError("missing_role_for_target_status", nil)
-	}
+	if !actor.GetBool("admin") {
+		next, err := nextStatus(flow.Statuses, current)
+		if err != nil {
+			return apis.NewBadRequestError("invalid_current_status", err)
+		}
+		if target != next {
+			return apis.NewBadRequestError("invalid_transition", nil)
+		}
 
-	ok, err := hasRoleForRequest(app, actor, record, data, requiredRole)
-	if err != nil {
-		return apis.NewBadRequestError("role_resolution_failed", err)
-	}
-	if !ok {
-		return apis.NewForbiddenError("forbidden_transition", nil)
+		requiredRole := strings.TrimSpace(flow.SetStatusBy[target])
+		if requiredRole == "" {
+			return apis.NewBadRequestError("missing_role_for_target_status", nil)
+		}
+
+		ok, err := hasRoleForRequest(app, actor, record, data, requiredRole)
+		if err != nil {
+			return apis.NewBadRequestError("role_resolution_failed", err)
+		}
+		if !ok {
+			return apis.NewForbiddenError("forbidden_transition", nil)
+		}
 	}
 
 	if target == "2-group_assigned" {
@@ -349,8 +374,60 @@ func loadSignupSettings(app *pocketbase.PocketBase) (signupSettingsConfig, error
 	}
 
 	var cfg signupSettingsConfig
-	if err := record.UnmarshalJSONField("data", &cfg); err != nil {
-		return signupSettingsConfig{}, err
+	raw := unwrapSettingData(record.Get("data"))
+	if rawSteps, ok := raw["steps"].([]any); ok {
+		cfg.Steps = make([]signupFieldConfig, 0, len(rawSteps))
+		for _, item := range rawSteps {
+			step, ok := item.(map[string]any)
+			if !ok {
+				continue
+			}
+			field := strings.TrimSpace(asString(step["field"]))
+			if field == "" {
+				continue
+			}
+			cfg.Steps = append(cfg.Steps, signupFieldConfig{Field: field})
+		}
+	}
+	return cfg, nil
+}
+
+func loadProfileSchemaSettings(app *pocketbase.PocketBase) (profileSchemaConfig, error) {
+	record, err := app.FindFirstRecordByFilter(
+		"settings",
+		"name = 'profile_schema'",
+		map[string]any{},
+	)
+	if err != nil || record == nil {
+		return profileSchemaConfig{}, fmt.Errorf("profile_schema settings not found")
+	}
+
+	raw := unwrapSettingData(record.Get("data"))
+	rawFields, ok := raw["fields"].([]any)
+	if !ok {
+		return profileSchemaConfig{}, fmt.Errorf("profile_schema fields missing")
+	}
+
+	cfg := profileSchemaConfig{
+		Fields: make([]profileFieldConfig, 0, len(rawFields)),
+	}
+	for _, item := range rawFields {
+		field, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		key := strings.TrimSpace(asString(field["key"]))
+		if key == "" {
+			continue
+		}
+		required := true
+		if value, ok := field["required"].(bool); ok {
+			required = value
+		}
+		cfg.Fields = append(cfg.Fields, profileFieldConfig{
+			Key:      key,
+			Required: required,
+		})
 	}
 	return cfg, nil
 }
@@ -365,9 +442,27 @@ func loadRequestsFlowSettings(app *pocketbase.PocketBase) (requestsFlowConfig, e
 		return requestsFlowConfig{}, fmt.Errorf("requests_flow settings not found")
 	}
 
+	raw := unwrapSettingData(record.Get("data"))
 	var cfg requestsFlowConfig
-	if err := record.UnmarshalJSONField("data", &cfg); err != nil {
-		return requestsFlowConfig{}, err
+	if rawStatuses, ok := raw["statuses"].([]any); ok {
+		cfg.Statuses = make([]string, 0, len(rawStatuses))
+		for _, value := range rawStatuses {
+			status := strings.TrimSpace(asString(value))
+			if status == "" {
+				continue
+			}
+			cfg.Statuses = append(cfg.Statuses, status)
+		}
+	}
+	if rawSetStatusBy, ok := raw["set_status_by"].(map[string]any); ok {
+		cfg.SetStatusBy = make(map[string]string, len(rawSetStatusBy))
+		for status, roleValue := range rawSetStatusBy {
+			role := strings.TrimSpace(asString(roleValue))
+			if role == "" {
+				continue
+			}
+			cfg.SetStatusBy[strings.TrimSpace(status)] = role
+		}
 	}
 	if len(cfg.Statuses) == 0 {
 		return requestsFlowConfig{}, fmt.Errorf("empty statuses")
@@ -385,22 +480,42 @@ func normalizeSubmitInput(raw map[string]any) map[string]any {
 	return raw
 }
 
-func validateAndBuildRequestData(input map[string]any, signup signupSettingsConfig) (map[string]any, bool, string, error) {
-	allowed := make(map[string]signupFieldConfig, len(signup.Fields))
-	for _, field := range signup.Fields {
+func validateAndBuildRequestData(input map[string]any, signup signupSettingsConfig, profile profileSchemaConfig, initialStatus string) (map[string]any, string, error) {
+	if len(signup.Steps) == 0 {
+		return nil, "", fmt.Errorf("signup steps not configured")
+	}
+
+	profileByKey := make(map[string]profileFieldConfig, len(profile.Fields))
+	for _, field := range profile.Fields {
 		key := strings.TrimSpace(field.Key)
 		if key == "" {
 			continue
 		}
-		allowed[key] = field
+		profileByKey[key] = field
+	}
+	if len(profileByKey) == 0 {
+		return nil, "", fmt.Errorf("profile fields not configured")
+	}
+
+	allowed := make(map[string]profileFieldConfig, len(signup.Steps))
+	for _, step := range signup.Steps {
+		key := strings.TrimSpace(step.Field)
+		if key == "" {
+			continue
+		}
+		fieldCfg, ok := profileByKey[key]
+		if !ok {
+			return nil, "", fmt.Errorf("signup step field not in profile_schema: %s", key)
+		}
+		allowed[key] = fieldCfg
 	}
 	if len(allowed) == 0 {
-		return nil, false, "", fmt.Errorf("signup fields not configured")
+		return nil, "", fmt.Errorf("signup fields not configured")
 	}
 
 	for key := range input {
 		if _, ok := allowed[key]; !ok {
-			return nil, false, "", fmt.Errorf("unknown field: %s", key)
+			return nil, "", fmt.Errorf("unknown field: %s", key)
 		}
 	}
 
@@ -411,38 +526,24 @@ func validateAndBuildRequestData(input map[string]any, signup signupSettingsConf
 		}
 	}
 
-	for key, field := range allowed {
-		if !field.Required {
-			continue
-		}
+	for key := range allowed {
 		if !hasNonEmptyValue(out[key]) {
-			return nil, false, "", fmt.Errorf("missing required field: %s", key)
+			return nil, "", fmt.Errorf("missing required field: %s", key)
 		}
 	}
 
 	email, ok := out["email"].(string)
 	if !ok || strings.TrimSpace(email) == "" {
-		return nil, false, "", fmt.Errorf("missing required field: email")
+		return nil, "", fmt.Errorf("missing required field: email")
 	}
 	normalizedEmail, err := normalizeEmail(email)
 	if err != nil {
-		return nil, false, "", fmt.Errorf("invalid email")
+		return nil, "", fmt.Errorf("invalid email")
 	}
 	delete(out, "email")
 
-	status := "1-submitted"
-	rejected := false
-	if signup.RequestDefaults != nil {
-		if value, ok := signup.RequestDefaults["status"].(string); ok && strings.TrimSpace(value) != "" {
-			status = strings.TrimSpace(value)
-		}
-		if value, ok := signup.RequestDefaults["rejected"].(bool); ok {
-			rejected = value
-		}
-	}
-
-	out["status"] = status
-	return out, rejected, normalizedEmail, nil
+	out["status"] = initialStatus
+	return out, normalizedEmail, nil
 }
 
 func hasNonEmptyValue(value any) bool {
@@ -520,15 +621,19 @@ func buildUserDataFromRequest(data map[string]any) map[string]any {
 
 	out := map[string]any{}
 	for key, value := range data {
-		switch key {
-		case "status", "reject_reason", "rejected_at", "rejected_by":
-			continue
-		default:
-			out[key] = value
-		}
+		out[key] = value
 	}
 
 	return out
+}
+
+func statusInFlow(statuses []string, target string) bool {
+	for _, status := range statuses {
+		if status == target {
+			return true
+		}
+	}
+	return false
 }
 
 func asString(value any) string {
