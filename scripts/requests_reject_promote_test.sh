@@ -18,7 +18,7 @@ ADMIN_TOKEN="${ADMIN_TOKEN:-}"
 # - REQ_ID_REJECT: request used for reject test
 # - REQ_ID_PROMOTE: request used for full approve+promote test
 REQ_ID_REJECT="ye537izdtlcoota"
-REQ_ID_PROMOTE="5e085yu7dyux9cj"
+REQ_ID_PROMOTE="dqp3u25fmbagubk"
 
 # Optional: needed only if REQ_ID_PROMOTE starts before 3-guardian_assigned.
 GROUP_ID=""

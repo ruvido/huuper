@@ -67,7 +67,7 @@ func SubmitRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		}
 
 		input := normalizeSubmitInput(raw)
-		data, email, err := validateAndBuildRequestData(input, signup, profileSchema, initialStatus)
+		data, email, err := validateAndBuildRequestData(input, signup, profileSchema)
 		if err != nil {
 			return apis.NewBadRequestError("invalid_request_data", err)
 		}
@@ -82,6 +82,7 @@ func SubmitRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 
 		record := core.NewRecord(requests)
 		record.Set("email", email)
+		record.Set("status", initialStatus)
 		record.Set("data", data)
 		record.Set("rejected", false)
 		if err := app.Save(record); err != nil {
@@ -91,6 +92,7 @@ func SubmitRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		return e.JSON(http.StatusCreated, map[string]any{
 			"id":       record.Id,
 			"email":    record.GetString("email"),
+			"status":   record.GetString("status"),
 			"rejected": false,
 			"data":     data,
 		})
@@ -165,6 +167,7 @@ func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 
 		return e.JSON(http.StatusOK, map[string]any{
 			"id":       record.Id,
+			"status":   record.GetString("status"),
 			"rejected": record.GetBool("rejected"),
 			"data":     record.Get("data"),
 		})
@@ -185,7 +188,7 @@ func applyTransitionAction(app *pocketbase.PocketBase, actor *core.Record, recor
 		return apis.NewBadRequestError("invalid_requests_flow_settings", err)
 	}
 
-	current := asString(data["status"])
+	current := strings.TrimSpace(record.GetString("status"))
 	if current == "" {
 		return apis.NewBadRequestError("missing_current_status", nil)
 	}
@@ -266,7 +269,7 @@ func applyTransitionAction(app *pocketbase.PocketBase, actor *core.Record, recor
 		record.Set("guardian", guardianID)
 	}
 
-	data["status"] = target
+	record.Set("status", target)
 	record.Set("data", data)
 	return nil
 }
@@ -317,7 +320,7 @@ func applyPromoteAction(app *pocketbase.PocketBase, actor *core.Record, record *
 		return "", apis.NewBadRequestError("request_rejected", nil)
 	}
 
-	current := asString(data["status"])
+	current := strings.TrimSpace(record.GetString("status"))
 	if current != "6-admin_approved" {
 		return "", apis.NewBadRequestError("invalid_promote_status", nil)
 	}
@@ -480,7 +483,7 @@ func normalizeSubmitInput(raw map[string]any) map[string]any {
 	return raw
 }
 
-func validateAndBuildRequestData(input map[string]any, signup signupSettingsConfig, profile profileSchemaConfig, initialStatus string) (map[string]any, string, error) {
+func validateAndBuildRequestData(input map[string]any, signup signupSettingsConfig, profile profileSchemaConfig) (map[string]any, string, error) {
 	if len(signup.Steps) == 0 {
 		return nil, "", fmt.Errorf("signup steps not configured")
 	}
@@ -542,7 +545,6 @@ func validateAndBuildRequestData(input map[string]any, signup signupSettingsConf
 	}
 	delete(out, "email")
 
-	out["status"] = initialStatus
 	return out, normalizedEmail, nil
 }
 
