@@ -12,7 +12,6 @@ import (
 	"sort"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
@@ -81,13 +80,13 @@ func RegisterEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		if err := e.BindBody(&payload); err != nil {
 			return apis.NewBadRequestError(errGeneric, err)
 		}
-	if payload.Data == nil {
-		payload.Data = map[string]any{}
-	}
-	normalizeRegistrationNames(payload.Data)
-	if !isDataSizeOk(payload.Data) {
-		return apis.NewBadRequestError(errGeneric, nil)
-	}
+		if payload.Data == nil {
+			payload.Data = map[string]any{}
+		}
+		normalizeRegistrationNames(payload.Data)
+		if !isDataSizeOk(payload.Data) {
+			return apis.NewBadRequestError(errGeneric, nil)
+		}
 		recipient, err := normalizeEmail(payload.Email)
 		if err != nil {
 			return apis.NewBadRequestError(errInvalidEmail, nil)
@@ -614,26 +613,6 @@ func normalizeRegistrationNames(data map[string]any) {
 			data["full_name"] = normalized
 		}
 	}
-}
-
-func normalizePersonName(value string) string {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
-		return ""
-	}
-	parts := strings.Fields(strings.ToLower(trimmed))
-	for i, part := range parts {
-		runes := []rune(part)
-		if len(runes) == 0 {
-			continue
-		}
-		runes[0] = unicode.ToUpper(runes[0])
-		for j := 1; j < len(runes); j++ {
-			runes[j] = unicode.ToLower(runes[j])
-		}
-		parts[i] = string(runes)
-	}
-	return strings.Join(parts, " ")
 }
 
 func safeHTML(value string) string {
