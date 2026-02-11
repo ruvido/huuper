@@ -25,6 +25,7 @@
 	let cropField = '';
 	let cropModalRef;
 	const nameFieldKey = 'full_name';
+	const customFieldSuffix = '_custom';
 
 	// Count only non-start steps
 	$: realSteps = formSteps.filter(s => s.type !== 'start');
@@ -40,40 +41,7 @@
 	$: progressPercentage = realSteps.length > 0 ? (realStepIndex / realSteps.length) * 100 : 0;
 
 	// Check if current step is complete
-	$: canProceed = (() => {
-		const step = formSteps[currentStep];
-		if (!step) return false;
-
-		if (step.type === 'start') {
-			return true;
-		} else if (step.type === 'text') {
-			return !!formData[step.field]?.trim();
-		} else if (step.type === 'textarea') {
-			return !!formData[step.field]?.trim();
-		} else if (step.type === 'file') {
-			return !!formData[step.field];
-		} else if (step.type === 'select') {
-			const value = formData[step.field];
-			if (step.min) {
-				// Multiple selection
-				if (!value || value.length < step.min) return false;
-				// Check if any selected option needs custom input
-				const hasInputOption = value.some(v => v.includes(':input'));
-				if (hasInputOption) {
-					return !!formData[step.field + '_custom']?.trim();
-				}
-				return true;
-			} else if (step.max === 1) {
-				// Single selection
-				const needsCustom = value?.includes(':input');
-				if (needsCustom) {
-					return !!formData[step.field + '_custom']?.trim();
-				}
-				return !!value;
-			}
-		}
-		return false;
-	})();
+	$: canProceed = isStepComplete(formSteps[currentStep], formData);
 
 	onMount(async () => {
 		try {
@@ -200,6 +168,55 @@
 		}
 	}
 
+	function customFieldKey(field) {
+		return field + customFieldSuffix;
+	}
+
+	function requiresCustomValue(value, isMultiple) {
+		if (isMultiple) {
+			return Array.isArray(value) && value.some(v => v.includes(':input'));
+		}
+		return typeof value === 'string' && value.includes(':input');
+	}
+
+	function resolveSelectableValue(field, value) {
+		const customValue = formData[customFieldKey(field)];
+		if (Array.isArray(value)) {
+			return value.map(v => (v.includes(':input') ? customValue || v.split(':')[0] : v));
+		}
+		if (typeof value === 'string' && value.includes(':input')) {
+			return customValue || value.split(':')[0];
+		}
+		return value;
+	}
+
+	function isStepComplete(step, data) {
+		if (!step) return false;
+
+		if (step.type === 'start') return true;
+		if (step.type === 'text' || step.type === 'textarea') {
+			return !!data[step.field]?.trim();
+		}
+		if (step.type === 'file') return !!data[step.field];
+		if (step.type !== 'select') return false;
+
+		const value = data[step.field];
+		const isMultiple = !!step.min;
+		if (isMultiple) {
+			if (!value || value.length < step.min) return false;
+		} else if (step.max === 1) {
+			if (!value) return false;
+		} else {
+			return false;
+		}
+
+		if (!requiresCustomValue(value, isMultiple)) {
+			return true;
+		}
+
+		return !!data[customFieldKey(step.field)]?.trim();
+	}
+
 	function normalizePersonName(value) {
 		if (!value || typeof value !== 'string') return '';
 		return value
@@ -284,16 +301,11 @@
 
 					// Handle arrays (multiple selection)
 					if (Array.isArray(value)) {
-						dataFields[step.field] = value.map(v => {
-							if (v.includes(':input')) {
-								return formData[step.field + '_custom'] || v.split(':')[0];
-							}
-							return v;
-						});
+						dataFields[step.field] = resolveSelectableValue(step.field, value);
 					}
 					// Handle single values
 					else if (value.includes?.(':input')) {
-						dataFields[step.field] = formData[step.field + '_custom'] || value.split(':')[0];
+						dataFields[step.field] = resolveSelectableValue(step.field, value);
 					} else {
 						dataFields[step.field] = value;
 					}

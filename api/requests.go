@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"maps"
 	"net/http"
 	"strings"
 	"time"
@@ -20,8 +21,7 @@ type signupSettingsConfig struct {
 }
 
 type profileFieldConfig struct {
-	Key      string `json:"key"`
-	Required bool   `json:"required"`
+	Key string `json:"key"`
 }
 
 type profileSchemaConfig struct {
@@ -40,6 +40,15 @@ type requestActionPayload struct {
 	GroupID      string `json:"group"`
 	GuardianID   string `json:"guardian"`
 }
+
+const (
+	requestActionTransition = "transition"
+	requestActionReject     = "reject"
+	requestActionPromote    = "promote"
+
+	requestStatusGroupAssigned    = "2-group_assigned"
+	requestStatusGuardianAssigned = "3-guardian_assigned"
+)
 
 // SubmitRequestHandler creates a request from public signup config.
 func SubmitRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
@@ -131,15 +140,15 @@ func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		deleteRequest := false
 		promotedUserID := ""
 		switch action {
-		case "transition":
+		case requestActionTransition:
 			if err := applyTransitionAction(app, e.Auth, record, data, payload, strings.TrimSpace(payload.TargetStatus)); err != nil {
 				return err
 			}
-		case "reject":
+		case requestActionReject:
 			if err := applyRejectAction(app, e.Auth, record, data, strings.TrimSpace(payload.Reason)); err != nil {
 				return err
 			}
-		case "promote":
+		case requestActionPromote:
 			userID, err := applyPromoteAction(app, e.Auth, record, data)
 			if err != nil {
 				return err
@@ -211,7 +220,7 @@ func applyTransitionAction(app *pocketbase.PocketBase, actor *core.Record, recor
 			return apis.NewBadRequestError("missing_role_for_target_status", nil)
 		}
 
-		ok, err := hasRoleForRequest(app, actor, record, data, requiredRole)
+		ok, err := hasRoleForRequest(app, actor, record, requiredRole)
 		if err != nil {
 			return apis.NewBadRequestError("role_resolution_failed", err)
 		}
@@ -220,53 +229,16 @@ func applyTransitionAction(app *pocketbase.PocketBase, actor *core.Record, recor
 		}
 	}
 
-	if target == "2-group_assigned" {
-		groupID := strings.TrimSpace(payload.GroupID)
-		if groupID == "" {
-			return apis.NewBadRequestError("missing_group", nil)
+	if target == requestStatusGroupAssigned {
+		if err := applyGroupAssignment(app, record, strings.TrimSpace(payload.GroupID)); err != nil {
+			return err
 		}
-		group, err := app.FindRecordById("groups", groupID)
-		if err != nil || group == nil {
-			return apis.NewBadRequestError("invalid_group", err)
-		}
-		record.Set("group", groupID)
 	}
 
-	if target == "3-guardian_assigned" {
-		groupID := strings.TrimSpace(record.GetString("group"))
-		if groupID == "" {
-			return apis.NewBadRequestError("missing_group_assignment", nil)
+	if target == requestStatusGuardianAssigned {
+		if err := applyGuardianAssignment(app, record, strings.TrimSpace(payload.GuardianID)); err != nil {
+			return err
 		}
-
-		guardianID := strings.TrimSpace(payload.GuardianID)
-		if guardianID == "" {
-			return apis.NewBadRequestError("missing_guardian", nil)
-		}
-
-		guardian, err := app.FindRecordById("users", guardianID)
-		if err != nil || guardian == nil {
-			return apis.NewBadRequestError("invalid_guardian", err)
-		}
-
-		guardianMemberships, err := app.FindRecordsByFilter(
-			"user_groups",
-			"user = {:user} && group = {:group}",
-			"",
-			1,
-			0,
-			map[string]any{
-				"user":  guardianID,
-				"group": groupID,
-			},
-		)
-		if err != nil {
-			return apis.NewBadRequestError("guardian_membership_check_failed", err)
-		}
-		if len(guardianMemberships) == 0 {
-			return apis.NewBadRequestError("guardian_not_in_group", nil)
-		}
-
-		record.Set("guardian", guardianID)
 	}
 
 	record.Set("status", target)
@@ -288,6 +260,54 @@ func applyRejectAction(app *pocketbase.PocketBase, actor *core.Record, record *c
 	data["rejected_by"] = adminDisplayName(actor)
 	record.Set("rejected", true)
 	record.Set("data", data)
+	return nil
+}
+
+func applyGroupAssignment(app *pocketbase.PocketBase, record *core.Record, groupID string) error {
+	if groupID == "" {
+		return apis.NewBadRequestError("missing_group", nil)
+	}
+	group, err := app.FindRecordById("groups", groupID)
+	if err != nil || group == nil {
+		return apis.NewBadRequestError("invalid_group", err)
+	}
+	record.Set("group", groupID)
+	return nil
+}
+
+func applyGuardianAssignment(app *pocketbase.PocketBase, record *core.Record, guardianID string) error {
+	groupID := strings.TrimSpace(record.GetString("group"))
+	if groupID == "" {
+		return apis.NewBadRequestError("missing_group_assignment", nil)
+	}
+	if guardianID == "" {
+		return apis.NewBadRequestError("missing_guardian", nil)
+	}
+
+	guardian, err := app.FindRecordById("users", guardianID)
+	if err != nil || guardian == nil {
+		return apis.NewBadRequestError("invalid_guardian", err)
+	}
+
+	guardianMemberships, err := app.FindRecordsByFilter(
+		"user_groups",
+		"user = {:user} && group = {:group}",
+		"",
+		1,
+		0,
+		map[string]any{
+			"user":  guardianID,
+			"group": groupID,
+		},
+	)
+	if err != nil {
+		return apis.NewBadRequestError("guardian_membership_check_failed", err)
+	}
+	if len(guardianMemberships) == 0 {
+		return apis.NewBadRequestError("guardian_not_in_group", nil)
+	}
+
+	record.Set("guardian", guardianID)
 	return nil
 }
 
@@ -321,7 +341,19 @@ func applyPromoteAction(app *pocketbase.PocketBase, actor *core.Record, record *
 	}
 
 	current := strings.TrimSpace(record.GetString("status"))
-	if current != "6-admin_approved" {
+	if current == "" {
+		return "", apis.NewBadRequestError("missing_current_status", nil)
+	}
+
+	flow, err := loadRequestsFlowSettings(app)
+	if err != nil {
+		return "", apis.NewBadRequestError("invalid_requests_flow_settings", err)
+	}
+	finalStatus := strings.TrimSpace(flow.Statuses[len(flow.Statuses)-1])
+	if finalStatus == "" {
+		return "", apis.NewBadRequestError("invalid_requests_flow_settings", nil)
+	}
+	if current != finalStatus {
 		return "", apis.NewBadRequestError("invalid_promote_status", nil)
 	}
 
@@ -367,17 +399,11 @@ func applyPromoteAction(app *pocketbase.PocketBase, actor *core.Record, record *
 }
 
 func loadSignupSettings(app *pocketbase.PocketBase) (signupSettingsConfig, error) {
-	record, err := app.FindFirstRecordByFilter(
-		"settings",
-		"name = 'signup'",
-		map[string]any{},
-	)
-	if err != nil || record == nil {
-		return signupSettingsConfig{}, fmt.Errorf("signup settings not found")
-	}
-
 	var cfg signupSettingsConfig
-	raw := unwrapSettingData(record.Get("data"))
+	raw, err := findSettingData(app, "signup")
+	if err != nil {
+		return signupSettingsConfig{}, err
+	}
 	if rawSteps, ok := raw["steps"].([]any); ok {
 		cfg.Steps = make([]signupFieldConfig, 0, len(rawSteps))
 		for _, item := range rawSteps {
@@ -396,16 +422,10 @@ func loadSignupSettings(app *pocketbase.PocketBase) (signupSettingsConfig, error
 }
 
 func loadProfileSchemaSettings(app *pocketbase.PocketBase) (profileSchemaConfig, error) {
-	record, err := app.FindFirstRecordByFilter(
-		"settings",
-		"name = 'profile_schema'",
-		map[string]any{},
-	)
-	if err != nil || record == nil {
-		return profileSchemaConfig{}, fmt.Errorf("profile_schema settings not found")
+	raw, err := findSettingData(app, "profile_schema")
+	if err != nil {
+		return profileSchemaConfig{}, err
 	}
-
-	raw := unwrapSettingData(record.Get("data"))
 	rawFields, ok := raw["fields"].([]any)
 	if !ok {
 		return profileSchemaConfig{}, fmt.Errorf("profile_schema fields missing")
@@ -423,29 +443,18 @@ func loadProfileSchemaSettings(app *pocketbase.PocketBase) (profileSchemaConfig,
 		if key == "" {
 			continue
 		}
-		required := true
-		if value, ok := field["required"].(bool); ok {
-			required = value
-		}
 		cfg.Fields = append(cfg.Fields, profileFieldConfig{
-			Key:      key,
-			Required: required,
+			Key: key,
 		})
 	}
 	return cfg, nil
 }
 
 func loadRequestsFlowSettings(app *pocketbase.PocketBase) (requestsFlowConfig, error) {
-	record, err := app.FindFirstRecordByFilter(
-		"settings",
-		"name = 'requests_flow'",
-		map[string]any{},
-	)
-	if err != nil || record == nil {
-		return requestsFlowConfig{}, fmt.Errorf("requests_flow settings not found")
+	raw, err := findSettingData(app, "requests_flow")
+	if err != nil {
+		return requestsFlowConfig{}, err
 	}
-
-	raw := unwrapSettingData(record.Get("data"))
 	var cfg requestsFlowConfig
 	if rawStatuses, ok := raw["statuses"].([]any); ok {
 		cfg.Statuses = make([]string, 0, len(rawStatuses))
@@ -488,29 +497,29 @@ func validateAndBuildRequestData(input map[string]any, signup signupSettingsConf
 		return nil, "", fmt.Errorf("signup steps not configured")
 	}
 
-	profileByKey := make(map[string]profileFieldConfig, len(profile.Fields))
+	profileByKey := make(map[string]struct{}, len(profile.Fields))
 	for _, field := range profile.Fields {
 		key := strings.TrimSpace(field.Key)
 		if key == "" {
 			continue
 		}
-		profileByKey[key] = field
+		profileByKey[key] = struct{}{}
 	}
 	if len(profileByKey) == 0 {
 		return nil, "", fmt.Errorf("profile fields not configured")
 	}
 
-	allowed := make(map[string]profileFieldConfig, len(signup.Steps))
+	allowed := make(map[string]struct{}, len(signup.Steps))
 	for _, step := range signup.Steps {
 		key := strings.TrimSpace(step.Field)
 		if key == "" {
 			continue
 		}
-		fieldCfg, ok := profileByKey[key]
+		_, ok := profileByKey[key]
 		if !ok {
 			return nil, "", fmt.Errorf("signup step field not in profile_schema: %s", key)
 		}
-		allowed[key] = fieldCfg
+		allowed[key] = struct{}{}
 	}
 	if len(allowed) == 0 {
 		return nil, "", fmt.Errorf("signup fields not configured")
@@ -573,7 +582,7 @@ func nextStatus(statuses []string, current string) (string, error) {
 	return "", fmt.Errorf("current status not found in flow")
 }
 
-func hasRoleForRequest(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any, role string) (bool, error) {
+func hasRoleForRequest(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, role string) (bool, error) {
 	switch role {
 	case "admin":
 		return actor.GetBool("admin"), nil
@@ -616,17 +625,24 @@ func ensureSubmitEmailAvailable(app *pocketbase.PocketBase, email string) error 
 	return nil
 }
 
+func findSettingData(app *pocketbase.PocketBase, name string) (map[string]any, error) {
+	record, err := app.FindFirstRecordByFilter(
+		"settings",
+		"name = {:name}",
+		map[string]any{"name": name},
+	)
+	if err != nil || record == nil {
+		return nil, fmt.Errorf("%s settings not found", name)
+	}
+
+	return unwrapSettingData(record.Get("data")), nil
+}
+
 func buildUserDataFromRequest(data map[string]any) map[string]any {
 	if data == nil {
 		return map[string]any{}
 	}
-
-	out := map[string]any{}
-	for key, value := range data {
-		out[key] = value
-	}
-
-	return out
+	return maps.Clone(data)
 }
 
 func statusInFlow(statuses []string, target string) bool {
