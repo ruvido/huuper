@@ -1,6 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
 	import { apiFetch } from '../lib/pocketbase';
+	import { formatEventDate } from '../lib/date';
 	import { navigate } from '../lib/router';
 	import DashboardLayout from '../components/DashboardLayout.svelte';
 	import StateCard from '../components/StateCard.svelte';
@@ -14,20 +15,6 @@
 		groups: { total: null },
 		events: { total: null, next: null },
 	};
-
-	function formatDatePart(raw) {
-		if (!raw) return '';
-		const parts = raw.split('-');
-		if (parts.length !== 3) return raw;
-		return `${parts[2]}/${parts[1]}/${parts[0]}`;
-	}
-
-	function formatEventDate(value) {
-		if (!value || typeof value !== 'string') return '';
-		const normalized = value.replace('T', ' ');
-		const [dateRaw] = normalized.split(' ');
-		return formatDatePart(dateRaw);
-	}
 
 	function goToNextEvent() {
 		if (!summary?.events?.next?.id) return;

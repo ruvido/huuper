@@ -8,6 +8,12 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
+var publicSettingsNames = map[string]bool{
+	"title":          true,
+	"password_reset": true,
+	"signup":         true,
+}
+
 func unwrapSettingData(raw any) map[string]any {
 	data := parseJSONMap(raw)
 	if nested, ok := data["data"].(map[string]any); ok && nested != nil {
@@ -24,13 +30,7 @@ func GetSettingsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) e
 			return apis.NewNotFoundError("Setting not found", nil)
 		}
 
-		publicNames := map[string]bool{
-			"title":          true,
-			"password_reset": true,
-			"signup":         true,
-		}
-
-		if !publicNames[name] && e.Auth == nil {
+		if !publicSettingsNames[name] && e.Auth == nil {
 			return apis.NewUnauthorizedError("Unauthorized", nil)
 		}
 

@@ -1,6 +1,7 @@
 <script>
 	import { onMount, tick } from 'svelte';
 	import { apiFetch } from '../lib/pocketbase';
+	import { formatEventDate } from '../lib/date';
 	import { queryParams, navigate } from '../lib/router';
 	import DashboardLayout from '../components/DashboardLayout.svelte';
 	import StateCard from '../components/StateCard.svelte';
@@ -21,20 +22,6 @@
 	let cancelingId = null;
 
 	$: eventId = $queryParams?.id;
-
-	function formatDatePart(raw) {
-		if (!raw) return '';
-		const parts = raw.split('-');
-		if (parts.length !== 3) return raw;
-		return `${parts[2]}/${parts[1]}/${parts[0]}`;
-	}
-
-	function formatEventDate(value) {
-		if (!value || typeof value !== 'string') return '';
-		const normalized = value.replace('T', ' ');
-		const [dateRaw] = normalized.split(' ');
-		return formatDatePart(dateRaw);
-	}
 
 	function stringValue(value) {
 		if (Array.isArray(value)) return value.filter(Boolean).join(', ');
