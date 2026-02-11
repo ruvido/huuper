@@ -14,8 +14,11 @@
 	import Home from './pages/Home.svelte';
 	import Profile from './pages/Profile.svelte';
 	import Groups from './pages/Groups.svelte';
+	import GroupDetail from './pages/GroupDetail.svelte';
 	import Admin from './pages/Admin.svelte';
 	import AdminEvent from './pages/AdminEvent.svelte';
+	import AdminRequests from './pages/AdminRequests.svelte';
+	import Requests from './pages/Requests.svelte';
 
 	let menuOpen = false;
 	let authReady = false;
@@ -115,10 +118,16 @@
 			<Profile />
 		{:else if $currentRoute === 'app/groups'}
 			<Groups />
+		{:else if $currentRoute.startsWith('app/group/')}
+			<GroupDetail />
 		{:else if $currentRoute === 'app/admin'}
 			<Admin />
 		{:else if $currentRoute === 'app/events'}
 			<AdminEvent />
+		{:else if $currentRoute === 'app/admin/requests' || $currentRoute.startsWith('app/admin/requests/')}
+			<AdminRequests />
+		{:else if $currentRoute === 'app/requests' || $currentRoute.startsWith('app/requests/')}
+			<Requests />
 		{:else}
 			<Login />
 		{/if}

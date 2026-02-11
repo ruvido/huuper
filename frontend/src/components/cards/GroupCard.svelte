@@ -3,6 +3,8 @@
 
 	export let group;
 	export let isMember = false;
+	export let onRequests = null;
+	export let onOpen = null;
 </script>
 
 <div class="group-card">
@@ -29,6 +31,16 @@
 		>
 			Join
 		</a>
+	{/if}
+	{#if typeof onRequests === 'function'}
+		<button class="requests-link" on:click={() => onRequests(group)}>
+			Requests
+		</button>
+	{/if}
+	{#if typeof onOpen === 'function'}
+		<button class="open-link" on:click={() => onOpen(group)}>
+			Open
+		</button>
 	{/if}
 </div>
 
@@ -99,6 +111,34 @@
 	.join-link:hover {
 		background: #fff;
 		color: #000;
+	}
+
+	.requests-link {
+		background: #fff;
+		color: #000;
+		border: 2px solid #000;
+		padding: clamp(0.875rem, 3vw, 1rem);
+		font-weight: 600;
+		cursor: pointer;
+	}
+
+	.requests-link:hover {
+		background: #000;
+		color: #fff;
+	}
+
+	.open-link {
+		background: #fff;
+		color: #000;
+		border: 2px solid #000;
+		padding: clamp(0.875rem, 3vw, 1rem);
+		font-weight: 600;
+		cursor: pointer;
+	}
+
+	.open-link:hover {
+		background: #000;
+		color: #fff;
 	}
 
 	.member-badge {

@@ -49,7 +49,11 @@ func main() {
 		se.Router.GET("/api/events/accept", api.AcceptEventHandler(app))
 		se.Router.POST("/api/telegram/generate-token", api.GenerateTelegramTokenHandler(app)).Bind(apis.RequireAuth())
 		se.Router.POST("/api/requests/submit", api.SubmitRequestHandler(app))
+		se.Router.GET("/api/requests", api.ListRequestsHandler(app)).Bind(apis.RequireAuth())
+		se.Router.GET("/api/requests/{id}", api.GetRequestHandler(app)).Bind(apis.RequireAuth())
 		se.Router.POST("/api/requests/{id}/action", api.RequestActionHandler(app)).Bind(apis.RequireAuth())
+		se.Router.GET("/api/groups/{id}/members", api.GroupMembersHandler(app)).Bind(apis.RequireAuth())
+		se.Router.GET("/api/groups/{id}/guardians", api.GroupGuardiansHandler(app)).Bind(apis.RequireAuth())
 
 		// Serve frontend
 		se.Router.GET("/{path...}", apis.Static(os.DirFS("./pb_public"), false))

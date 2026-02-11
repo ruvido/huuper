@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maps"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -41,6 +42,18 @@ type requestActionPayload struct {
 	GuardianID   string `json:"guardian"`
 }
 
+type requestListItem struct {
+	ID       string         `json:"id"`
+	Email    string         `json:"email"`
+	Status   string         `json:"status"`
+	Rejected bool           `json:"rejected"`
+	GroupID  string         `json:"group"`
+	Guardian string         `json:"guardian"`
+	Created  string         `json:"created"`
+	Updated  string         `json:"updated"`
+	Data     map[string]any `json:"data"`
+}
+
 const (
 	requestActionTransition = "transition"
 	requestActionReject     = "reject"
@@ -49,6 +62,139 @@ const (
 	requestStatusGroupAssigned    = "2-group_assigned"
 	requestStatusGuardianAssigned = "3-guardian_assigned"
 )
+
+// ListRequestsHandler returns requests visible to the authenticated user.
+func ListRequestsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		actor := e.Auth
+		if actor == nil {
+			return apis.NewUnauthorizedError("Unauthorized", nil)
+		}
+
+		query := e.Request.URL.Query()
+		status := strings.TrimSpace(query.Get("status"))
+		groupID := strings.TrimSpace(query.Get("group_id"))
+		guardianID := strings.TrimSpace(query.Get("guardian"))
+		search := strings.TrimSpace(query.Get("q"))
+		sort := strings.TrimSpace(query.Get("sort"))
+		if sort == "" {
+			sort = "-updated"
+		}
+
+		page := 1
+		if pageRaw := strings.TrimSpace(query.Get("page")); pageRaw != "" {
+			parsed, err := strconv.Atoi(pageRaw)
+			if err != nil || parsed < 1 {
+				return apis.NewBadRequestError("invalid_page", nil)
+			}
+			page = parsed
+		}
+
+		perPage := 200
+		if perPageRaw := strings.TrimSpace(query.Get("per_page")); perPageRaw != "" {
+			parsed, err := strconv.Atoi(perPageRaw)
+			if err != nil || parsed < 1 {
+				return apis.NewBadRequestError("invalid_per_page", nil)
+			}
+			if parsed > 500 {
+				parsed = 500
+			}
+			perPage = parsed
+		}
+
+		includeRejected, err := parseBoolQuery(query.Get("include_rejected"), false)
+		if err != nil {
+			return apis.NewBadRequestError("invalid_include_rejected", nil)
+		}
+
+		params := map[string]any{}
+		filters := []string{}
+
+		if status != "" {
+			filters = append(filters, "status = {:status}")
+			params["status"] = status
+		}
+		if groupID != "" {
+			filters = append(filters, "group = {:group}")
+			params["group"] = groupID
+		}
+		if guardianID != "" {
+			filters = append(filters, "guardian = {:guardian}")
+			params["guardian"] = guardianID
+		}
+		if search != "" {
+			filters = append(filters, "email ~ {:q}")
+			params["q"] = search
+		}
+
+		// Keep rejected hidden by default. Admin can explicitly include them.
+		if actor.GetBool("admin") {
+			if !includeRejected {
+				filters = append(filters, "rejected = false")
+			}
+		} else {
+			filters = append(filters, "rejected = false")
+		}
+
+		filter := strings.Join(filters, " && ")
+		records, err := app.FindRecordsByFilter("requests", filter, sort, perPage, (page-1)*perPage, params)
+		if err != nil {
+			return apis.NewBadRequestError("failed_requests", err)
+		}
+
+		assistantGroups, err := assistantGroupIDsForUser(app, actor)
+		if err != nil {
+			return apis.NewBadRequestError("failed_groups_lookup", err)
+		}
+
+		items := make([]requestListItem, 0, len(records))
+		for _, record := range records {
+			if !canViewRequest(actor, record, assistantGroups) {
+				continue
+			}
+			items = append(items, mapRequestItem(record))
+		}
+
+		return e.JSON(http.StatusOK, map[string]any{
+			"items": items,
+			"page":  page,
+		})
+	}
+}
+
+// GetRequestHandler returns one request if visible to the authenticated user.
+func GetRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		actor := e.Auth
+		if actor == nil {
+			return apis.NewUnauthorizedError("Unauthorized", nil)
+		}
+
+		id := strings.TrimSpace(e.Request.PathValue("id"))
+		if id == "" {
+			return apis.NewBadRequestError("invalid_request", nil)
+		}
+
+		record, err := app.FindRecordById("requests", id)
+		if err != nil || record == nil {
+			return apis.NewNotFoundError("request_not_found", err)
+		}
+
+		if record.GetBool("rejected") && !actor.GetBool("admin") {
+			return apis.NewForbiddenError("forbidden_request", nil)
+		}
+
+		assistantGroups, err := assistantGroupIDsForUser(app, actor)
+		if err != nil {
+			return apis.NewBadRequestError("failed_groups_lookup", err)
+		}
+		if !canViewRequest(actor, record, assistantGroups) {
+			return apis.NewForbiddenError("forbidden_request", nil)
+		}
+
+		return e.JSON(http.StatusOK, mapRequestItem(record))
+	}
+}
 
 // SubmitRequestHandler creates a request from public signup config.
 func SubmitRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
@@ -660,5 +806,78 @@ func asString(value any) string {
 		return typed
 	default:
 		return ""
+	}
+}
+
+func parseBoolQuery(raw string, fallback bool) (bool, error) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return fallback, nil
+	}
+	switch strings.ToLower(value) {
+	case "1", "true", "yes":
+		return true, nil
+	case "0", "false", "no":
+		return false, nil
+	default:
+		return false, fmt.Errorf("invalid bool")
+	}
+}
+
+func assistantGroupIDsForUser(app *pocketbase.PocketBase, user *core.Record) (map[string]struct{}, error) {
+	out := map[string]struct{}{}
+	if user == nil || user.GetBool("admin") {
+		return out, nil
+	}
+
+	groups, err := app.FindRecordsByFilter(
+		"groups",
+		"assistant = {:assistant}",
+		"",
+		500,
+		0,
+		map[string]any{"assistant": user.Id},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, group := range groups {
+		out[group.Id] = struct{}{}
+	}
+	return out, nil
+}
+
+func canViewRequest(actor *core.Record, request *core.Record, assistantGroups map[string]struct{}) bool {
+	if actor == nil || request == nil {
+		return false
+	}
+	if actor.GetBool("admin") {
+		return true
+	}
+
+	if strings.TrimSpace(request.GetString("guardian")) == actor.Id {
+		return true
+	}
+
+	groupID := strings.TrimSpace(request.GetString("group"))
+	if groupID == "" {
+		return false
+	}
+	_, ok := assistantGroups[groupID]
+	return ok
+}
+
+func mapRequestItem(record *core.Record) requestListItem {
+	return requestListItem{
+		ID:       record.Id,
+		Email:    record.GetString("email"),
+		Status:   record.GetString("status"),
+		Rejected: record.GetBool("rejected"),
+		GroupID:  record.GetString("group"),
+		Guardian: record.GetString("guardian"),
+		Created:  record.GetString("created"),
+		Updated:  record.GetString("updated"),
+		Data:     parseJSONMap(record.Get("data")),
 	}
 }

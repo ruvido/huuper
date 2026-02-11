@@ -68,6 +68,16 @@
 	function goToProfile() {
 		navigate('app/profile');
 	}
+
+	function goToGroupRequests(group) {
+		if (!group?.id) return;
+		navigate(`app/requests?group_id=${encodeURIComponent(group.id)}`);
+	}
+
+	function goToGroup(group) {
+		if (!group?.id) return;
+		navigate(`app/group/${encodeURIComponent(group.id)}`);
+	}
 </script>
 
 <DashboardLayout title="Groups">
@@ -80,7 +90,12 @@
 	{:else}
 		<div class="groups-list">
 			{#each groups as group}
-				<GroupCard {group} isMember={memberGroups.includes(group.id)} />
+				<GroupCard
+					{group}
+					isMember={memberGroups.includes(group.id)}
+					onRequests={memberGroups.includes(group.id) ? goToGroupRequests : null}
+					onOpen={memberGroups.includes(group.id) ? goToGroup : null}
+				/>
 			{/each}
 		</div>
 	{/if}

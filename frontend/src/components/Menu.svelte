@@ -47,6 +47,11 @@
 			<button on:click={() => handleNavigate('app/groups')}>Groups</button>
 		</li>
 		<li>
+			<button on:click={() => handleNavigate(isAdmin ? 'app/admin/requests' : 'app/requests')}>
+				Requests
+			</button>
+		</li>
+		<li>
 			<button on:click={handleLogout}>Logout</button>
 		</li>
 	</ul>

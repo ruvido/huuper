@@ -1,6 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
 	import { apiFetch, pb } from '../lib/pocketbase';
+	import { navigate } from '../lib/router';
 	import DashboardLayout from '../components/DashboardLayout.svelte';
 	import StateCard from '../components/StateCard.svelte';
 	import EventCard from '../components/cards/EventCard.svelte';
@@ -92,6 +93,16 @@
 		} finally {
 			groupsLoading = false;
 		}
+	}
+
+	function goToGroupRequests(group) {
+		if (!group?.id) return;
+		navigate(`app/requests?group_id=${encodeURIComponent(group.id)}`);
+	}
+
+	function goToGroup(group) {
+		if (!group?.id) return;
+		navigate(`app/group/${encodeURIComponent(group.id)}`);
 	}
 
 	async function registerEvent(event) {
@@ -241,7 +252,7 @@
 		{:else}
 			<div class="groups-list">
 				{#each groups as group}
-					<GroupCard {group} isMember={true} />
+					<GroupCard {group} isMember={true} onRequests={goToGroupRequests} onOpen={goToGroup} />
 				{/each}
 			</div>
 		{/if}
