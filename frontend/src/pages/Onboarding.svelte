@@ -24,7 +24,6 @@
 	let cropFile = null;
 	let cropField = '';
 	let cropModalRef;
-	const nameFieldKey = 'full_name';
 	const customFieldSuffix = '_custom';
 
 	// Count only non-start steps
@@ -217,17 +216,6 @@
 		return !!data[customFieldKey(step.field)]?.trim();
 	}
 
-	function normalizePersonName(value) {
-		if (!value || typeof value !== 'string') return '';
-		return value
-			.trim()
-			.toLowerCase()
-			.split(/\s+/)
-			.filter(Boolean)
-			.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-			.join(' ');
-	}
-
 	function handleClose() {
 		pb.authStore.clear();
 		navigate('login');
@@ -311,13 +299,6 @@
 					}
 				}
 			});
-
-			if (typeof dataFields[nameFieldKey] === 'string') {
-				const normalized = normalizePersonName(dataFields[nameFieldKey]);
-				if (normalized) {
-					dataFields[nameFieldKey] = normalized;
-				}
-			}
 
 			// Add data as JSON
 			if (Object.keys(dataFields).length > 0) {

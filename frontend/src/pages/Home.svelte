@@ -1,6 +1,6 @@
 <script>
 	import { onMount } from 'svelte';
-	import { pb } from '../lib/pocketbase';
+	import { apiFetch, pb } from '../lib/pocketbase';
 	import DashboardLayout from '../components/DashboardLayout.svelte';
 	import StateCard from '../components/StateCard.svelte';
 	import EventCard from '../components/cards/EventCard.svelte';
@@ -64,11 +64,7 @@
 		const updates = {};
 		await Promise.all(events.map(async (event) => {
 			try {
-				const res = await fetch(`/api/events/${encodeURIComponent(event.slug)}/status`, {
-					headers: {
-						Authorization: pb.authStore.token
-					}
-				});
+				const res = await apiFetch(`/api/events/${encodeURIComponent(event.slug)}/status`);
 				if (!res.ok) return;
 				const data = await res.json();
 				updates[event.id] = !!data?.registered;
@@ -150,11 +146,10 @@
 					data: pb.authStore.record?.data || {}
 				};
 
-				const res = await fetch(`/api/events/${encodeURIComponent(event.slug)}/register`, {
+				const res = await apiFetch(`/api/events/${encodeURIComponent(event.slug)}/register`, {
 					method: 'POST',
 					headers: {
-						'Content-Type': 'application/json',
-						Authorization: pb.authStore.token
+						'Content-Type': 'application/json'
 					},
 					body: JSON.stringify(payload)
 				});
@@ -164,11 +159,8 @@
 			}
 
 			if (isUnsubscribe) {
-				const res = await fetch(`/api/events/${encodeURIComponent(event.slug)}/unsubscribe`, {
-					method: 'POST',
-					headers: {
-						Authorization: pb.authStore.token
-					}
+				const res = await apiFetch(`/api/events/${encodeURIComponent(event.slug)}/unsubscribe`, {
+					method: 'POST'
 				});
 
 				if (!res.ok) return;

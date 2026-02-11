@@ -13,10 +13,19 @@ pb.authStore.onChange(() => {
 	authRecord.set(pb.authStore.record);
 });
 
-export function fetchSetting(name) {
-	return fetch(`/api/settings/${name}`, {
-		headers: {
-			Authorization: pb.authStore.token,
-		},
+export function apiFetch(path, options = {}) {
+	const headers = new Headers(options.headers || {});
+	const token = pb.authStore.token;
+	if (token) {
+		headers.set('Authorization', token);
+	}
+
+	return fetch(path, {
+		...options,
+		headers,
 	});
+}
+
+export function fetchSetting(name) {
+	return apiFetch(`/api/settings/${name}`);
 }

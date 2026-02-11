@@ -1,6 +1,6 @@
 <script>
 	import { onMount } from 'svelte';
-	import { pb } from '../lib/pocketbase';
+	import { apiFetch } from '../lib/pocketbase';
 	import { navigate } from '../lib/router';
 	import DashboardLayout from '../components/DashboardLayout.svelte';
 	import StateCard from '../components/StateCard.svelte';
@@ -38,11 +38,7 @@
 		loading = true;
 		error = '';
 		try {
-			const response = await fetch('/api/admin/summary', {
-				headers: {
-					Authorization: pb.authStore.token,
-				},
-			});
+			const response = await apiFetch('/api/admin/summary');
 			if (!response.ok) {
 				throw new Error('Failed to load admin data');
 			}
