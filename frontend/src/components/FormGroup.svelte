@@ -6,15 +6,21 @@
 	export let id;
 	export let disabled = false;
 	export let required = false;
+	export let minLength;
 	export let error = ''; // Expose error as bindable prop
 	export let matchField = ''; // Optional: field name to match (for password confirmation)
 	export let matchValue = ''; // Optional: value to match against
 
 	let touched = false;
 
-	// Real-time validation for password match only - but only after field is touched
-	$: if (matchField && value !== undefined && touched) {
+	$: if (value !== undefined && touched) {
 		validateField();
+	}
+
+	function handleInput() {
+		if (touched) {
+			validateField();
+		}
 	}
 
 	function handleBlur() {
@@ -25,14 +31,14 @@
 	function validateField() {
 		error = '';
 
-		// Required check
-		if (required && !value) {
+		const normalizedValue = typeof value === 'string' ? value.trim() : value;
+
+		if (required && !normalizedValue) {
 			error = `${label} is required`;
 			return;
 		}
 
-		// Email validation
-		if (type === 'email' && value) {
+		if (type === 'email' && typeof value === 'string' && value !== '') {
 			const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 			if (!emailRegex.test(value)) {
 				error = 'Please enter a valid email address';
@@ -40,15 +46,11 @@
 			}
 		}
 
-		// Password validation
-		if (type === 'password' && value && name === 'password') {
-			if (value.length < 8) {
-				error = 'Password must be at least 8 characters';
-				return;
-			}
+		if (minLength && typeof value === 'string' && value.length > 0 && value.length < minLength) {
+			error = `Must be at least ${minLength} characters`;
+			return;
 		}
 
-		// Password match validation
 		if (matchField && value !== matchValue) {
 			error = 'Passwords do not match';
 			return;
@@ -70,8 +72,9 @@
 		{name}
 		{disabled}
 		{required}
+		minlength={minLength}
 		bind:value
-		on:input
+		on:input={handleInput}
 		on:blur={handleBlur}
 		class:error
 	/>
