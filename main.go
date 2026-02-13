@@ -54,6 +54,7 @@ func main() {
 		se.Router.POST("/api/requests/{id}/action", api.RequestActionHandler(app)).Bind(apis.RequireAuth())
 		se.Router.GET("/api/groups/{id}/members", api.GroupMembersHandler(app)).Bind(apis.RequireAuth())
 		se.Router.GET("/api/groups/{id}/guardians", api.GroupGuardiansHandler(app)).Bind(apis.RequireAuth())
+		se.Router.GET("/api/groups/{id}/requests-count", api.GroupRequestsCountHandler(app)).Bind(apis.RequireAuth())
 
 		// Serve frontend
 		se.Router.GET("/{path...}", apis.Static(os.DirFS("./pb_public"), false))

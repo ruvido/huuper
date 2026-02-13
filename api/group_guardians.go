@@ -24,6 +24,40 @@ type groupGuardianItem struct {
 	ProtegesCount int    `json:"proteges_count"`
 }
 
+func GroupRequestsCountHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		actor := e.Auth
+		if actor == nil {
+			return apis.NewUnauthorizedError("Unauthorized", nil)
+		}
+
+		group, err := findGroupByPathID(app, e)
+		if err != nil {
+			return err
+		}
+		if err := requireGroupVisibility(app, actor, group); err != nil {
+			return err
+		}
+
+		records, err := app.FindRecordsByFilter(
+			"requests",
+			"group = {:group} && rejected = false",
+			"",
+			0,
+			0,
+			map[string]any{"group": group.Id},
+		)
+		if err != nil {
+			return apis.NewBadRequestError("failed_requests_count", err)
+		}
+
+		return e.JSON(http.StatusOK, map[string]any{
+			"group_id": group.Id,
+			"count":    len(records),
+		})
+	}
+}
+
 func GroupMembersHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		actor := e.Auth

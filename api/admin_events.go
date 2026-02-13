@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
@@ -48,7 +49,7 @@ func AdminEventDetailsHandler(app *pocketbase.PocketBase) func(e *core.RequestEv
 
 		items := make([]adminRegistrationItem, 0, len(registrations))
 		for _, record := range registrations {
-			items = append(items, mapRegistration(record))
+			items = append(items, mapRegistration(app, record))
 		}
 
 		eventData := parseJSONMap(event.Get("data"))
@@ -125,10 +126,14 @@ func AdminCancelRegistrationHandler(app *pocketbase.PocketBase) func(e *core.Req
 	}
 }
 
-func mapRegistration(record *core.Record) adminRegistrationItem {
+func mapRegistration(app *pocketbase.PocketBase, record *core.Record) adminRegistrationItem {
 	data := parseJSONMap(record.Get("data"))
-
-	userId := record.GetString("user")
+	userId := strings.TrimSpace(record.GetString("user"))
+	if userId != "" {
+		if user, err := app.FindRecordById("users", userId); err == nil && user != nil {
+			data = parseJSONMap(user.Get("data"))
+		}
+	}
 
 	return adminRegistrationItem{
 		ID:      record.Id,

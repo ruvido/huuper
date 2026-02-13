@@ -95,14 +95,9 @@
 		}
 	}
 
-	function goToGroupRequests(group) {
-		if (!group?.id) return;
-		navigate(`app/requests?group_id=${encodeURIComponent(group.id)}`);
-	}
-
 	function goToGroup(group) {
 		if (!group?.id) return;
-		navigate(`app/group/${encodeURIComponent(group.id)}`);
+		navigate(`app/groups/${encodeURIComponent(group.id)}`);
 	}
 
 	async function registerEvent(event) {
@@ -153,8 +148,7 @@
 				if (!email) return;
 
 				const payload = {
-					email,
-					data: pb.authStore.record?.data || {}
+					email
 				};
 
 				const res = await apiFetch(`/api/events/${encodeURIComponent(event.slug)}/register`, {
@@ -252,7 +246,7 @@
 		{:else}
 			<div class="groups-list">
 				{#each groups as group}
-					<GroupCard {group} isMember={true} onRequests={goToGroupRequests} onOpen={goToGroup} />
+					<GroupCard {group} isMember={true} onOpen={goToGroup} />
 				{/each}
 			</div>
 		{/if}
