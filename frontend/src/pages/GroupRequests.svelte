@@ -43,6 +43,11 @@
 		return clean.charAt(0).toUpperCase() + clean.slice(1);
 	}
 
+	function displayStatus(item) {
+		if (item?.rejected) return 'Rejected';
+		return formatStatus(item?.status);
+	}
+
 	async function loadAll() {
 		if (!groupId) return;
 		loading = true;
@@ -96,7 +101,7 @@
 					{#each requests as item}
 						<button class="row" type="button" on:click={() => openRequest(item)}>
 							<p class="name">{displayName(item)}</p>
-							<p class="status">{formatStatus(item.status)}</p>
+							<p class="status">{displayStatus(item)}</p>
 						</button>
 					{/each}
 				{/if}

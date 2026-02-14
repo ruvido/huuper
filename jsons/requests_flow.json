@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "steps": [
+    {
+      "role": "admin",
+      "action": "assign_group",
+      "label": "Assegna gruppo"
+    },
+    {
+      "role": "assistant",
+      "action": "assign_guardian",
+      "label": "Assegna guardian"
+    },
+    {
+      "role": "guardian",
+      "action": "mentoring",
+      "label": "Mentoring"
+    },
+    {
+      "role": "assistant",
+      "action": "group_approved",
+      "label": "Approvazione gruppo"
+    },
+    {
+      "role": "admin",
+      "action": "admin_approved",
+      "label": "Approvazione admin"
+    }
+  ]
+}

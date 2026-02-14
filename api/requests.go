@@ -29,38 +29,33 @@ type profileSchemaConfig struct {
 	Fields []profileFieldConfig `json:"fields"`
 }
 
-type requestsFlowConfig struct {
-	Statuses    []string          `json:"statuses"`
-	SetStatusBy map[string]string `json:"set_status_by"`
-}
-
 type requestActionPayload struct {
-	Action       string `json:"action"`
-	TargetStatus string `json:"target_status"`
-	Reason       string `json:"reason"`
-	GroupID      string `json:"group"`
-	GuardianID   string `json:"guardian"`
+	Action         string `json:"action"`
+	Reason         string `json:"reason"`
+	GroupID        string `json:"group"`
+	GuardianID     string `json:"guardian"`
+	MentoringNotes string `json:"mentoring_notes"`
 }
 
 type requestListItem struct {
-	ID       string         `json:"id"`
-	Email    string         `json:"email"`
-	Status   string         `json:"status"`
-	Rejected bool           `json:"rejected"`
-	GroupID  string         `json:"group"`
-	Guardian string         `json:"guardian"`
-	Created  string         `json:"created"`
-	Updated  string         `json:"updated"`
-	Data     map[string]any `json:"data"`
+	ID          string         `json:"id"`
+	Email       string         `json:"email"`
+	Status      string         `json:"status"`
+	Rejected    bool           `json:"rejected"`
+	GroupID     string         `json:"group"`
+	Guardian    string         `json:"guardian"`
+	Created     string         `json:"created"`
+	Updated     string         `json:"updated"`
+	Data        map[string]any `json:"data"`
+	FlowVersion int            `json:"flow_version"`
+	StepIndex   int            `json:"step_index"`
+	Workflow    map[string]any `json:"workflow"`
 }
 
 const (
-	requestActionTransition = "transition"
-	requestActionReject     = "reject"
-	requestActionPromote    = "promote"
-
-	requestStatusGroupAssigned    = "2-group_assigned"
-	requestStatusGuardianAssigned = "3-guardian_assigned"
+	requestActionAdvance = "advance"
+	requestActionReject  = "reject"
+	requestActionPromote = "promote"
 )
 
 // ListRequestsHandler returns requests visible to the authenticated user.
@@ -110,10 +105,6 @@ func ListRequestsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) 
 		params := map[string]any{}
 		filters := []string{}
 
-		if status != "" {
-			filters = append(filters, "status = {:status}")
-			params["status"] = status
-		}
 		if groupID != "" {
 			filters = append(filters, "group = {:group}")
 			params["group"] = groupID
@@ -146,13 +137,24 @@ func ListRequestsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) 
 		if err != nil {
 			return apis.NewBadRequestError("failed_groups_lookup", err)
 		}
+		flow, err := loadRequestsFlowSettings(app)
+		if err != nil {
+			return apis.NewBadRequestError("invalid_requests_flow_settings", err)
+		}
 
 		items := make([]requestListItem, 0, len(records))
 		for _, record := range records {
 			if !canViewRequest(actor, record, assistantGroups) {
 				continue
 			}
-			items = append(items, mapRequestItem(record))
+			item, err := mapRequestItemWithWorkflow(app, actor, record, flow)
+			if err != nil {
+				return apis.NewBadRequestError("failed_requests_workflow", err)
+			}
+			if status != "" && !strings.EqualFold(strings.TrimSpace(item.Status), strings.TrimSpace(status)) {
+				continue
+			}
+			items = append(items, item)
 		}
 
 		return e.JSON(http.StatusOK, map[string]any{
@@ -192,7 +194,49 @@ func GetRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) er
 			return apis.NewForbiddenError("forbidden_request", nil)
 		}
 
-		return e.JSON(http.StatusOK, mapRequestItem(record))
+		item := mapRequestItem(record)
+		flow, err := loadRequestsFlowSettings(app)
+		if err != nil {
+			return apis.NewBadRequestError("invalid_requests_flow_settings", err)
+		}
+		flowVersion, _ := requestProgressFromData(item.Data)
+		stepIndex := effectiveRequestStepIndex(record, item.Data, flow)
+		computedStatus := statusForStepIndex(stepIndex, flow.Steps)
+
+		nextStep, hasNext := flowStepAt(flow, stepIndex)
+		canAdvance := false
+		requiredField := ""
+		if hasNext && !item.Rejected {
+			requiredField = requiredFieldForAction(nextStep.Action)
+			canAdvance, err = hasRoleForRequest(app, actor, record, nextStep.Role)
+			if err != nil {
+				return apis.NewBadRequestError("role_resolution_failed", err)
+			}
+		}
+
+		return e.JSON(http.StatusOK, map[string]any{
+			"id":           item.ID,
+			"email":        item.Email,
+			"status":       computedStatus,
+			"rejected":     item.Rejected,
+			"group":        item.GroupID,
+			"guardian":     item.Guardian,
+			"flow_version": flowVersion,
+			"step_index":   stepIndex,
+			"created":      item.Created,
+			"updated":      item.Updated,
+			"data":         item.Data,
+			"workflow": map[string]any{
+				"total_steps":       len(flow.Steps),
+				"has_next_step":     hasNext,
+				"next_role":         nextStep.Role,
+				"next_action":       nextStep.Action,
+				"next_action_label": nextStep.Label,
+				"required_field":    requiredField,
+				"can_advance":       canAdvance,
+				"current_version":   flow.Version,
+			},
+		})
 	}
 }
 
@@ -210,10 +254,6 @@ func SubmitRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		flow, err := loadRequestsFlowSettings(app)
 		if err != nil {
 			return apis.NewBadRequestError("invalid_requests_flow_settings", err)
-		}
-		initialStatus := strings.TrimSpace(flow.Statuses[0])
-		if initialStatus == "" {
-			return apis.NewBadRequestError("invalid_requests_flow_settings", nil)
 		}
 
 		var raw map[string]any
@@ -237,7 +277,8 @@ func SubmitRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 
 		record := core.NewRecord(requests)
 		record.Set("email", email)
-		record.Set("status", initialStatus)
+		data[requestFlowVersionDataKey] = flow.Version
+		data[requestStepIndexDataKey] = 0
 		record.Set("data", data)
 		record.Set("rejected", false)
 		if err := app.Save(record); err != nil {
@@ -247,7 +288,8 @@ func SubmitRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		return e.JSON(http.StatusCreated, map[string]any{
 			"id":       record.Id,
 			"email":    record.GetString("email"),
-			"status":   record.GetString("status"),
+			"status":   requestStatusSubmitted,
+			"step":     0,
 			"rejected": false,
 			"data":     data,
 		})
@@ -286,8 +328,8 @@ func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		deleteRequest := false
 		promotedUserID := ""
 		switch action {
-		case requestActionTransition:
-			if err := applyTransitionAction(app, e.Auth, record, data, payload, strings.TrimSpace(payload.TargetStatus)); err != nil {
+		case requestActionAdvance, "transition":
+			if err := applyAdvanceAction(app, e.Auth, record, data, payload); err != nil {
 				return err
 			}
 		case requestActionReject:
@@ -320,20 +362,24 @@ func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 			return apis.NewBadRequestError("failed_to_update_request", err)
 		}
 
+		flow, err := loadRequestsFlowSettings(app)
+		if err != nil {
+			return apis.NewBadRequestError("invalid_requests_flow_settings", err)
+		}
+		step := parseFlowVersion(data[requestStepIndexDataKey])
+		status := statusForStepIndex(step, flow.Steps)
+
 		return e.JSON(http.StatusOK, map[string]any{
 			"id":       record.Id,
-			"status":   record.GetString("status"),
+			"status":   status,
+			"step":     step,
 			"rejected": record.GetBool("rejected"),
 			"data":     record.Get("data"),
 		})
 	}
 }
 
-func applyTransitionAction(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any, payload requestActionPayload, target string) error {
-	if target == "" {
-		return apis.NewBadRequestError("missing_target_status", nil)
-	}
-
+func applyAdvanceAction(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any, payload requestActionPayload) error {
 	if record.GetBool("rejected") {
 		return apis.NewBadRequestError("request_rejected", nil)
 	}
@@ -343,51 +389,47 @@ func applyTransitionAction(app *pocketbase.PocketBase, actor *core.Record, recor
 		return apis.NewBadRequestError("invalid_requests_flow_settings", err)
 	}
 
-	current := strings.TrimSpace(record.GetString("status"))
-	if current == "" {
-		return apis.NewBadRequestError("missing_current_status", nil)
+	stepIndex := effectiveRequestStepIndex(record, data, flow)
+	nextStep, hasNext := flowStepAt(flow, stepIndex)
+	if !hasNext {
+		return apis.NewBadRequestError("last_step_reached", nil)
 	}
 
-	if !statusInFlow(flow.Statuses, target) {
-		return apis.NewBadRequestError("invalid_transition", nil)
+	ok, err := hasRoleForRequest(app, actor, record, nextStep.Role)
+	if err != nil {
+		return apis.NewBadRequestError("role_resolution_failed", err)
+	}
+	if !ok {
+		return apis.NewForbiddenError("forbidden_transition", nil)
 	}
 
-	if !actor.GetBool("admin") {
-		next, err := nextStatus(flow.Statuses, current)
-		if err != nil {
-			return apis.NewBadRequestError("invalid_current_status", err)
-		}
-		if target != next {
-			return apis.NewBadRequestError("invalid_transition", nil)
-		}
-
-		requiredRole := strings.TrimSpace(flow.SetStatusBy[target])
-		if requiredRole == "" {
-			return apis.NewBadRequestError("missing_role_for_target_status", nil)
-		}
-
-		ok, err := hasRoleForRequest(app, actor, record, requiredRole)
-		if err != nil {
-			return apis.NewBadRequestError("role_resolution_failed", err)
-		}
-		if !ok {
-			return apis.NewForbiddenError("forbidden_transition", nil)
-		}
-	}
-
-	if target == requestStatusGroupAssigned {
+	if nextStep.Action == requestFlowActionAssignGroup {
 		if err := applyGroupAssignment(app, record, strings.TrimSpace(payload.GroupID)); err != nil {
 			return err
 		}
 	}
 
-	if target == requestStatusGuardianAssigned {
-		if err := applyGuardianAssignment(app, record, strings.TrimSpace(payload.GuardianID)); err != nil {
+	if nextStep.Action == requestFlowActionAssignGuardian {
+		if err := applyGuardianAssignment(app, record, data, actor, strings.TrimSpace(payload.GuardianID)); err != nil {
 			return err
 		}
 	}
 
-	record.Set("status", target)
+	if nextStep.Action == requestFlowActionMentoring {
+		note := strings.TrimSpace(payload.MentoringNotes)
+		if note == "" {
+			return apis.NewBadRequestError("missing_mentoring_notes", nil)
+		}
+		data["mentoring_notes"] = note
+		data["mentoring_done_at"] = time.Now().UTC().Format(time.RFC3339)
+		if actor != nil {
+			data["mentoring_done_by"] = adminDisplayName(actor)
+		}
+	}
+
+	nextStepIndex := stepIndex + 1
+	data[requestStepIndexDataKey] = nextStepIndex
+	data[requestFlowVersionDataKey] = flow.Version
 	record.Set("data", data)
 	return nil
 }
@@ -401,9 +443,11 @@ func applyRejectAction(app *pocketbase.PocketBase, actor *core.Record, record *c
 		return apis.NewForbiddenError("forbidden_reject", nil)
 	}
 
-	data["reject_reason"] = reason
-	data["rejected_at"] = time.Now().UTC().Format(time.RFC3339)
-	data["rejected_by"] = adminDisplayName(actor)
+	data["rejected"] = map[string]any{
+		"reason":      reason,
+		"rejected_at": time.Now().UTC().Format(time.RFC3339),
+		"rejected_by": adminDisplayName(actor),
+	}
 	record.Set("rejected", true)
 	record.Set("data", data)
 	return nil
@@ -421,7 +465,7 @@ func applyGroupAssignment(app *pocketbase.PocketBase, record *core.Record, group
 	return nil
 }
 
-func applyGuardianAssignment(app *pocketbase.PocketBase, record *core.Record, guardianID string) error {
+func applyGuardianAssignment(app *pocketbase.PocketBase, record *core.Record, data map[string]any, actor *core.Record, guardianID string) error {
 	groupID := strings.TrimSpace(record.GetString("group"))
 	if groupID == "" {
 		return apis.NewBadRequestError("missing_group_assignment", nil)
@@ -454,6 +498,14 @@ func applyGuardianAssignment(app *pocketbase.PocketBase, record *core.Record, gu
 	}
 
 	record.Set("guardian", guardianID)
+	guardianPayload := map[string]any{
+		"name":        adminDisplayName(guardian),
+		"assigned_at": time.Now().UTC().Format(time.RFC3339),
+	}
+	if actor != nil {
+		guardianPayload["assigned_by"] = adminDisplayName(actor)
+	}
+	data["guardian"] = guardianPayload
 	return nil
 }
 
@@ -486,21 +538,25 @@ func applyPromoteAction(app *pocketbase.PocketBase, actor *core.Record, record *
 		return "", apis.NewBadRequestError("request_rejected", nil)
 	}
 
-	current := strings.TrimSpace(record.GetString("status"))
-	if current == "" {
-		return "", apis.NewBadRequestError("missing_current_status", nil)
-	}
-
 	flow, err := loadRequestsFlowSettings(app)
 	if err != nil {
 		return "", apis.NewBadRequestError("invalid_requests_flow_settings", err)
 	}
-	finalStatus := strings.TrimSpace(flow.Statuses[len(flow.Statuses)-1])
-	if finalStatus == "" {
-		return "", apis.NewBadRequestError("invalid_requests_flow_settings", nil)
-	}
-	if current != finalStatus {
-		return "", apis.NewBadRequestError("invalid_promote_status", nil)
+	stepIndex := effectiveRequestStepIndex(record, data, flow)
+	if stepIndex < len(flow.Steps) {
+		// Allow direct promote when the next step is admin_approved
+		// so admin approval and user promotion happen in a single action.
+		nextStep, hasNext := flowStepAt(flow, stepIndex)
+		if !hasNext || nextStep.Action != requestFlowActionAdminApproved {
+			return "", apis.NewBadRequestError("invalid_promote_status", nil)
+		}
+		ok, err := hasRoleForRequest(app, actor, record, nextStep.Role)
+		if err != nil {
+			return "", apis.NewBadRequestError("role_resolution_failed", err)
+		}
+		if !ok {
+			return "", apis.NewForbiddenError("forbidden_promote", nil)
+		}
 	}
 
 	email, err := normalizeEmail(record.GetString("email"))
@@ -530,7 +586,7 @@ func applyPromoteAction(app *pocketbase.PocketBase, actor *core.Record, record *
 	user.Set("email", email)
 	user.Set("password", tempPassword)
 	user.Set("passwordConfirm", tempPassword)
-	user.Set("status", "active")
+	user.Set("status", "approved")
 
 	userData := buildUserDataFromRequest(data)
 	if len(userData) > 0 {
@@ -601,31 +657,7 @@ func loadRequestsFlowSettings(app *pocketbase.PocketBase) (requestsFlowConfig, e
 	if err != nil {
 		return requestsFlowConfig{}, err
 	}
-	var cfg requestsFlowConfig
-	if rawStatuses, ok := raw["statuses"].([]any); ok {
-		cfg.Statuses = make([]string, 0, len(rawStatuses))
-		for _, value := range rawStatuses {
-			status := strings.TrimSpace(asString(value))
-			if status == "" {
-				continue
-			}
-			cfg.Statuses = append(cfg.Statuses, status)
-		}
-	}
-	if rawSetStatusBy, ok := raw["set_status_by"].(map[string]any); ok {
-		cfg.SetStatusBy = make(map[string]string, len(rawSetStatusBy))
-		for status, roleValue := range rawSetStatusBy {
-			role := strings.TrimSpace(asString(roleValue))
-			if role == "" {
-				continue
-			}
-			cfg.SetStatusBy[strings.TrimSpace(status)] = role
-		}
-	}
-	if len(cfg.Statuses) == 0 {
-		return requestsFlowConfig{}, fmt.Errorf("empty statuses")
-	}
-	return cfg, nil
+	return parseRequestsFlowConfig(raw)
 }
 
 func normalizeSubmitInput(raw map[string]any) map[string]any {
@@ -715,26 +747,23 @@ func hasNonEmptyValue(value any) bool {
 	}
 }
 
-func nextStatus(statuses []string, current string) (string, error) {
-	for i, status := range statuses {
-		if status != current {
-			continue
-		}
-		if i+1 >= len(statuses) {
-			return "", fmt.Errorf("last status reached")
-		}
-		return statuses[i+1], nil
-	}
-	return "", fmt.Errorf("current status not found in flow")
-}
-
 func hasRoleForRequest(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, role string) (bool, error) {
+	if actor != nil && actor.GetBool("admin") {
+		return true, nil
+	}
+
 	switch role {
-	case "admin":
-		return actor.GetBool("admin"), nil
-	case "guardian":
+	case requestRoleAdmin:
+		return actor != nil && actor.GetBool("admin"), nil
+	case requestRoleGuardian:
+		if actor == nil {
+			return false, nil
+		}
 		return strings.TrimSpace(record.GetString("guardian")) == actor.Id, nil
-	case "assistant":
+	case requestRoleAssistant:
+		if actor == nil {
+			return false, nil
+		}
 		groupID := strings.TrimSpace(record.GetString("group"))
 		if groupID == "" {
 			return false, nil
@@ -788,16 +817,17 @@ func buildUserDataFromRequest(data map[string]any) map[string]any {
 	if data == nil {
 		return map[string]any{}
 	}
-	return maps.Clone(data)
+	out := maps.Clone(data)
+	delete(out, requestFlowVersionDataKey)
+	delete(out, requestStepIndexDataKey)
+	return out
 }
 
-func statusInFlow(statuses []string, target string) bool {
-	for _, status := range statuses {
-		if status == target {
-			return true
-		}
+func flowStepAt(flow requestsFlowConfig, stepIndex int) (requestsFlowStep, bool) {
+	if stepIndex < 0 || stepIndex >= len(flow.Steps) {
+		return requestsFlowStep{}, false
 	}
-	return false
+	return flow.Steps[stepIndex], true
 }
 
 func asString(value any) string {
@@ -872,7 +902,7 @@ func mapRequestItem(record *core.Record) requestListItem {
 	return requestListItem{
 		ID:       record.Id,
 		Email:    record.GetString("email"),
-		Status:   record.GetString("status"),
+		Status:   "",
 		Rejected: record.GetBool("rejected"),
 		GroupID:  record.GetString("group"),
 		Guardian: record.GetString("guardian"),
@@ -880,4 +910,71 @@ func mapRequestItem(record *core.Record) requestListItem {
 		Updated:  record.GetString("updated"),
 		Data:     parseJSONMap(record.Get("data")),
 	}
+}
+
+func mapRequestItemWithWorkflow(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, flow requestsFlowConfig) (requestListItem, error) {
+	item := mapRequestItem(record)
+	flowVersion, _ := requestProgressFromData(item.Data)
+	stepIndex := effectiveRequestStepIndex(record, item.Data, flow)
+
+	nextStep, hasNext := flowStepAt(flow, stepIndex)
+	canAdvance := false
+	requiredField := ""
+	if hasNext && !item.Rejected {
+		requiredField = requiredFieldForAction(nextStep.Action)
+		ok, err := hasRoleForRequest(app, actor, record, nextStep.Role)
+		if err != nil {
+			return requestListItem{}, err
+		}
+		canAdvance = ok
+	}
+
+	item.FlowVersion = flowVersion
+	item.StepIndex = stepIndex
+	item.Status = statusForStepIndex(stepIndex, flow.Steps)
+	currentStep, hasCurrent := flowStepAt(flow, stepIndex-1)
+	currentAction := ""
+	currentActionLabel := ""
+	if hasCurrent {
+		currentAction = currentStep.Action
+		currentActionLabel = currentStep.Label
+	}
+	if currentActionLabel == "" {
+		normalized := normalizeStatusValue(item.Status)
+		currentActionLabel = strings.ReplaceAll(normalized, "_", " ")
+	}
+	item.Workflow = map[string]any{
+		"total_steps":          len(flow.Steps),
+		"has_next_step":        hasNext,
+		"current_action":       currentAction,
+		"current_action_label": currentActionLabel,
+		"next_role":            nextStep.Role,
+		"next_action":          nextStep.Action,
+		"next_action_label":    nextStep.Label,
+		"required_field":       requiredField,
+		"can_advance":          canAdvance,
+		"current_version":      flow.Version,
+	}
+	return item, nil
+}
+
+func effectiveRequestStepIndex(record *core.Record, data map[string]any, flow requestsFlowConfig) int {
+	_, stepIndex := requestProgressFromData(data)
+	if record == nil {
+		return stepIndex
+	}
+
+	for stepIndex < len(flow.Steps) {
+		required := requiredFieldForAction(flow.Steps[stepIndex].Action)
+		if required == "group" && strings.TrimSpace(record.GetString("group")) != "" {
+			stepIndex++
+			continue
+		}
+		if required == "guardian" && strings.TrimSpace(record.GetString("guardian")) != "" {
+			stepIndex++
+			continue
+		}
+		break
+	}
+	return stepIndex
 }

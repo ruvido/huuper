@@ -2,7 +2,7 @@
 	import Card from '../Card.svelte';
 	import { Clock, Check } from 'lucide-svelte';
 
-	export let status = 'pending'; // 'pending' | 'active'
+	export let status = 'pending'; // 'pending' | 'approved' | 'active'
 </script>
 
 <Card>
@@ -13,9 +13,14 @@
 			<p class="pending-message"><Clock size={20} /> In attesa di approvazione</p>
 			<p class="help-text">Il tuo account è in attesa di essere approvato da un amministratore.</p>
 		</div>
-	{:else}
+	{:else if status === 'active'}
 		<div class="status-active">
 			<p class="active-message"><Check size={20} /> Account attivo</p>
+		</div>
+	{:else}
+		<div class="status-approved">
+			<p class="approved-message"><Clock size={20} /> In attesa ingresso gruppo</p>
+			<p class="help-text">Quando entri in almeno un gruppo Telegram il profilo diventa attivo.</p>
 		</div>
 	{/if}
 </Card>
@@ -29,6 +34,7 @@
 	}
 
 	.status-pending,
+	.status-approved,
 	.status-active {
 		text-align: center;
 	}
@@ -45,6 +51,13 @@
 		color: #008000;
 		font-size: clamp(1rem, 3vw, 1.125rem);
 		margin: 0;
+	}
+
+	.approved-message {
+		font-weight: 600;
+		color: #1e88e5;
+		font-size: clamp(1rem, 3vw, 1.125rem);
+		margin: 0 0 clamp(0.5rem, 2vw, 0.75rem) 0;
 	}
 
 	.help-text {

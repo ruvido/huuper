@@ -22,6 +22,10 @@ Repository guidance for contributors and automated agents.
 Do: prefer existing helpers, keep logic linear, document only what is non-obvious.
 Don't: duplicate code, add clever abstractions, drift from official conventions.
 
+## Collaboration Constraint
+- Do not introduce automatic behavior, inferred UX changes, or fallback logic unless the user explicitly requests it.
+- If a change is ambiguous, ask before implementing.
+
 ## When Unsure
 Check official docs first:
 - https://pocketbase.io/docs/

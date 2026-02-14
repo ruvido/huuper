@@ -55,59 +55,8 @@ func RegisterSettingsValidationHooks(app *pocketbase.PocketBase) {
 }
 
 func validateRequestsFlowSettingData(data map[string]any) error {
-	rawStatuses, ok := data["statuses"]
-	if !ok {
-		return fmt.Errorf("settings.requests_flow missing statuses")
-	}
-	statuses, ok := rawStatuses.([]any)
-	if !ok || len(statuses) == 0 {
-		return fmt.Errorf("settings.requests_flow statuses must be a non-empty array")
-	}
-
-	seen := make(map[string]struct{}, len(statuses))
-	for _, raw := range statuses {
-		status := strings.TrimSpace(asString(raw))
-		if status == "" {
-			return fmt.Errorf("settings.requests_flow status cannot be empty")
-		}
-		if _, exists := seen[status]; exists {
-			return fmt.Errorf("duplicate status: %s", status)
-		}
-		seen[status] = struct{}{}
-	}
-
-	rawSetStatusBy, ok := data["set_status_by"]
-	if !ok {
-		return nil
-	}
-	setStatusBy, ok := rawSetStatusBy.(map[string]any)
-	if !ok {
-		return fmt.Errorf("settings.requests_flow set_status_by must be an object")
-	}
-
-	validRoles := map[string]struct{}{
-		"admin":     {},
-		"assistant": {},
-		"guardian":  {},
-	}
-	for rawStatus, rawRole := range setStatusBy {
-		status := strings.TrimSpace(rawStatus)
-		if status == "" {
-			return fmt.Errorf("settings.requests_flow set_status_by contains empty status key")
-		}
-		if _, exists := seen[status]; !exists {
-			return fmt.Errorf("settings.requests_flow set_status_by unknown status: %s", status)
-		}
-		role := strings.TrimSpace(asString(rawRole))
-		if role == "" {
-			return fmt.Errorf("settings.requests_flow set_status_by role is required for status: %s", status)
-		}
-		if _, exists := validRoles[role]; !exists {
-			return fmt.Errorf("settings.requests_flow invalid role %q for status: %s", role, status)
-		}
-	}
-
-	return nil
+	_, err := parseRequestsFlowConfig(data)
+	return err
 }
 
 func loadProfileSchemaKeys(app core.App) (map[string]struct{}, error) {
