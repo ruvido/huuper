@@ -1,22 +1,21 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tools/types"
 )
 
 type adminRegistrationItem struct {
-	ID       string         `json:"id"`
-	Email    string         `json:"email"`
-	Status   string         `json:"status"`
-	Created  string         `json:"created"`
-	HasUser  bool           `json:"hasUser"`
-	Data     map[string]any `json:"data"`
+	ID      string         `json:"id"`
+	Email   string         `json:"email"`
+	Status  string         `json:"status"`
+	Created string         `json:"created"`
+	HasUser bool           `json:"hasUser"`
+	Data    map[string]any `json:"data"`
 }
 
 // AdminEventDetailsHandler returns the event and its registrations.
@@ -50,7 +49,7 @@ func AdminEventDetailsHandler(app *pocketbase.PocketBase) func(e *core.RequestEv
 
 		items := make([]adminRegistrationItem, 0, len(registrations))
 		for _, record := range registrations {
-			items = append(items, mapRegistration(record))
+			items = append(items, mapRegistration(app, record))
 		}
 
 		eventData := parseJSONMap(event.Get("data"))
@@ -127,41 +126,21 @@ func AdminCancelRegistrationHandler(app *pocketbase.PocketBase) func(e *core.Req
 	}
 }
 
-func mapRegistration(record *core.Record) adminRegistrationItem {
+func mapRegistration(app *pocketbase.PocketBase, record *core.Record) adminRegistrationItem {
 	data := parseJSONMap(record.Get("data"))
-
-	userId := record.GetString("user")
-
-	return adminRegistrationItem{
-		ID:       record.Id,
-		Email:    record.GetString("email"),
-		Status:   record.GetString("status"),
-		Created:  record.GetString("created"),
-		HasUser:  userId != "",
-		Data:     data,
-	}
-}
-
-func parseJSONMap(raw any) map[string]any {
-	data := map[string]any{}
-	if raw == nil {
-		return data
-	}
-
-	switch typed := raw.(type) {
-	case map[string]any:
-		data = typed
-	case types.JSONRaw:
-		_ = json.Unmarshal(typed, &data)
-	case string:
-		_ = json.Unmarshal([]byte(typed), &data)
-	case []byte:
-		_ = json.Unmarshal(typed, &data)
-	default:
-		if payload, err := json.Marshal(typed); err == nil {
-			_ = json.Unmarshal(payload, &data)
+	userId := strings.TrimSpace(record.GetString("user"))
+	if userId != "" {
+		if user, err := app.FindRecordById("users", userId); err == nil && user != nil {
+			data = parseJSONMap(user.Get("data"))
 		}
 	}
 
-	return data
+	return adminRegistrationItem{
+		ID:      record.Id,
+		Email:   record.GetString("email"),
+		Status:  record.GetString("status"),
+		Created: record.GetString("created"),
+		HasUser: userId != "",
+		Data:    data,
+	}
 }

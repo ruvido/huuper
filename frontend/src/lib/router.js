@@ -8,7 +8,16 @@ const authOnlyRoutes = ['onboarding', 'pending-approval', 'telegram-connect'];
 const appPrefix = 'app/';
 export const defaultAppRoute = 'app/home';
 const adminRoute = 'app/admin';
-const appRoutes = [defaultAppRoute, 'app/groups', 'app/profile', adminRoute, 'app/events'];
+const adminPrefix = 'app/admin';
+const appRoutes = [
+	defaultAppRoute,
+	'app/groups',
+	'app/profile',
+	adminRoute,
+	'app/events',
+	'app/requests',
+	'app/admin/requests'
+];
 
 function updateRoute() {
 	const hash = window.location.hash.slice(1) || 'login'; // Remove #
@@ -31,6 +40,9 @@ export function navigate(route) {
 export function resolveNextRoute(next) {
 	if (!next || typeof next !== 'string') return defaultAppRoute;
 	if (next === 'app') return defaultAppRoute;
+	if (next.startsWith('app/groups/')) return next;
+	if (next.startsWith('app/requests/')) return next;
+	if (next.startsWith('app/admin/requests/')) return next;
 	if (next.startsWith(appPrefix) && appRoutes.includes(next)) return next;
 	return defaultAppRoute;
 }
@@ -59,7 +71,12 @@ export function getTargetRoute(isAuthenticated, user, currentRoute) {
 
 	const isAdmin = !!user?.admin;
 
-	if (currentRoute === adminRoute && !isAdmin) return defaultAppRoute;
+	if ((currentRoute === adminRoute || currentRoute.startsWith(`${adminPrefix}/`)) && !isAdmin) {
+		return defaultAppRoute;
+	}
+	if (currentRoute.startsWith('app/groups/')) return currentRoute;
+	if (currentRoute.startsWith('app/requests/')) return currentRoute;
+	if (currentRoute.startsWith('app/admin/requests/')) return currentRoute;
 	if (isAdmin && currentRoute === defaultAppRoute) return adminRoute;
 	if (currentRoute === 'app') return isAdmin ? adminRoute : defaultAppRoute;
 	if (currentRoute.startsWith(appPrefix)) {

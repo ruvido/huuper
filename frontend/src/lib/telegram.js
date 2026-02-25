@@ -1,11 +1,8 @@
-import { pb } from './pocketbase';
+import { apiFetch } from './pocketbase';
 
 export async function generateTelegramDeepLink(botName) {
-	const response = await fetch('/api/telegram/generate-token', {
+	const response = await apiFetch('/api/telegram/generate-token', {
 		method: 'POST',
-		headers: {
-			Authorization: pb.authStore.token,
-		},
 	});
 
 	if (!response.ok) {

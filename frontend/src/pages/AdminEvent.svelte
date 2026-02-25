@@ -1,40 +1,27 @@
 <script>
-import { onMount, tick } from 'svelte';
-	import { pb } from '../lib/pocketbase';
+	import { onMount, tick } from 'svelte';
+	import { apiFetch } from '../lib/pocketbase';
+	import { formatEventDate } from '../lib/date';
 	import { queryParams, navigate } from '../lib/router';
 	import DashboardLayout from '../components/DashboardLayout.svelte';
-import StateCard from '../components/StateCard.svelte';
-import AdminCard from '../components/AdminCard.svelte';
-import StatRow from '../components/StatRow.svelte';
+	import StateCard from '../components/StateCard.svelte';
+	import AdminCard from '../components/AdminCard.svelte';
+	import StatRow from '../components/StatRow.svelte';
 	import ConfirmModal from '../components/modals/ConfirmModal.svelte';
 
 	let loading = true;
 	let error = '';
 	let eventInfo = null;
 	let registrations = [];
-let confirmOpen = false;
-let confirmLoading = false;
-let confirmTarget = null;
-let cancelConfirmOpen = false;
-let cancelConfirmTarget = null;
-let lastEventId = null;
-let cancelingId = null;
+	let confirmOpen = false;
+	let confirmLoading = false;
+	let confirmTarget = null;
+	let cancelConfirmOpen = false;
+	let cancelConfirmTarget = null;
+	let lastEventId = null;
+	let cancelingId = null;
 
 	$: eventId = $queryParams?.id;
-
-	function formatDatePart(raw) {
-		if (!raw) return '';
-		const parts = raw.split('-');
-		if (parts.length !== 3) return raw;
-		return `${parts[2]}/${parts[1]}/${parts[0]}`;
-	}
-
-	function formatEventDate(value) {
-		if (!value || typeof value !== 'string') return '';
-		const normalized = value.replace('T', ' ');
-		const [dateRaw] = normalized.split(' ');
-		return formatDatePart(dateRaw);
-	}
 
 	function stringValue(value) {
 		if (Array.isArray(value)) return value.filter(Boolean).join(', ');
@@ -42,76 +29,72 @@ let cancelingId = null;
 		return '';
 	}
 
-function displayName(registration) {
-	const data = registration?.data || {};
-	const fullName = typeof data.full_name === 'string' ? data.full_name.trim() : '';
-	if (fullName) return fullName;
-	return 'Unknown';
-}
+	function displayName(registration) {
+		const data = registration?.data || {};
+		const fullName = typeof data.full_name === 'string' ? data.full_name.trim() : '';
+		if (fullName) return fullName;
+		return 'Unknown';
+	}
 
-function displayRegion(registration) {
-	const data = registration?.data || {};
-	const region = typeof data.region === 'string' ? data.region.trim() : '';
-	if (region) return region;
-	return 'Unknown';
-}
+	function displayRegion(registration) {
+		const data = registration?.data || {};
+		const region = typeof data.region === 'string' ? data.region.trim() : '';
+		if (region) return region;
+		return 'Unknown';
+	}
 
-function displayPhone(registration) {
-	const data = registration?.data || {};
-	const phone = typeof data.mobile === 'string' ? data.mobile.trim() : '';
-	if (phone) return phone;
-	return '';
-}
+	function displayPhone(registration) {
+		const data = registration?.data || {};
+		const phone = typeof data.mobile === 'string' ? data.mobile.trim() : '';
+		if (phone) return phone;
+		return '';
+	}
 
-function resolveStatus(registration) {
-	if (registration?.status) return registration.status;
-	return 'pending';
-}
+	function resolveStatus(registration) {
+		if (registration?.status) return registration.status;
+		return 'pending';
+	}
 
-$: eventData = eventInfo?.data && typeof eventInfo.data === 'object' ? eventInfo.data : {};
-$: locationText = stringValue(eventData?.location);
-$: dateLine = [formatEventDate(eventInfo?.event_date), locationText].filter(Boolean).join(' · ');
+	$: eventData = eventInfo?.data && typeof eventInfo.data === 'object' ? eventInfo.data : {};
+	$: locationText = stringValue(eventData?.location);
+	$: dateLine = [formatEventDate(eventInfo?.event_date), locationText].filter(Boolean).join(' · ');
 
-function parseCreated(registration) {
-	const raw = registration?.created;
-	if (!raw || typeof raw !== 'string') return 0;
-	const parsed = Date.parse(raw);
-	return Number.isNaN(parsed) ? 0 : parsed;
-}
+	function parseCreated(registration) {
+		const raw = registration?.created;
+		if (!raw || typeof raw !== 'string') return 0;
+		const parsed = Date.parse(raw);
+		return Number.isNaN(parsed) ? 0 : parsed;
+	}
 
-function formatShortDate(raw) {
-	if (!raw || typeof raw !== 'string') return '';
-	const parsed = new Date(raw);
-	if (Number.isNaN(parsed.getTime())) return '';
-	const day = String(parsed.getDate()).padStart(2, '0');
-	const month = parsed.toLocaleString('en-US', { month: 'short' }).toUpperCase();
-	return `${day} ${month}`;
-}
+	function formatShortDate(raw) {
+		if (!raw || typeof raw !== 'string') return '';
+		const parsed = new Date(raw);
+		if (Number.isNaN(parsed.getTime())) return '';
+		const day = String(parsed.getDate()).padStart(2, '0');
+		const month = parsed.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+		return `${day} ${month}`;
+	}
 
-$: pendingItems = registrations
-	.filter((r) => resolveStatus(r) === 'pending')
-	.sort((a, b) => parseCreated(b) - parseCreated(a));
-$: approvedItems = registrations
-	.filter((r) => resolveStatus(r) === 'active')
-	.sort((a, b) => parseCreated(b) - parseCreated(a));
-$: cancelledItems = registrations
-	.filter((r) => resolveStatus(r) === 'cancelled')
-	.sort((a, b) => parseCreated(a) - parseCreated(b));
-$: pendingCount = pendingItems.length;
-$: approvedCount = approvedItems.length;
-$: cancelledCount = cancelledItems.length;
-$: totalCount = pendingCount + approvedCount + cancelledCount;
+	$: pendingItems = registrations
+		.filter((r) => resolveStatus(r) === 'pending')
+		.sort((a, b) => parseCreated(b) - parseCreated(a));
+	$: approvedItems = registrations
+		.filter((r) => resolveStatus(r) === 'active')
+		.sort((a, b) => parseCreated(b) - parseCreated(a));
+	$: cancelledItems = registrations
+		.filter((r) => resolveStatus(r) === 'cancelled')
+		.sort((a, b) => parseCreated(a) - parseCreated(b));
+	$: pendingCount = pendingItems.length;
+	$: approvedCount = approvedItems.length;
+	$: cancelledCount = cancelledItems.length;
+	$: totalCount = pendingCount + approvedCount + cancelledCount;
 
 	async function loadDetails() {
 		if (!eventId) return;
 		loading = true;
 		error = '';
 		try {
-			const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}`, {
-				headers: {
-					Authorization: pb.authStore.token,
-				},
-			});
+			const response = await apiFetch(`/api/admin/events/${encodeURIComponent(eventId)}`);
 			if (!response.ok) {
 				throw new Error('Failed to load event data');
 			}
@@ -151,11 +134,8 @@ $: totalCount = pendingCount + approvedCount + cancelledCount;
 		await tick();
 		const startedAt = Date.now();
 		try {
-			const response = await fetch(`/api/admin/registrations/${encodeURIComponent(confirmTarget.id)}/approve`, {
-				method: 'POST',
-				headers: {
-					Authorization: pb.authStore.token,
-				},
+			const response = await apiFetch(`/api/admin/registrations/${encodeURIComponent(confirmTarget.id)}/approve`, {
+				method: 'POST'
 			});
 			if (!response.ok) {
 				throw new Error('Failed to approve');
@@ -180,13 +160,10 @@ $: totalCount = pendingCount + approvedCount + cancelledCount;
 		cancelingId = cancelConfirmTarget.id;
 		error = '';
 		try {
-			const response = await fetch(
+			const response = await apiFetch(
 				`/api/admin/registrations/${encodeURIComponent(cancelConfirmTarget.id)}/cancel`,
 				{
-					method: 'POST',
-					headers: {
-						Authorization: pb.authStore.token,
-					},
+					method: 'POST'
 				}
 			);
 			if (!response.ok) {
@@ -203,21 +180,21 @@ $: totalCount = pendingCount + approvedCount + cancelledCount;
 		}
 	}
 
-function goBack() {
-	navigate('app/admin');
-}
+	function goBack() {
+		navigate('app/admin');
+	}
 
-$: if (eventId && eventId !== lastEventId) {
-	lastEventId = eventId;
-	loadDetails();
-}
-
-onMount(() => {
-	if (eventId) {
+	$: if (eventId && eventId !== lastEventId) {
 		lastEventId = eventId;
 		loadDetails();
 	}
-});
+
+	onMount(() => {
+		if (eventId) {
+			lastEventId = eventId;
+			loadDetails();
+		}
+	});
 </script>
 
 <DashboardLayout title="Event">

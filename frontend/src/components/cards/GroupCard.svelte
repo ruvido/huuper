@@ -3,43 +3,66 @@
 
 	export let group;
 	export let isMember = false;
+	export let onOpen = null;
+	$: clickable = typeof onOpen === 'function';
+
+	function handleOpen() {
+		if (clickable) {
+			onOpen(group);
+		}
+	}
 </script>
 
-<div class="group-card">
-	<div class="group-icon">
-		{group.name.charAt(0).toUpperCase()}
-	</div>
-	<div class="group-info">
-		<h3>
-			{group.name}
-			{#if isMember}
-				<span class="member-badge"><Check size={14} /> Member</span>
+{#if clickable}
+	<button class="group-card clickable" type="button" aria-label={`Open ${group.name}`} on:click={handleOpen}>
+		<div class="group-icon">
+			{group.name.charAt(0).toUpperCase()}
+		</div>
+		<div class="group-info">
+			<h3>
+				{group.name}
+				{#if isMember}
+					<span class="member-badge"><Check size={14} /> Member</span>
+				{/if}
+			</h3>
+			{#if group.description}
+				<p class="description">{group.description}</p>
 			{/if}
-		</h3>
-		{#if group.description}
-			<p class="description">{group.description}</p>
-		{/if}
+		</div>
+	</button>
+{:else}
+	<div class="group-card">
+		<div class="group-icon">
+			{group.name.charAt(0).toUpperCase()}
+		</div>
+		<div class="group-info">
+			<h3>
+				{group.name}
+				{#if isMember}
+					<span class="member-badge"><Check size={14} /> Member</span>
+				{/if}
+			</h3>
+			{#if group.description}
+				<p class="description">{group.description}</p>
+			{/if}
+		</div>
 	</div>
-	{#if group.invite_link}
-		<a
-			href={group.invite_link}
-			target="_blank"
-			rel="noopener noreferrer"
-			class="join-link"
-		>
-			Join
-		</a>
-	{/if}
-</div>
+{/if}
 
 <style>
 	.group-card {
+		width: 100%;
+		text-align: left;
 		background: #fff;
 		border: 2px solid #000;
 		padding: clamp(0.75rem, 2.5vw, 1rem);
 		display: flex;
 		align-items: center;
 		gap: clamp(0.75rem, 2vw, 1rem);
+	}
+
+	.group-card.clickable {
+		cursor: pointer;
 	}
 
 	.group-icon {
@@ -81,24 +104,6 @@
 		display: -webkit-box;
 		-webkit-line-clamp: 2;
 		-webkit-box-orient: vertical;
-	}
-
-	.join-link {
-		background: #000;
-		color: #fff;
-		border: 2px solid #000;
-		padding: clamp(0.875rem, 3vw, 1rem);
-		text-decoration: none;
-		font-weight: 600;
-		text-align: center;
-		white-space: nowrap;
-		transition: background 0.2s, color 0.2s;
-		flex-shrink: 0;
-	}
-
-	.join-link:hover {
-		background: #fff;
-		color: #000;
 	}
 
 	.member-badge {

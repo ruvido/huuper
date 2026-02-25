@@ -12,7 +12,6 @@ import (
 	"sort"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
@@ -81,16 +80,34 @@ func RegisterEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		if err := e.BindBody(&payload); err != nil {
 			return apis.NewBadRequestError(errGeneric, err)
 		}
-	if payload.Data == nil {
-		payload.Data = map[string]any{}
-	}
-	normalizeRegistrationNames(payload.Data)
-	if !isDataSizeOk(payload.Data) {
-		return apis.NewBadRequestError(errGeneric, nil)
-	}
+		if payload.Data == nil {
+			payload.Data = map[string]any{}
+		}
+		normalizeRegistrationNames(payload.Data)
 		recipient, err := normalizeEmail(payload.Email)
 		if err != nil {
 			return apis.NewBadRequestError(errInvalidEmail, nil)
+		}
+
+		linkedUser := e.Auth
+		if linkedUser == nil {
+			user, err := app.FindFirstRecordByFilter(
+				"users",
+				"email = {:email}",
+				map[string]any{"email": recipient},
+			)
+			if err == nil && user != nil && strings.TrimSpace(user.GetString("status")) == "active" {
+				linkedUser = user
+			}
+		}
+
+		registrationData := payload.Data
+		if linkedUser != nil {
+			// Absolute source-of-truth: when a user is linked, profile data lives in users.data.
+			registrationData = map[string]any{}
+		}
+		if !isDataSizeOk(registrationData) {
+			return apis.NewBadRequestError(errGeneric, nil)
 		}
 
 		registrations, err := app.FindCollectionByNameOrId("event_registrations")
@@ -119,16 +136,16 @@ func RegisterEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		record.Set("accept_token", acceptToken)
 		record.Set("accept_expires_at", time.Now().UTC().Add(7*24*time.Hour))
 		record.Set("event", event.Id)
-		if e.Auth != nil {
-			record.Set("user", e.Auth.Id)
+		if linkedUser != nil {
+			record.Set("user", linkedUser.Id)
 		}
 		record.Set("email", recipient)
-		if e.Auth != nil {
+		if linkedUser != nil {
 			record.Set("status", "active")
 		} else {
 			record.Set("status", "pending")
 		}
-		record.Set("data", payload.Data)
+		record.Set("data", registrationData)
 
 		if err := app.Save(record); err != nil {
 			if isUniqueConstraintError(err) {
@@ -138,10 +155,14 @@ func RegisterEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		}
 
 		emailSent := false
-		if templateId := getRelationId(event, "reply_template"); templateId != "" {
-			emailSent = sendRegistrationEmail(app, templateId, recipient, payload.Data)
+		effectiveData := registrationData
+		if linkedUser != nil {
+			effectiveData = parseJSONMap(linkedUser.Get("data"))
 		}
-		sendAdminNotification(app, event, recipient, record.GetString("accept_token"), payload.Data)
+		if templateId := getRelationId(event, "reply_template"); templateId != "" {
+			emailSent = sendRegistrationEmail(app, templateId, recipient, effectiveData)
+		}
+		sendAdminNotification(app, event, recipient, record.GetString("accept_token"), effectiveData)
 
 		return e.JSON(http.StatusCreated, map[string]any{
 			"id":         record.Id,
@@ -614,26 +635,6 @@ func normalizeRegistrationNames(data map[string]any) {
 			data["full_name"] = normalized
 		}
 	}
-}
-
-func normalizePersonName(value string) string {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
-		return ""
-	}
-	parts := strings.Fields(strings.ToLower(trimmed))
-	for i, part := range parts {
-		runes := []rune(part)
-		if len(runes) == 0 {
-			continue
-		}
-		runes[0] = unicode.ToUpper(runes[0])
-		for j := 1; j < len(runes); j++ {
-			runes[j] = unicode.ToLower(runes[j])
-		}
-		parts[i] = string(runes)
-	}
-	return strings.Join(parts, " ")
 }
 
 func safeHTML(value string) string {

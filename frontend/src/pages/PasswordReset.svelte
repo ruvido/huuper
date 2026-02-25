@@ -164,6 +164,7 @@
 					bind:error={passwordError}
 					disabled={loading}
 					required
+					minLength={8}
 				/>
 
 				<FormGroup

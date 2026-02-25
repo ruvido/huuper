@@ -19,6 +19,9 @@
 	let emailError = '';
 	let passwordError = '';
 	let confirmError = '';
+	let emailField;
+	let passwordField;
+	let passwordConfirmField;
 
 	async function handleSignup() {
 		// Reset errors
@@ -27,19 +30,8 @@
 		passwordError = '';
 		confirmError = '';
 
-		// Basic validation
-		if (!email || !password || !passwordConfirm) {
-			error = 'All fields are required';
-			return;
-		}
-
-		if (password !== passwordConfirm) {
-			confirmError = 'Passwords do not match';
-			return;
-		}
-
-		if (password.length < 8) {
-			passwordError = 'Password must be at least 8 characters';
+		const isValid = emailField?.isValid() && passwordField?.isValid() && passwordConfirmField?.isValid();
+		if (!isValid) {
 			return;
 		}
 
@@ -99,6 +91,7 @@
 
 	<form on:submit|preventDefault={handleSignup}>
 		<FormGroup
+			bind:this={emailField}
 			id="email"
 			type="email"
 			label="Email"
@@ -110,6 +103,7 @@
 		/>
 
 		<FormGroup
+			bind:this={passwordField}
 			id="password"
 			type="password"
 			label="Password"
@@ -118,9 +112,11 @@
 			bind:error={passwordError}
 			disabled={loading}
 			required={true}
+			minLength={8}
 		/>
 
 		<FormGroup
+			bind:this={passwordConfirmField}
 			id="passwordConfirm"
 			type="password"
 			label="Confirm Password"

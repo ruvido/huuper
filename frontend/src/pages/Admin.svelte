@@ -1,6 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
-	import { pb } from '../lib/pocketbase';
+	import { apiFetch } from '../lib/pocketbase';
+	import { formatEventDate } from '../lib/date';
 	import { navigate } from '../lib/router';
 	import DashboardLayout from '../components/DashboardLayout.svelte';
 	import StateCard from '../components/StateCard.svelte';
@@ -15,20 +16,6 @@
 		events: { total: null, next: null },
 	};
 
-	function formatDatePart(raw) {
-		if (!raw) return '';
-		const parts = raw.split('-');
-		if (parts.length !== 3) return raw;
-		return `${parts[2]}/${parts[1]}/${parts[0]}`;
-	}
-
-	function formatEventDate(value) {
-		if (!value || typeof value !== 'string') return '';
-		const normalized = value.replace('T', ' ');
-		const [dateRaw] = normalized.split(' ');
-		return formatDatePart(dateRaw);
-	}
-
 	function goToNextEvent() {
 		if (!summary?.events?.next?.id) return;
 		navigate(`app/events?id=${encodeURIComponent(summary.events.next.id)}`);
@@ -38,11 +25,7 @@
 		loading = true;
 		error = '';
 		try {
-			const response = await fetch('/api/admin/summary', {
-				headers: {
-					Authorization: pb.authStore.token,
-				},
-			});
+			const response = await apiFetch('/api/admin/summary');
 			if (!response.ok) {
 				throw new Error('Failed to load admin data');
 			}

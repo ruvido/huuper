@@ -12,17 +12,20 @@
 	let passwordError = '';
 	let error = '';
 	let loading = false;
+	let emailField;
+	let passwordField;
 
 	async function handleLogin() {
-		if (!email || !password) {
-			error = 'Email and password are required';
+		error = '';
+		emailError = '';
+		passwordError = '';
+
+		const isValid = emailField?.isValid() && passwordField?.isValid();
+		if (!isValid) {
 			return;
 		}
 
 		loading = true;
-		error = '';
-		emailError = '';
-		passwordError = '';
 
 		try {
 			await pb.collection('users').authWithPassword(email, password);
@@ -54,6 +57,7 @@
 
 	<form on:submit|preventDefault={handleLogin}>
 		<FormGroup
+			bind:this={emailField}
 			id="email"
 			type="email"
 			label="Email"
@@ -61,9 +65,11 @@
 			bind:value={email}
 			bind:error={emailError}
 			disabled={loading}
+			required={true}
 		/>
 
 		<FormGroup
+			bind:this={passwordField}
 			id="password"
 			type="password"
 			label="Password"
@@ -71,6 +77,7 @@
 			bind:value={password}
 			bind:error={passwordError}
 			disabled={loading}
+			required={true}
 		/>
 
 		<ErrorMessage {error} />

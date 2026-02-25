@@ -9,15 +9,14 @@
 	import ConfirmationPage from '../components/onboarding/ConfirmationPage.svelte';
 
 	let steps = [];
+	let confirmation = null;
 	let currentStep = 0;
 	let formData = {};
 	let error = '';
 	let loading = false;
 	let showConfirmation = false;
 
-	// Separate confirmation step from form steps
-	$: confirmationStep = steps.find(s => s.type === 'confirmation');
-	$: formSteps = steps.filter(s => s.type !== 'confirmation');
+	$: formSteps = steps;
 
 	// Crop state
 	let showCropModal = false;
@@ -25,7 +24,7 @@
 	let cropFile = null;
 	let cropField = '';
 	let cropModalRef;
-	const nameFieldKey = 'full_name';
+	const customFieldSuffix = '_custom';
 
 	// Count only non-start steps
 	$: realSteps = formSteps.filter(s => s.type !== 'start');
@@ -41,60 +40,101 @@
 	$: progressPercentage = realSteps.length > 0 ? (realStepIndex / realSteps.length) * 100 : 0;
 
 	// Check if current step is complete
-	$: canProceed = (() => {
-		const step = formSteps[currentStep];
-		if (!step) return false;
-
-		if (step.type === 'start') {
-			return true;
-		} else if (step.type === 'text') {
-			return !!formData[step.field]?.trim();
-		} else if (step.type === 'textarea') {
-			return !!formData[step.field]?.trim();
-		} else if (step.type === 'file') {
-			return !!formData[step.field];
-		} else if (step.type === 'select') {
-			const value = formData[step.field];
-			if (step.min) {
-				// Multiple selection
-				if (!value || value.length < step.min) return false;
-				// Check if any selected option needs custom input
-				const hasInputOption = value.some(v => v.includes(':input'));
-				if (hasInputOption) {
-					return !!formData[step.field + '_custom']?.trim();
-				}
-				return true;
-			} else if (step.max === 1) {
-				// Single selection
-				const needsCustom = value?.includes(':input');
-				if (needsCustom) {
-					return !!formData[step.field + '_custom']?.trim();
-				}
-				return !!value;
-			}
-		}
-		return false;
-	})();
+	$: canProceed = isStepComplete(formSteps[currentStep], formData);
 
 	onMount(async () => {
-		// Fetch onboarding config from settings
 		try {
-			const response = await fetchSetting('onboarding');
-			if (response.ok) {
-				const data = await response.json();
-				steps = data.data.steps || [];
-			} else {
+			const [onboardingResponse, profileResponse] = await Promise.all([
+				fetchSetting('onboarding'),
+				fetchSetting('profile_schema'),
+			]);
+
+			if (!onboardingResponse.ok || !profileResponse.ok) {
 				error = 'Failed to load onboarding configuration';
+				return;
 			}
-		} catch (err) {
+
+			const onboardingPayload = await onboardingResponse.json();
+			const profilePayload = await profileResponse.json();
+
+			const onboardingData = onboardingPayload?.data || {};
+			const profileData = profilePayload?.data || {};
+			steps = buildOnboardingSteps(onboardingData, profileData);
+			confirmation = onboardingData.confirmation || null;
+
+			if (steps.length === 0) {
+				error = 'Onboarding configuration has no steps';
+			}
+		} catch {
 			error = 'Failed to load onboarding configuration';
 		}
 	});
+
+	function normalizeFieldType(type) {
+		const value = (type || '').toLowerCase();
+		if (value === 'phone') return 'text';
+		if (value === 'email') return 'text';
+		return value;
+	}
+
+	function buildOnboardingSteps(onboardingData, profileData) {
+		const out = [];
+		const profileFields = Array.isArray(profileData?.fields) ? profileData.fields : [];
+		const byKey = new Map();
+		for (const field of profileFields) {
+			const key = field?.key;
+			if (typeof key === 'string' && key.trim() !== '') {
+				byKey.set(key, field);
+			}
+		}
+
+		const startPage = onboardingData?.start_page;
+		if (startPage && typeof startPage === 'object') {
+			out.push({
+				id: 'start',
+				type: 'start',
+				title: startPage.title || '',
+				text: startPage.text || '',
+				button: startPage.button || 'Inizia',
+			});
+		}
+
+		const rawSteps = Array.isArray(onboardingData?.steps) ? onboardingData.steps : [];
+		for (const rawStep of rawSteps) {
+			const key = typeof rawStep?.field === 'string' ? rawStep.field.trim() : '';
+			if (!key) continue;
+
+			const field = byKey.get(key);
+			if (!field) continue;
+
+			out.push({
+				id: key,
+				field: key,
+				type: normalizeFieldType(field.type),
+				title: rawStep.title || field.title || field.label || '',
+				label: rawStep.label || field.label || '',
+				options: Array.isArray(field.options) ? field.options : [],
+				min: Number.isFinite(field.min) ? field.min : undefined,
+				max: Number.isFinite(field.max) ? field.max : undefined,
+			});
+		}
+
+		return out;
+	}
 
 	function nextStep() {
 		if (currentStep < formSteps.length - 1 && canProceed) {
 			currentStep++;
 		}
+	}
+
+	async function completeStep() {
+		if (!canProceed || loading) return;
+		if (confirmation) {
+			showConfirmation = true;
+			return;
+		}
+		await handleSubmit();
 	}
 
 	function prevStep() {
@@ -127,15 +167,53 @@
 		}
 	}
 
-	function normalizePersonName(value) {
-		if (!value || typeof value !== 'string') return '';
-		return value
-			.trim()
-			.toLowerCase()
-			.split(/\s+/)
-			.filter(Boolean)
-			.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-			.join(' ');
+	function customFieldKey(field) {
+		return field + customFieldSuffix;
+	}
+
+	function requiresCustomValue(value, isMultiple) {
+		if (isMultiple) {
+			return Array.isArray(value) && value.some(v => v.includes(':input'));
+		}
+		return typeof value === 'string' && value.includes(':input');
+	}
+
+	function resolveSelectableValue(field, value) {
+		const customValue = formData[customFieldKey(field)];
+		if (Array.isArray(value)) {
+			return value.map(v => (v.includes(':input') ? customValue || v.split(':')[0] : v));
+		}
+		if (typeof value === 'string' && value.includes(':input')) {
+			return customValue || value.split(':')[0];
+		}
+		return value;
+	}
+
+	function isStepComplete(step, data) {
+		if (!step) return false;
+
+		if (step.type === 'start') return true;
+		if (step.type === 'text' || step.type === 'textarea') {
+			return !!data[step.field]?.trim();
+		}
+		if (step.type === 'file') return !!data[step.field];
+		if (step.type !== 'select') return false;
+
+		const value = data[step.field];
+		const isMultiple = !!step.min;
+		if (isMultiple) {
+			if (!value || value.length < step.min) return false;
+		} else if (step.max === 1) {
+			if (!value) return false;
+		} else {
+			return false;
+		}
+
+		if (!requiresCustomValue(value, isMultiple)) {
+			return true;
+		}
+
+		return !!data[customFieldKey(step.field)]?.trim();
 	}
 
 	function handleClose() {
@@ -170,12 +248,12 @@
 			cropImage = '';
 			cropFile = null;
 
-			// Auto-advance after crop
-			if (currentStep < formSteps.length - 1) {
-				currentStep++;
-			} else {
-				showConfirmation = true;
-			}
+				// Auto-advance after crop
+				if (currentStep < formSteps.length - 1) {
+					currentStep++;
+				} else {
+					await completeStep();
+				}
 		} catch (err) {
 			error = 'Errore nel processare l\'immagine';
 		} finally {
@@ -211,28 +289,16 @@
 
 					// Handle arrays (multiple selection)
 					if (Array.isArray(value)) {
-						dataFields[step.field] = value.map(v => {
-							if (v.includes(':input')) {
-								return formData[step.field + '_custom'] || v.split(':')[0];
-							}
-							return v;
-						});
+						dataFields[step.field] = resolveSelectableValue(step.field, value);
 					}
 					// Handle single values
 					else if (value.includes?.(':input')) {
-						dataFields[step.field] = formData[step.field + '_custom'] || value.split(':')[0];
+						dataFields[step.field] = resolveSelectableValue(step.field, value);
 					} else {
 						dataFields[step.field] = value;
 					}
 				}
 			});
-
-			if (typeof dataFields[nameFieldKey] === 'string') {
-				const normalized = normalizePersonName(dataFields[nameFieldKey]);
-				if (normalized) {
-					dataFields[nameFieldKey] = normalized;
-				}
-			}
 
 			// Add data as JSON
 			if (Object.keys(dataFields).length > 0) {
@@ -275,9 +341,9 @@
 			{loading}
 			onBack={prevStep}
 			onNext={nextStep}
-			onClose={handleClose}
-			onComplete={() => showConfirmation = true}
-		/>
+				onClose={handleClose}
+				onComplete={completeStep}
+			/>
 	{/if}
 
 	{#if !showConfirmation}
@@ -292,22 +358,22 @@
 					{error}
 					{canProceed}
 					isLastStep={currentStep === formSteps.length - 1}
-					onNext={nextStep}
-					onComplete={() => showConfirmation = true}
-					onClose={handleClose}
-					onToggleOption={toggleOption}
-					onFileSelect={openCropModal}
+						onNext={nextStep}
+						onComplete={completeStep}
+						onClose={handleClose}
+						onToggleOption={toggleOption}
+						onFileSelect={openCropModal}
 				/>
 			{/if}
 		</div>
 	{/if}
 
 	<!-- Confirmation Page -->
-	{#if showConfirmation && confirmationStep}
+	{#if showConfirmation && confirmation}
 		<ConfirmationPage
-			title={confirmationStep.title}
-			text={confirmationStep.text}
-			buttonText={confirmationStep.button}
+			title={confirmation.title}
+			text={confirmation.text}
+			buttonText={confirmation.button}
 			{loading}
 			onSubmit={handleSubmit}
 		/>

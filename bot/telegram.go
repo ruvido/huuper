@@ -445,6 +445,7 @@ func handleUserChatMemberUpdate(update *tgbotapi.ChatMemberUpdated) {
 			}
 		}
 	}
+
 }
 
 func syncAllUsersWithNewGroup() {
@@ -538,6 +539,7 @@ func syncUserGroupMemberships(user *core.Record) {
 			}
 		}
 	}
+
 }
 
 func sendWelcomeMessage(chatID int64) {
