@@ -41,6 +41,7 @@ func main() {
 		se.Router.GET("/api/settings/{name}", api.GetSettingsHandler(app))
 		se.Router.GET("/api/admin/summary", api.AdminSummaryHandler(app)).Bind(apis.RequireAuth())
 		se.Router.GET("/api/admin/events/{id}", api.AdminEventDetailsHandler(app)).Bind(apis.RequireAuth())
+		se.Router.POST("/api/admin/events/{id}/email", api.AdminEventEmailHandler(app)).Bind(apis.RequireAuth())
 		se.Router.POST("/api/admin/registrations/{id}/approve", api.AdminApproveRegistrationHandler(app)).Bind(apis.RequireAuth())
 		se.Router.POST("/api/admin/registrations/{id}/cancel", api.AdminCancelRegistrationHandler(app)).Bind(apis.RequireAuth())
 		se.Router.POST("/api/events/{slug}/register", api.RegisterEventHandler(app))
