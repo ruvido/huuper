@@ -114,8 +114,8 @@ func RegisterEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 
 		registrationData := payload.Data
 		if linkedUser != nil {
-			// Absolute source-of-truth: when a user is linked, profile data lives in users.data.
-			registrationData = map[string]any{}
+			// Keep required field non-empty without duplicating profile data.
+			registrationData = map[string]any{"linked_user": true}
 		}
 		if !isDataSizeOk(registrationData) {
 			return apis.NewBadRequestError(errGeneric, nil)
@@ -151,11 +151,7 @@ func RegisterEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 			record.Set("user", linkedUser.Id)
 		}
 		record.Set("email", recipient)
-		if linkedUser != nil {
-			record.Set("status", "active")
-		} else {
-			record.Set("status", "pending")
-		}
+		record.Set("status", "pending")
 		record.Set("data", registrationData)
 
 		if err := app.Save(record); err != nil {
@@ -169,6 +165,11 @@ func RegisterEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		effectiveData := registrationData
 		if linkedUser != nil {
 			effectiveData = parseJSONMap(linkedUser.Get("data"))
+		}
+		if linkedUser != nil {
+			if err := activateEventRegistration(app, record); err != nil {
+				return apis.NewBadRequestError(errGeneric, err)
+			}
 		}
 		emailSent = sendRegistrationEmail(app, event, recipient)
 		sendAdminNotification(app, event, recipient, record.GetString("accept_token"), effectiveData)
