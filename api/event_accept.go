@@ -35,8 +35,7 @@ func AcceptEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) e
 			return e.JSON(http.StatusOK, map[string]any{"status": "already_accepted"})
 		}
 
-		record.Set("status", "active")
-		if err := app.Save(record); err != nil {
+		if err := activateEventRegistration(app, record); err != nil {
 			return apis.NewBadRequestError("Aggiornamento fallito", err)
 		}
 

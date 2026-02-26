@@ -73,6 +73,14 @@ go build -o huuper main.go
 ./huuper serve
 ```
 
+### Deploy
+
+```bash
+./deploy.sh
+```
+
+Per dettagli e override VPS vedi `DEPLOY.md`.
+
 ## Project Structure
 
 ```

@@ -39,7 +39,9 @@ func RegisterSettingsValidationHooks(app *pocketbase.PocketBase) {
 		case "signup", "onboarding":
 			keys, err := loadProfileSchemaKeys(e.App)
 			if err != nil {
-				return apis.NewBadRequestError("invalid_profile_schema", err)
+				// During fresh bootstrap migrations, signup/onboarding can be created
+				// before profile_schema exists. Skip cross-validation in that phase.
+				return e.Next()
 			}
 			if err := validateFlowSettingData(name, data, keys); err != nil {
 				return apis.NewBadRequestError("invalid_"+name+"_settings", err)
@@ -55,8 +57,28 @@ func RegisterSettingsValidationHooks(app *pocketbase.PocketBase) {
 }
 
 func validateRequestsFlowSettingData(data map[string]any) error {
-	_, err := parseRequestsFlowConfig(data)
-	return err
+	if _, err := parseRequestsFlowConfig(data); err == nil {
+		return nil
+	}
+	return validateLegacyRequestsFlowSettingData(data)
+}
+
+func validateLegacyRequestsFlowSettingData(data map[string]any) error {
+	rawStatuses, ok := data["statuses"]
+	if !ok {
+		return fmt.Errorf("settings.requests_flow missing statuses")
+	}
+	statuses, ok := rawStatuses.([]any)
+	if !ok || len(statuses) == 0 {
+		return fmt.Errorf("settings.requests_flow statuses must be a non-empty array")
+	}
+	for i, raw := range statuses {
+		status := strings.TrimSpace(asString(raw))
+		if status == "" {
+			return fmt.Errorf("settings.requests_flow statuses[%d] is empty", i)
+		}
+	}
+	return nil
 }
 
 func loadProfileSchemaKeys(app core.App) (map[string]struct{}, error) {

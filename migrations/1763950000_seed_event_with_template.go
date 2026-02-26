@@ -13,34 +13,6 @@ func init() {
 			return err
 		}
 
-		templates, err := app.FindCollectionByNameOrId("templates")
-		if err != nil {
-			return err
-		}
-
-		templateName := "event_registration_reply_test"
-		existingTemplate, _ := app.FindFirstRecordByFilter(
-			"templates",
-			"name = {:name}",
-			map[string]any{"name": templateName},
-		)
-
-		var templateRecord *core.Record
-		if existingTemplate != nil {
-			templateRecord = existingTemplate
-		} else {
-			templateRecord = core.NewRecord(templates)
-			templateRecord.Set("name", templateName)
-			templateRecord.Set("slug", "event-registration-reply-test")
-			templateRecord.Set("data", map[string]any{
-				"subject": "Sei dei nostri!",
-				"body":    "md: Ciao!<br><br>Abbiamo ricevuto la tua iscrizione.<br>A presto!",
-			})
-			if err := app.Save(templateRecord); err != nil {
-				return err
-			}
-		}
-
 		eventSlug := "evento-test"
 		existingEvent, _ := app.FindFirstRecordByFilter(
 			"events",
@@ -56,7 +28,6 @@ func init() {
 		eventRecord.Set("slug", eventSlug)
 		eventRecord.Set("active", true)
 		eventRecord.Set("event_date", types.NowDateTime().AddDate(0, 0, 7))
-		eventRecord.Set("reply_template", templateRecord.Id)
 		eventRecord.Set("data", map[string]any{
 			"messages": map[string]any{
 				"invalid_event":      "Evento non valido.",
@@ -78,17 +49,6 @@ func init() {
 		)
 		if existingEvent != nil {
 			if err := app.Delete(existingEvent); err != nil {
-				return err
-			}
-		}
-
-		existingTemplate, _ := app.FindFirstRecordByFilter(
-			"templates",
-			"name = {:name}",
-			map[string]any{"name": "event_registration_reply_test"},
-		)
-		if existingTemplate != nil {
-			if err := app.Delete(existingTemplate); err != nil {
 				return err
 			}
 		}

@@ -41,6 +41,17 @@ const (
 	errGeneric          = "error_generic"
 )
 
+const (
+	templateKindUserRegistrationReceived = "events.user.registration_received"
+	templateKindUserRegistrationAccepted = "events.user.registration_accepted"
+	templateKindAdminNewRegistration     = "events.admin.new_registration"
+)
+
+const (
+	emailSenderScopeGeneral = "general"
+	emailSenderScopeEvents  = "events"
+)
+
 // RegisterEventHandler creates a registration for an active event by slug.
 func RegisterEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
@@ -134,7 +145,7 @@ func RegisterEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 
 		record := core.NewRecord(registrations)
 		record.Set("accept_token", acceptToken)
-		record.Set("accept_expires_at", time.Now().UTC().Add(7*24*time.Hour))
+		record.Set("accept_expires_at", acceptTokenExpiryForEvent(event))
 		record.Set("event", event.Id)
 		if linkedUser != nil {
 			record.Set("user", linkedUser.Id)
@@ -159,9 +170,7 @@ func RegisterEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		if linkedUser != nil {
 			effectiveData = parseJSONMap(linkedUser.Get("data"))
 		}
-		if templateId := getRelationId(event, "reply_template"); templateId != "" {
-			emailSent = sendRegistrationEmail(app, templateId, recipient, effectiveData)
-		}
+		emailSent = sendRegistrationEmail(app, event, recipient)
 		sendAdminNotification(app, event, recipient, record.GetString("accept_token"), effectiveData)
 
 		return e.JSON(http.StatusCreated, map[string]any{
@@ -171,38 +180,38 @@ func RegisterEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 	}
 }
 
-func getRelationId(record *core.Record, field string) string {
-	raw := record.Get(field)
-	switch value := raw.(type) {
-	case string:
-		return value
-	case []string:
-		if len(value) > 0 {
-			return value[0]
-		}
-	case []any:
-		if len(value) > 0 {
-			if id, ok := value[0].(string); ok {
-				return id
-			}
-		}
+func sendRegistrationEmail(app *pocketbase.PocketBase, event *core.Record, recipient string) bool {
+	eventID := ""
+	if event != nil {
+		eventID = event.Id
 	}
-	return ""
+	return sendUserTemplateEmailByKind(
+		app,
+		eventID,
+		templateKindUserRegistrationReceived,
+		recipient,
+		"Failed to send registration email",
+	)
 }
 
-func sendRegistrationEmail(app *pocketbase.PocketBase, templateId string, recipient string, data map[string]any) bool {
+func sendUserTemplateEmailByKind(
+	app *pocketbase.PocketBase,
+	eventID string,
+	kind string,
+	recipient string,
+	logMessage string,
+) bool {
 	recipientAddress, ok := parseAddress(recipient)
 	if !ok {
 		return false
 	}
 
-	template, err := loadTemplateDataById(app, templateId)
+	template, found, err := loadTemplateDataByKind(app, eventID, kind)
 	if err != nil {
-		app.Logger().Warn("Failed to load reply template", "error", err)
+		app.Logger().Warn("Failed to load template", "kind", kind, "error", err)
 		return false
 	}
-
-	if !templateHasContent(template) {
+	if !found || !templateHasContent(template) {
 		return false
 	}
 
@@ -219,12 +228,12 @@ func sendRegistrationEmail(app *pocketbase.PocketBase, templateId string, recipi
 		template.Subject,
 		template.Body,
 		replyToAddr,
-		"Failed to send registration email",
+		logMessage,
 	)
 }
 
 func sendAdminNotification(app *pocketbase.PocketBase, event *core.Record, registrantEmail string, acceptToken string, data map[string]any) {
-	template, adminAddress, ok := adminTemplateOrWarn(app, event, registrantEmail)
+	template, adminAddress, ok := adminTemplateOrWarn(app, event, registrantEmail, templateKindAdminNewRegistration)
 	if !ok {
 		return
 	}
@@ -243,7 +252,7 @@ func sendAdminNotification(app *pocketbase.PocketBase, event *core.Record, regis
 	)
 }
 
-func sendAdminTemplateMissing(app *pocketbase.PocketBase, event *core.Record, registrantEmail string) {
+func sendAdminTemplateMissing(app *pocketbase.PocketBase, event *core.Record, registrantEmail string, kind string) {
 	adminAddresses := findSuperuserEmails(app)
 	if len(adminAddresses) == 0 {
 		return
@@ -253,8 +262,8 @@ func sendAdminTemplateMissing(app *pocketbase.PocketBase, event *core.Record, re
 	if event != nil {
 		eventTitle = strings.TrimSpace(event.GetString("title"))
 	}
-	body := "Missing admin email template: admin-email-event\n" +
-		"Create it in collection \"templates\" with field \"slug\" = \"admin-email-event\".\n" +
+	body := "Missing admin email template kind: " + kind + "\n" +
+		"Create it in collection \"templates\" with matching field \"kind\".\n" +
 		"Used by /api/events/{slug}/register to notify admins.\n\n" +
 		"Suggested content:\n" +
 		"Subject: New registration for [event]\n" +
@@ -266,7 +275,7 @@ func sendAdminTemplateMissing(app *pocketbase.PocketBase, event *core.Record, re
 	_ = renderAndSendEmail(
 		app,
 		adminAddresses,
-		"Missing admin-email-event template",
+		"Missing admin template kind",
 		body,
 		nil,
 		"Failed to send admin template warning",
@@ -378,16 +387,42 @@ func parseAddress(raw string) (mail.Address, bool) {
 	return parsed, ok
 }
 
-func senderFrom(app *pocketbase.PocketBase) (mail.Address, bool) {
-	senderAddress := strings.TrimSpace(app.Settings().Meta.SenderAddress)
-	if senderAddress == "" {
+func senderFromGeneral(app *pocketbase.PocketBase) (mail.Address, bool) {
+	return senderFromScope(app, emailSenderScopeGeneral)
+}
+
+func senderFromEvents(app *pocketbase.PocketBase) (mail.Address, bool) {
+	return senderFromScope(app, emailSenderScopeEvents)
+}
+
+func senderFromScope(app *pocketbase.PocketBase, scope string) (mail.Address, bool) {
+	raw := ""
+	if settingsData, err := findSettingData(app, "email"); err == nil {
+		if scope == emailSenderScopeEvents {
+			if eventsFrom, ok := settingsData[emailSenderScopeEvents].(string); ok {
+				raw = strings.TrimSpace(eventsFrom)
+			}
+		}
+		if raw == "" {
+			if general, ok := settingsData[emailSenderScopeGeneral].(string); ok {
+				raw = strings.TrimSpace(general)
+			}
+		}
+	}
+	if raw == "" {
+		raw = strings.TrimSpace(app.Settings().Meta.SenderAddress)
+	}
+	if raw == "" {
 		return mail.Address{}, false
 	}
-	parsed, ok := parseAddress(senderAddress)
+
+	parsed, ok := parseAddress(raw)
 	if !ok {
 		return mail.Address{}, false
 	}
-	parsed.Name = app.Settings().Meta.SenderName
+	if strings.TrimSpace(parsed.Name) == "" {
+		parsed.Name = app.Settings().Meta.SenderName
+	}
 	return parsed, true
 }
 
@@ -416,7 +451,7 @@ func sendEmailBodies(
 	replyTo *mail.Address,
 	logMessage string,
 ) bool {
-	sender, ok := senderFrom(app)
+	sender, ok := senderFromEvents(app)
 	if !ok {
 		return false
 	}
@@ -625,6 +660,25 @@ func templateVars(event *core.Record, registrantEmail string, data map[string]an
 	return eventTitle, name, email
 }
 
+func acceptTokenExpiryForEvent(event *core.Record) time.Time {
+	if event == nil {
+		return time.Now().UTC()
+	}
+	eventDate := event.GetDateTime("event_date")
+	if eventDate.IsZero() {
+		return time.Now().UTC()
+	}
+	localEventDay := eventDate.Time().In(time.Local)
+	endOfDayLocal := time.Date(
+		localEventDay.Year(),
+		localEventDay.Month(),
+		localEventDay.Day(),
+		23, 59, 59, 0,
+		time.Local,
+	)
+	return endOfDayLocal.UTC()
+}
+
 func normalizeRegistrationNames(data map[string]any) {
 	if data == nil {
 		return
@@ -649,43 +703,81 @@ func renderTemplate(raw string, replacements []string) string {
 	return out
 }
 
-func adminTemplateOrWarn(app *pocketbase.PocketBase, event *core.Record, registrantEmail string) (templateData, mail.Address, bool) {
-	template, err := loadTemplateDataBySlug(app, "admin-email-event")
+func adminTemplateOrWarn(app *pocketbase.PocketBase, event *core.Record, registrantEmail string, kind string) (templateData, mail.Address, bool) {
+	eventID := ""
+	if event != nil {
+		eventID = event.Id
+	}
+	template, found, err := loadTemplateDataByKind(app, eventID, kind)
 	if err != nil {
 		app.Logger().Warn("Failed to load admin template", "error", err)
-		sendAdminTemplateMissing(app, event, registrantEmail)
+		sendAdminTemplateMissing(app, event, registrantEmail, kind)
 		return templateData{}, mail.Address{}, false
 	}
-	if !templateHasContent(template) {
-		sendAdminTemplateMissing(app, event, registrantEmail)
+	if !found || !templateHasContent(template) {
+		sendAdminTemplateMissing(app, event, registrantEmail, kind)
 		return templateData{}, mail.Address{}, false
 	}
 	adminAddress, ok := parseAddress(template.To)
 	if !ok {
-		sendAdminTemplateMissing(app, event, registrantEmail)
+		sendAdminTemplateMissing(app, event, registrantEmail, kind)
 		return templateData{}, mail.Address{}, false
 	}
 	return template, adminAddress, true
 }
 
-func loadTemplateDataById(app *pocketbase.PocketBase, templateId string) (templateData, error) {
-	record, err := app.FindRecordById("templates", templateId)
+func loadTemplateDataByKind(app *pocketbase.PocketBase, eventID string, kind string) (templateData, bool, error) {
+	record, err := findTemplateByKindAndEvent(app, kind, eventID)
 	if err != nil {
-		return templateData{}, err
+		return templateData{}, false, err
 	}
-	return parseTemplateData(record)
+	if record != nil {
+		template, err := parseTemplateData(record)
+		if err != nil {
+			return templateData{}, false, err
+		}
+		return template, true, nil
+	}
+
+	if eventID == "" {
+		return templateData{}, false, nil
+	}
+
+	record, err = findTemplateByKindAndEvent(app, kind, "")
+	if err != nil {
+		return templateData{}, false, err
+	}
+	if record == nil {
+		return templateData{}, false, nil
+	}
+
+	template, err := parseTemplateData(record)
+	if err != nil {
+		return templateData{}, false, err
+	}
+	return template, true, nil
 }
 
-func loadTemplateDataBySlug(app *pocketbase.PocketBase, slug string) (templateData, error) {
-	record, err := app.FindFirstRecordByFilter(
-		"templates",
-		"slug = {:slug}",
-		map[string]any{"slug": slug},
-	)
-	if err != nil {
-		return templateData{}, err
+func findTemplateByKindAndEvent(app *pocketbase.PocketBase, kind string, eventID string) (*core.Record, error) {
+	if strings.TrimSpace(kind) == "" {
+		return nil, nil
 	}
-	return parseTemplateData(record)
+
+	filter := "kind = {:kind} && event = ''"
+	params := map[string]any{"kind": kind}
+	if strings.TrimSpace(eventID) != "" {
+		filter = "kind = {:kind} && event = {:event}"
+		params["event"] = strings.TrimSpace(eventID)
+	}
+
+	records, err := app.FindRecordsByFilter("templates", filter, "", 1, 0, params)
+	if err != nil {
+		return nil, err
+	}
+	if len(records) == 0 {
+		return nil, nil
+	}
+	return records[0], nil
 }
 
 func templateHasContent(template templateData) bool {
@@ -705,4 +797,23 @@ func isUniqueConstraintError(err error) bool {
 		return false
 	}
 	return strings.Contains(strings.ToLower(err.Error()), "unique")
+}
+
+func activateEventRegistration(app *pocketbase.PocketBase, record *core.Record) error {
+	record.Set("status", "active")
+	if err := app.Save(record); err != nil {
+		return err
+	}
+
+	eventID := strings.TrimSpace(record.GetString("event"))
+	recipient := strings.TrimSpace(record.GetString("email"))
+	_ = sendUserTemplateEmailByKind(
+		app,
+		eventID,
+		templateKindUserRegistrationAccepted,
+		recipient,
+		"Failed to send accepted registration email",
+	)
+
+	return nil
 }

@@ -1,6 +1,7 @@
 # PocketBase
 pb_data*
 pocketbase
+bin
 
 # Environment variables
 .env

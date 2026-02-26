@@ -8,6 +8,7 @@ import (
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/tools/mailer"
 )
 
 type adminEventEmailPayload struct {
@@ -121,18 +122,24 @@ func uniqueAddressesFromRecords(records []*core.Record) []mail.Address {
 }
 
 func sendPlainEmailToRecipients(app *pocketbase.PocketBase, recipients []mail.Address, subject string, body string) (int, int) {
+	from, ok := senderFromEvents(app)
+	if !ok {
+		return 0, len(recipients)
+	}
+
+	textBody, htmlBody := renderEmailBody(body)
+
 	sent := 0
 	failed := 0
 	for _, recipient := range recipients {
-		ok := renderAndSendEmail(
-			app,
-			[]mail.Address{recipient},
-			subject,
-			body,
-			nil,
-			"Failed to send admin event email",
-		)
-		if ok {
+		message := &mailer.Message{
+			From:    from,
+			To:      []mail.Address{recipient},
+			Subject: subject,
+			Text:    textBody,
+			HTML:    htmlBody,
+		}
+		if err := app.NewMailClient().Send(message); err == nil {
 			sent++
 		} else {
 			failed++
