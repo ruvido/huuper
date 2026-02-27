@@ -8,6 +8,7 @@ Deploy is deterministic: build locally, sync artifacts to VPS, start container o
 - `VPS_PATH=/home/ruvido/dev/huuper`
 - `SERVICE_NAME=huuper`
 - `BIN_NAME=huuper`
+- `BIN_DIR=bin`
 
 You can override any of them per command.
 
@@ -21,8 +22,8 @@ What it does:
 
 1. Stops remote container (`docker compose down`).
 2. Builds frontend locally (`frontend/npm ci && npm run build`).
-3. Builds Linux binary locally (`huuper`).
-4. Rsyncs `docker-compose.yml`, `Dockerfile`, `huuper`, `migrations/`, `pb_public/` to VPS.
+3. Builds Linux binary locally (`bin/huuper`).
+4. Rsyncs `docker-compose.yml`, `Dockerfile`, `bin/`, `migrations/`, `pb_public/` to VPS.
 5. Starts remote container with `docker compose up -d --build --force-recreate`.
 
 ## Required on VPS

@@ -13,7 +13,8 @@ fi
 
 BASE="${BASE:-}"
 EVENT_ID="${1:-i48zu71lysxrhi9}"
-EMAIL="${2:-test+$(date +%s)@realmen.it}"
+# EMAIL="${2:-test+$(date +%s)@realmen.it}"
+EMAIL="test123@realmen.it"
 FULL_NAME="${3:-Ruvido}"
 MOBILE="${4:-3400000000}"
 REGION="${5:-nord-est}"

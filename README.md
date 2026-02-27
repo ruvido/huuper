@@ -67,10 +67,11 @@ npm run build
 
 # Build Go binary
 cd ..
-go build -o huuper main.go
+mkdir -p bin
+go build -o bin/huuper main.go
 
 # Run
-./huuper serve
+./bin/huuper serve
 ```
 
 ### Deploy

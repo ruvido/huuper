@@ -6,7 +6,7 @@ WORKDIR /app
 RUN apk --no-cache add ca-certificates tzdata
 
 # Copy prebuilt binary and migrations
-COPY huuper ./huuper
+COPY bin/huuper ./huuper
 COPY migrations ./migrations
 
 # Create directory for data persistence

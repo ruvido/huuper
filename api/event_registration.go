@@ -13,9 +13,11 @@ import (
 	"strings"
 	"time"
 
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/core/validators"
 	"github.com/pocketbase/pocketbase/tools/mailer"
 	"github.com/yuin/goldmark"
 	htmlrender "github.com/yuin/goldmark/renderer/html"
@@ -796,7 +798,18 @@ func isUniqueConstraintError(err error) bool {
 	if err == nil {
 		return false
 	}
-	return strings.Contains(strings.ToLower(err.Error()), "unique")
+	normalized := validators.NormalizeUniqueIndexError(
+		err,
+		"event_registrations",
+		[]string{"event", "email"},
+	)
+	fieldErrors, ok := normalized.(validation.Errors)
+	if !ok {
+		return false
+	}
+	_, hasEvent := fieldErrors["event"]
+	_, hasEmail := fieldErrors["email"]
+	return hasEvent || hasEmail
 }
 
 func activateEventRegistration(app *pocketbase.PocketBase, record *core.Record) error {
