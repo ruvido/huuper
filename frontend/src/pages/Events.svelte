@@ -1,33 +1,20 @@
 <script>
 	import { onMount } from 'svelte';
 	import { apiFetch, pb } from '../lib/pocketbase';
-	import { navigate } from '../lib/router';
 	import DashboardLayout from '../components/DashboardLayout.svelte';
-	import StateCard from '../components/StateCard.svelte';
 	import EventCard from '../components/cards/EventCard.svelte';
-	import GroupCard from '../components/cards/GroupCard.svelte';
-	import Card from '../components/Card.svelte';
 	import ConfirmModal from '../components/modals/ConfirmModal.svelte';
+	import Card from '../components/Card.svelte';
 
 	let events = [];
-	let groups = [];
 	let eventsLoading = false;
-	let groupsLoading = false;
 	let eventsError = '';
-	let groupsError = '';
 	let registeredById = {};
 	let registeringById = {};
 	let unsubscribingById = {};
 	let openById = {};
 	let confirmState = null;
 	let confirmConfig = null;
-
-	const user = pb.authStore.record;
-
-	function hasTelegram() {
-		const telegram = user?.telegram;
-		return telegram && Object.keys(telegram).length > 0;
-	}
 
 	function isFutureEvent(eventDate) {
 		if (!eventDate || typeof eventDate !== 'string') return false;
@@ -75,30 +62,6 @@
 			}
 		}));
 		registeredById = { ...registeredById, ...updates };
-	}
-
-	async function loadGroups() {
-		groupsLoading = true;
-		groupsError = '';
-		try {
-			const currentUser = pb.authStore.record;
-			const result = await pb.collection('user_groups').getList(1, 200, {
-				filter: `user = "${currentUser.id}"`,
-				expand: 'group'
-			});
-			groups = result.items
-				.map((item) => item?.expand?.group)
-				.filter(Boolean);
-		} catch (err) {
-			groupsError = err.message || err.toString() || 'Failed to load groups';
-		} finally {
-			groupsLoading = false;
-		}
-	}
-
-	function goToGroup(group) {
-		if (!group?.id) return;
-		navigate(`app/groups/${encodeURIComponent(group.id)}`);
 	}
 
 	function setCardOpen(eventId, value) {
@@ -164,15 +127,10 @@
 				const email = pb.authStore.record?.email || '';
 				if (!email) return;
 
-				const payload = {
-					email
-				};
-
+				const payload = { email };
 				const res = await apiFetch(`/api/events/${encodeURIComponent(event.slug)}/register`, {
 					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json'
-					},
+					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify(payload)
 				});
 
@@ -186,7 +144,6 @@
 				const res = await apiFetch(`/api/events/${encodeURIComponent(event.slug)}/unsubscribe`, {
 					method: 'POST'
 				});
-
 				if (!res.ok) return;
 				registeredById = { ...registeredById, [event.id]: false };
 			}
@@ -222,21 +179,20 @@
 
 	onMount(() => {
 		loadEvents();
-		loadGroups();
 	});
 </script>
 
-<DashboardLayout title="Home">
+<DashboardLayout title="Eventi">
 	<section class="section">
 		<h2 class="section-title">Upcoming Events</h2>
 		{#if eventsError}
-			<StateCard>{eventsError}</StateCard>
+			<Card variant="state">{eventsError}</Card>
 		{:else if eventsLoading}
-			<StateCard>Loading events...</StateCard>
+			<Card variant="state">Loading events...</Card>
 		{:else if events.length === 0}
-			<StateCard>No upcoming events.</StateCard>
+			<Card variant="state">No upcoming events.</Card>
 		{:else}
-			<div class="events-list">
+			<div class="stack-list">
 				{#each events as event}
 					<EventCard
 						{event}
@@ -254,33 +210,6 @@
 				{/each}
 			</div>
 		{/if}
-	</section>
-
-	<section class="section">
-		<h2 class="section-title">Your Groups</h2>
-		{#if groupsError}
-			<StateCard>{groupsError}</StateCard>
-		{:else if groupsLoading}
-			<StateCard>Loading groups...</StateCard>
-		{:else if groups.length === 0}
-			<StateCard>You are not in any groups yet.</StateCard>
-		{:else}
-			<div class="groups-list">
-				{#each groups as group}
-					<GroupCard {group} isMember={true} onOpen={goToGroup} />
-				{/each}
-			</div>
-		{/if}
-	</section>
-
-	<section class="section">
-		<h2 class="section-title">Profile</h2>
-		<Card>
-			<p class="profile-email">{user?.email}</p>
-			<p class="profile-telegram">
-				{hasTelegram() ? 'Telegram connected' : 'Telegram missing'}
-			</p>
-		</Card>
 	</section>
 </DashboardLayout>
 
@@ -301,34 +230,9 @@
 		gap: clamp(1rem, 3vw, 1.25rem);
 	}
 
-	.section + .section {
-		margin-top: clamp(1.5rem, 5vw, 2.5rem);
-	}
-
 	.section-title {
 		margin: 0;
-		font-size: clamp(1.1rem, 3vw, 1.25rem);
 		font-weight: 700;
-		color: #000;
-	}
-
-	.events-list,
-	.groups-list {
-		display: grid;
-		gap: clamp(1rem, 3vw, 1.5rem);
-		grid-template-columns: 1fr;
-	}
-
-	.profile-email {
-		margin: 0 0 0.5rem 0;
-		font-weight: 700;
-		color: #000;
-		word-break: break-word;
-	}
-
-	.profile-telegram {
-		margin: 0;
-		font-weight: 600;
 		color: #000;
 	}
 </style>

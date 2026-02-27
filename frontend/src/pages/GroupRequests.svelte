@@ -2,8 +2,7 @@
 	import { apiFetch, pb } from '../lib/pocketbase';
 	import { currentRoute, navigate } from '../lib/router';
 	import DashboardLayout from '../components/DashboardLayout.svelte';
-	import StateCard from '../components/StateCard.svelte';
-	import AdminCard from '../components/AdminCard.svelte';
+	import Card from '../components/Card.svelte';
 
 	let loading = true;
 	let error = '';
@@ -83,50 +82,48 @@
 
 <DashboardLayout title={group?.name || 'Requests'}>
 	{#if error}
-		<StateCard>{error}</StateCard>
+		<Card variant="state">{error}</Card>
 	{:else if loading}
-		<StateCard>Loading...</StateCard>
+		<Card variant="state">Loading...</Card>
 	{:else if !canViewRequests}
-		<StateCard>Not allowed.</StateCard>
+		<Card variant="state">Not allowed.</Card>
 	{:else}
-		<AdminCard>
+		<Card variant="admin">
 			<h2>{requests.length} requests</h2>
-		</AdminCard>
+		</Card>
 
-		<AdminCard>
+		<Card variant="admin">
 			<div class="list">
 				{#if requests.length === 0}
 					<p class="empty">No requests.</p>
 				{:else}
 					{#each requests as item}
-						<button class="row" type="button" on:click={() => openRequest(item)}>
-							<p class="name">{displayName(item)}</p>
-							<p class="status">{displayStatus(item)}</p>
+						<button class="row-action" type="button" on:click={() => openRequest(item)}>
+							<Card variant="item">
+								<p class="name">{displayName(item)}</p>
+								<p class="status">{displayStatus(item)}</p>
+							</Card>
 						</button>
 					{/each}
 				{/if}
 			</div>
-		</AdminCard>
+		</Card>
 	{/if}
 </DashboardLayout>
 
 <style>
-	h2 {
-		margin: 0;
-		font-size: 1.1rem;
-	}
+	h2 { margin: 0; }
 
 	.list {
 		display: grid;
 		gap: 0.5rem;
 	}
 
-	.row {
+	.row-action {
 		width: 100%;
-		text-align: left;
-		border: 1px solid #000;
-		background: #fff;
-		padding: 0.75rem;
+		border: none;
+		background: transparent;
+		padding: 0;
 		cursor: pointer;
 	}
 
@@ -137,7 +134,11 @@
 
 	.status {
 		margin: 0.2rem 0 0;
-		font-size: 0.9rem;
+		font-size: var(--ui-font-size);
+	}
+
+	.row-action + .row-action {
+		margin-top: 0.5rem;
 	}
 
 	.empty {

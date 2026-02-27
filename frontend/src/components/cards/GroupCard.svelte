@@ -1,5 +1,6 @@
 <script>
 	import { Check } from 'lucide-svelte';
+	import Card from '../Card.svelte';
 
 	export let group;
 	export let isMember = false;
@@ -15,47 +16,60 @@
 
 {#if clickable}
 	<button class="group-card clickable" type="button" aria-label={`Open ${group.name}`} on:click={handleOpen}>
-		<div class="group-icon">
-			{group.name.charAt(0).toUpperCase()}
-		</div>
-		<div class="group-info">
-			<h3>
-				{group.name}
-				{#if isMember}
-					<span class="member-badge"><Check size={14} /> Member</span>
-				{/if}
-			</h3>
-			{#if group.description}
-				<p class="description">{group.description}</p>
-			{/if}
-		</div>
+		<Card variant="item">
+			<div class="group-content">
+				<div class="group-icon">
+					{group.name.charAt(0).toUpperCase()}
+				</div>
+				<div class="group-info">
+					<h3>
+						{group.name}
+						{#if isMember}
+							<span class="member-badge"><Check size={14} /> Member</span>
+						{/if}
+					</h3>
+					{#if group.description}
+						<p class="description">{group.description}</p>
+					{/if}
+				</div>
+			</div>
+		</Card>
 	</button>
 {:else}
-	<div class="group-card">
-		<div class="group-icon">
-			{group.name.charAt(0).toUpperCase()}
-		</div>
-		<div class="group-info">
-			<h3>
-				{group.name}
-				{#if isMember}
-					<span class="member-badge"><Check size={14} /> Member</span>
+	<Card variant="item">
+		<div class="group-content">
+			<div class="group-icon">
+				{group.name.charAt(0).toUpperCase()}
+			</div>
+			<div class="group-info">
+				<h3>
+					{group.name}
+					{#if isMember}
+						<span class="member-badge"><Check size={14} /> Member</span>
+					{/if}
+				</h3>
+				{#if group.description}
+					<p class="description">{group.description}</p>
 				{/if}
-			</h3>
-			{#if group.description}
-				<p class="description">{group.description}</p>
-			{/if}
+			</div>
 		</div>
-	</div>
+	</Card>
 {/if}
 
 <style>
 	.group-card {
 		width: 100%;
 		text-align: left;
-		background: #fff;
-		border: 2px solid #000;
-		padding: clamp(0.75rem, 2.5vw, 1rem);
+		background: transparent;
+		border: none;
+		padding: 0;
+	}
+
+	.group-card :global(.card.item) {
+		width: 100%;
+	}
+
+	.group-content {
 		display: flex;
 		align-items: center;
 		gap: clamp(0.75rem, 2vw, 1rem);
@@ -73,7 +87,7 @@
 		align-items: center;
 		justify-content: center;
 		flex-shrink: 0;
-		font-size: clamp(1.75rem, 5vw, 2rem);
+		font-size: var(--ui-font-size);
 		font-weight: bold;
 		color: #000;
 	}
@@ -88,7 +102,7 @@
 
 	h3 {
 		margin: 0;
-		font-size: clamp(1.125rem, 3.5vw, 1.25rem);
+		font-size: var(--ui-font-size);
 		color: #000;
 		font-weight: bold;
 		word-break: break-word;
@@ -98,7 +112,7 @@
 		margin: 0;
 		color: #000;
 		font-weight: 600;
-		font-size: clamp(0.8125rem, 2.5vw, 0.875rem);
+		font-size: var(--ui-font-size);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		display: -webkit-box;
@@ -109,7 +123,7 @@
 	.member-badge {
 		display: inline-block;
 		margin-left: clamp(0.5rem, 2vw, 0.75rem);
-		font-size: clamp(0.75rem, 2vw, 0.875rem);
+		font-size: var(--ui-font-size);
 		color: #0a0;
 		font-weight: 600;
 	}

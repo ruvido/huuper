@@ -1,9 +1,8 @@
 <script>
 	import { apiFetch, pb } from '../lib/pocketbase';
-	import { currentRoute, navigate } from '../lib/router';
+	import { currentRoute } from '../lib/router';
 	import DashboardLayout from '../components/DashboardLayout.svelte';
-	import StateCard from '../components/StateCard.svelte';
-	import AdminCard from '../components/AdminCard.svelte';
+	import Card from '../components/Card.svelte';
 
 	const FACT_KEYS = ['region', 'birth_year', 'marital_status', 'children'];
 	const RESERVED_DATA_KEYS = new Set([
@@ -32,7 +31,7 @@
 
 	function parseRequestId(route) {
 		if (typeof route !== 'string') return '';
-		const match = route.match(/^app\/requests\/([^/]+)$/);
+		const match = route.match(/^(?:app|admin)\/requests\/([^/]+)$/);
 		return match?.[1] || '';
 	}
 
@@ -99,17 +98,14 @@
 	$: mobileValue = asTrimmedString(requestData?.mobile);
 	$: motivationValue = asTrimmedString(requestData?.motivation);
 	$: extraEntries = Object.entries(requestData).filter(([key, value]) => !RESERVED_DATA_KEYS.has(key) && hasValue(value));
+
 	$: if (requestId && requestId !== lastRequestId) {
 		lastRequestId = requestId;
 		void loadAll();
 	}
 
 	function goBack() {
-		if (window.history.length > 1) {
-			window.history.back();
-			return;
-		}
-		navigate('app/requests');
+		window.history.back();
 	}
 
 	async function loadAll() {
@@ -127,19 +123,16 @@
 	}
 </script>
 
-<DashboardLayout title="Request">
-	{#if error}
-		<StateCard>{error}</StateCard>
-	{:else if loading}
-		<StateCard>Loading...</StateCard>
-	{:else if !request}
-		<StateCard>Request not found.</StateCard>
-	{:else}
-		<AdminCard>
-			<button class="back" type="button" on:click={goBack}>Back</button>
-		</AdminCard>
+<DashboardLayout title="Request" showBack={true} onBack={goBack}>
 
-		<AdminCard>
+	{#if error}
+		<Card variant="state">{error}</Card>
+	{:else if loading}
+		<Card variant="state">Loading...</Card>
+	{:else if !request}
+		<Card variant="state">Request not found.</Card>
+	{:else}
+		<Card variant="admin">
 			<div class="data">
 				<p class="name">{displayName}</p>
 				<p class="status">{formatStatus(request.status)}</p>
@@ -174,20 +167,11 @@
 					</div>
 				{/if}
 			</div>
-		</AdminCard>
+		</Card>
 	{/if}
 </DashboardLayout>
 
 <style>
-	.back {
-		border: 1px solid #000;
-		background: #fff;
-		padding: 0.6rem 0.9rem;
-		cursor: pointer;
-		font-size: 0.95rem;
-		font-weight: 600;
-	}
-
 	.data {
 		display: grid;
 		gap: 0.8rem;

@@ -14,8 +14,12 @@ ssh "$VPS_HOST" "mkdir -p '$VPS_PATH' '$VPS_PATH/$BIN_DIR'"
 
 echo "frontend: build"
 cd "$ROOT_DIR/frontend"
-npm ci
-npm run build
+if ! command -v bun >/dev/null 2>&1; then
+  echo "bun not found. Please install bun before deploy."
+  exit 1
+fi
+bun install --frozen-lockfile
+bun run build
 cd "$ROOT_DIR"
 
 echo "backend: build linux binary"

@@ -132,7 +132,8 @@
 
 <style>
 	.event-card {
-		border: 2px solid #000;
+		border: 1px solid #000;
+		border-radius: var(--card-radius);
 		background: #fff;
 		padding: 0;
 	}
@@ -160,7 +161,7 @@
 
 	h3 {
 		margin: 0;
-		font-size: clamp(1.1rem, 3.5vw, 1.25rem);
+		font-size: var(--ui-font-size);
 		color: #000;
 		font-weight: 700;
 		word-break: break-word;
@@ -168,7 +169,7 @@
 
 	.event-date {
 		margin: 0;
-		font-size: clamp(0.85rem, 2.5vw, 0.95rem);
+		font-size: var(--ui-font-size);
 		color: #000;
 		font-weight: 600;
 	}
@@ -250,7 +251,7 @@
 	}
 
 	.details-content {
-		font-size: 0.95rem;
+		font-size: var(--ui-font-size);
 		color: #000;
 		line-height: 1.5;
 	}

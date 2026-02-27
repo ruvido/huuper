@@ -1,15 +1,14 @@
 <script>
-import { apiFetch, pb } from '../lib/pocketbase';
-import { currentRoute, navigate } from '../lib/router';
+	import { apiFetch, pb } from '../lib/pocketbase';
+	import { currentRoute, navigate } from '../lib/router';
 	import DashboardLayout from '../components/DashboardLayout.svelte';
-	import StateCard from '../components/StateCard.svelte';
-	import AdminCard from '../components/AdminCard.svelte';
+	import Card from '../components/Card.svelte';
 
 	let loading = true;
 	let error = '';
 	let group = null;
 	let members = [];
-	let requestsCount = 0;
+	let requests = [];
 	let lastGroupId = '';
 
 	$: groupId = parseGroupId($currentRoute);
@@ -18,7 +17,8 @@ import { currentRoute, navigate } from '../lib/router';
 	$: isAssistant = !!(group?.assistant && actorId && group.assistant === actorId);
 	$: meInMembers = members.find((item) => item?.id === actorId) || null;
 	$: isGuardian = !!meInMembers?.is_guardian;
-	$: canOpenRequests = isAdmin || isAssistant || isGuardian;
+	$: canViewRequests = isAdmin || isAssistant || isGuardian;
+	$: visibleRequests = requests;
 
 	$: if (groupId && groupId !== lastGroupId) {
 		lastGroupId = groupId;
@@ -33,15 +33,31 @@ import { currentRoute, navigate } from '../lib/router';
 		return tail.split('/')[0] || '';
 	}
 
+	function goBack() {
+		window.history.back();
+	}
+
 	function displayName(item) {
 		if (typeof item?.full_name === 'string' && item.full_name.trim()) return item.full_name.trim();
 		if (typeof item?.data?.full_name === 'string' && item.data.full_name.trim()) return item.data.full_name.trim();
 		return item?.email || 'Unknown';
 	}
 
-	function openRequests() {
-		if (!canOpenRequests || !groupId) return;
-		navigate(`app/groups/${encodeURIComponent(groupId)}/requests`);
+	function formatStatus(status) {
+		if (!status || typeof status !== 'string') return '';
+		const clean = status.replace(/^\d+-/, '').replaceAll('_', ' ');
+		if (!clean) return '';
+		return clean.charAt(0).toUpperCase() + clean.slice(1);
+	}
+
+	function displayStatus(item) {
+		if (item?.rejected) return 'Rejected';
+		return formatStatus(item?.status);
+	}
+
+	function openRequest(item) {
+		if (!item?.id) return;
+		navigate(`app/requests/${encodeURIComponent(item.id)}`);
 	}
 
 	async function loadAll() {
@@ -51,80 +67,88 @@ import { currentRoute, navigate } from '../lib/router';
 		try {
 			const fetchJSONOrThrow = async (path) => {
 				const response = await apiFetch(path);
-				if (!response.ok) {
-					throw new Error('Failed to load group data');
-				}
+				if (!response.ok) throw new Error('Failed to load group data');
 				return response.json();
 			};
 
-			const [groupData, membersData, requestsCountData] = await Promise.all([
+			const requestsPath = (() => {
+				const base = `/api/requests?group_id=${encodeURIComponent(groupId)}`;
+				if (isGuardian && !isAssistant && !isAdmin && actorId) {
+					return `${base}&guardian=${encodeURIComponent(actorId)}`;
+				}
+				return base;
+			})();
+
+			const [groupData, membersData, requestsData] = await Promise.all([
 				pb.collection('groups').getOne(groupId),
 				fetchJSONOrThrow(`/api/groups/${encodeURIComponent(groupId)}/members`),
-				fetchJSONOrThrow(`/api/groups/${encodeURIComponent(groupId)}/requests-count`)
+				fetchJSONOrThrow(requestsPath)
 			]);
 
 			if (!groupData) throw new Error('Group not found');
 			group = groupData;
 			members = Array.isArray(membersData?.items) ? membersData.items : [];
-			requestsCount = Number(requestsCountData?.count ?? 0);
+			requests = Array.isArray(requestsData?.items) ? requestsData.items : [];
 		} catch (err) {
 			error = err?.message || err?.toString() || 'Failed to load group';
 		} finally {
 			loading = false;
 		}
 	}
-
 </script>
 
-<DashboardLayout title={group?.name || 'Group'}>
-	{#if error}
-		<StateCard>{error}</StateCard>
-	{:else if loading}
-		<StateCard>Loading group...</StateCard>
-	{:else}
-		<AdminCard>
-			<button class="requests-card" type="button" disabled={!canOpenRequests} on:click={openRequests}>
-				<h2>{requestsCount} requests</h2>
-			</button>
-		</AdminCard>
+<DashboardLayout title={group?.name || 'Group'} showBack={true} onBack={goBack}>
 
-		<AdminCard>
+	{#if error}
+		<Card variant="state">{error}</Card>
+	{:else if loading}
+		<Card variant="state">Loading group...</Card>
+	{:else}
+		{#if canViewRequests}
+			<Card variant="admin">
+				<div class="list">
+					<div class="list-section">
+						<h2>Requests</h2>
+						{#if visibleRequests.length === 0}
+							<p class="empty">No requests to manage.</p>
+						{:else}
+							{#each visibleRequests as item}
+								<button class="request-action" type="button" on:click={() => openRequest(item)}>
+									<Card variant="item">
+										<p class="name">{displayName(item)}</p>
+										<p class="status">{displayStatus(item)}</p>
+									</Card>
+								</button>
+							{/each}
+						{/if}
+					</div>
+				</div>
+			</Card>
+		{/if}
+
+		<Card variant="admin">
 			<div class="list">
 				<div class="list-section">
+					<h2>Members</h2>
 					{#if members.length === 0}
 						<p class="empty">No members.</p>
 					{:else}
 						{#each members as member}
-							<div class="row">
-								<div class="row-info">
-									<p class="name">{displayName(member)}</p>
-								</div>
-							</div>
+							<Card variant="item">
+								<p class="name">{displayName(member)}</p>
+							</Card>
 						{/each}
 					{/if}
 				</div>
 			</div>
-		</AdminCard>
+		</Card>
 	{/if}
 </DashboardLayout>
 
 <style>
 	h2 {
 		margin: 0;
-		font-size: 1.1rem;
-	}
-
-	.requests-card {
-		width: 100%;
-		text-align: left;
-		border: none;
-		padding: 0;
-		background: transparent;
-		cursor: pointer;
-	}
-
-	.requests-card:disabled {
-		cursor: default;
+		font-size: var(--ui-font-size);
 	}
 
 	.list {
@@ -137,22 +161,28 @@ import { currentRoute, navigate } from '../lib/router';
 		gap: 0.5rem;
 	}
 
-	.row {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr);
-		align-items: center;
-		gap: 1rem;
-		padding: 0.75rem 0;
-		border-top: 1px solid #000;
+	.request-action {
+		border: none;
+		background: transparent;
+		padding: 0;
+		width: 100%;
+		cursor: pointer;
 	}
 
-	.row-info {
-		min-width: 0;
-		overflow: hidden;
+	.status {
+		margin: 0.2rem 0 0;
+		font-size: var(--ui-font-size);
+		font-weight: 500;
+	}
+
+	.list-section :global(.card.item) + :global(.card.item),
+	.list-section .request-action + .request-action {
+		margin-top: 0.5rem;
 	}
 
 	.name {
 		margin: 0;
+		font-size: var(--ui-font-size);
 		font-weight: 700;
 		white-space: nowrap;
 		overflow: hidden;

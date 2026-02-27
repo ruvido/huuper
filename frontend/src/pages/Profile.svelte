@@ -288,14 +288,14 @@
 	}
 
 	.help-text {
-		font-size: clamp(0.75rem, 2vw, 0.875rem) !important;
-		color: #666 !important;
+		font-size: clamp(0.75rem, 2vw, 0.875rem);
+		color: #666;
 	}
 
 	.error-message {
 		color: #d00;
 		font-size: clamp(0.875rem, 2.5vw, 1rem);
-		margin-top: clamp(1rem, 3vw, 1.5rem) !important;
+		margin-top: clamp(1rem, 3vw, 1.5rem);
 	}
 
 </style>

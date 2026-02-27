@@ -1,10 +1,14 @@
 <script>
 	export let title;
+	export let showBack = false;
+	export let onBack = null;
+	import TopBar from './TopBar.svelte';
 </script>
 
 <div class="dashboard-page">
+	<TopBar {title} {showBack} {onBack} />
+
 	<div class="dashboard-container">
-		<h1 class="dashboard-title">{title}</h1>
 		<slot />
 	</div>
 </div>
@@ -13,7 +17,7 @@
 	.dashboard-page {
 		min-height: 100vh;
 		background: #fff;
-		padding: 5rem clamp(1rem, 4vw, 2rem) clamp(1rem, 4vw, 2rem);
+		padding: 4.25rem clamp(1rem, 4vw, 2rem) 5.5rem;
 	}
 
 	.dashboard-container {
@@ -22,12 +26,5 @@
 		display: flex;
 		flex-direction: column;
 		gap: clamp(1.5rem, 4vw, 2rem);
-	}
-
-	.dashboard-title {
-		margin: 0 0 clamp(1rem, 3vw, 1.5rem) 0;
-		font-size: 2rem;
-		font-weight: bold;
-		color: #000;
 	}
 </style>

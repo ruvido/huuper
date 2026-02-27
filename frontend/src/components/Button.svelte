@@ -49,17 +49,17 @@
 	}
 
 	.btn-link {
-		background: transparent !important;
-		border: none !important;
+		background: transparent;
+		border: none;
 		text-decoration: underline;
-		padding: 0 !important;
+		padding: 0;
 		margin-left: 0.25rem;
-		width: auto !important;
+		width: auto;
 		color: #000;
 	}
 
 	.btn-link:hover {
 		opacity: 0.7;
-		background: transparent !important;
+		background: transparent;
 	}
 </style>

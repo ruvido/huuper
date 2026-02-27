@@ -4,21 +4,20 @@
 	import { formatEventDate } from '../lib/date';
 	import { navigate } from '../lib/router';
 	import DashboardLayout from '../components/DashboardLayout.svelte';
-	import StateCard from '../components/StateCard.svelte';
-	import AdminCard from '../components/AdminCard.svelte';
 	import StatRow from '../components/StatRow.svelte';
+	import Card from '../components/Card.svelte';
 
 	let loading = true;
 	let error = '';
 	let summary = {
 		users: { total: null, noTelegram: null, notActive: null },
 		groups: { total: null },
-		events: { total: null, next: null },
+		events: { total: null, next: null }
 	};
 
 	function goToNextEvent() {
 		if (!summary?.events?.next?.id) return;
-		navigate(`app/events?id=${encodeURIComponent(summary.events.next.id)}`);
+		navigate(`admin/events?id=${encodeURIComponent(summary.events.next.id)}`);
 	}
 
 	async function loadSummary() {
@@ -34,15 +33,15 @@
 				users: {
 					total: Number(data?.users?.total ?? 0),
 					noTelegram: Number(data?.users?.noTelegram ?? 0),
-					notActive: Number(data?.users?.notActive ?? 0),
+					notActive: Number(data?.users?.notActive ?? 0)
 				},
 				groups: {
-					total: Number(data?.groups?.total ?? 0),
+					total: Number(data?.groups?.total ?? 0)
 				},
 				events: {
 					total: Number(data?.events?.total ?? 0),
-					next: data?.events?.next || null,
-				},
+					next: data?.events?.next || null
+				}
 			};
 		} catch (err) {
 			error = err.message || err.toString() || 'Failed to load admin data';
@@ -57,11 +56,11 @@
 <DashboardLayout title="Admin">
 	<section class="section">
 		{#if error}
-			<StateCard>{error}</StateCard>
+			<Card variant="state">{error}</Card>
 		{:else if loading}
-			<StateCard>Caricamento...</StateCard>
+			<Card variant="state">Caricamento...</Card>
 		{:else}
-			<AdminCard>
+			<Card variant="admin">
 				<button class="event-card" on:click={goToNextEvent} disabled={!summary.events?.next?.id}>
 					<div class="title-row">
 						<p class="title">{summary.events?.next?.title || 'Nessun evento'}</p>
@@ -73,36 +72,36 @@
 								center
 								items={[
 									{ label: 'Iscritti', value: summary.events.next.registrations ?? '—' },
-									{ label: 'Da approvare', value: summary.events.next.pending ?? '—' },
+									{ label: 'Da approvare', value: summary.events.next.pending ?? '—' }
 								]}
 							/>
 						</div>
 					{/if}
 				</button>
-			</AdminCard>
+			</Card>
 		{/if}
 	</section>
 
 	<section class="section">
-		<AdminCard>
+		<Card variant="admin">
 			<StatRow
 				items={[
 					{ label: 'Utenti', value: summary.users.total ?? '—', color: '#000' },
 					{ label: 'No Telegram', value: summary.users.noTelegram ?? '—', color: '#1e88e5' },
-					{ label: '!Active', value: summary.users.notActive ?? '—', color: '#d32f2f' },
+					{ label: '!Active', value: summary.users.notActive ?? '—', color: '#d32f2f' }
 				]}
 			/>
-		</AdminCard>
+		</Card>
 	</section>
 
 	<section class="section">
 		<div class="two-col">
-			<AdminCard>
+			<Card variant="admin">
 				<StatRow center items={[{ label: 'Gruppi', value: summary.groups.total ?? '—' }]} />
-			</AdminCard>
-			<AdminCard>
+			</Card>
+			<Card variant="admin">
 				<StatRow center items={[{ label: 'Eventi', value: summary.events.total ?? '—' }]} />
-			</AdminCard>
+			</Card>
 		</div>
 	</section>
 </DashboardLayout>

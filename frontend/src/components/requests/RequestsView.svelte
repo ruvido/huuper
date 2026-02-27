@@ -3,7 +3,7 @@
 	import { apiFetch, pb } from '../../lib/pocketbase';
 	import { navigate, queryParams } from '../../lib/router';
 	import DashboardLayout from '../DashboardLayout.svelte';
-	import StateCard from '../StateCard.svelte';
+	import Card from '../Card.svelte';
 
 	export let title = 'Requests';
 	export let adminMode = false;
@@ -200,7 +200,8 @@
 
 	function openRequest(item) {
 		if (!item?.id) return;
-		navigate(`app/requests/${encodeURIComponent(item.id)}`);
+		const base = adminMode ? 'admin/requests' : 'app/requests';
+		navigate(`${base}/${encodeURIComponent(item.id)}`);
 	}
 
 	function setSelectedGroup(id, value) {
@@ -332,15 +333,15 @@
 
 <DashboardLayout {title}>
 	{#if error}
-		<StateCard>{error}</StateCard>
+		<Card variant="state">{error}</Card>
 	{:else if loading}
-		<StateCard>Loading requests...</StateCard>
+		<Card variant="state">Loading requests...</Card>
 	{:else if requests.length === 0}
-		<StateCard>No requests.</StateCard>
+		<Card variant="state">No requests.</Card>
 	{:else}
 		<div class="list">
 			{#each visibleRequests as item (item.id)}
-				<div class="card">
+				<Card variant="item">
 					<div class="head">
 						<div>
 							<p class="name">{displayName(item)}</p>
@@ -427,34 +428,36 @@
 							{/if}
 						</div>
 					{/if}
-				</div>
+				</Card>
 			{/each}
 
 			{#if rejectedRequests.length > 0}
 				<div class="divider" aria-hidden="true">---</div>
 				{#each rejectedRequests as item (item.id)}
-					<div class="card rejected">
-						<div class="head">
-							<div>
-								<p class="name">{displayName(item)}</p>
-								{#if displayRegion(item)}
-									<p class="meta">{displayRegion(item)}</p>
-								{/if}
+					<div class="rejected">
+						<Card variant="item">
+							<div class="head">
+								<div>
+									<p class="name">{displayName(item)}</p>
+									{#if displayRegion(item)}
+										<p class="meta">{displayRegion(item)}</p>
+									{/if}
+								</div>
+								<button class="details" type="button" on:click={() => openRequest(item)}>Details</button>
 							</div>
-							<button class="details" type="button" on:click={() => openRequest(item)}>Details</button>
-						</div>
 
-						{#if totalSteps(item) > 0}
-							<div class="progress-track" role="presentation">
-								<div class="progress-fill" style={`width: ${progressPercent(item)}%`}></div>
-							</div>
-							<div class="steps" aria-hidden="true">
-								{#each Array(totalSteps(item)) as _, index}
-									<span class="step" class:active={index < visualStepIndex(item)}>{index + 1}</span>
-								{/each}
-							</div>
-							<p class="step-meta">{currentStepMeta(item)}</p>
-						{/if}
+							{#if totalSteps(item) > 0}
+								<div class="progress-track" role="presentation">
+									<div class="progress-fill" style={`width: ${progressPercent(item)}%`}></div>
+								</div>
+								<div class="steps" aria-hidden="true">
+									{#each Array(totalSteps(item)) as _, index}
+										<span class="step" class:active={index < visualStepIndex(item)}>{index + 1}</span>
+									{/each}
+								</div>
+								<p class="step-meta">{currentStepMeta(item)}</p>
+							{/if}
+						</Card>
 					</div>
 				{/each}
 			{/if}
@@ -466,14 +469,6 @@
 	.list {
 		display: grid;
 		gap: 0.65rem;
-	}
-
-	.card {
-		display: grid;
-		gap: 0.6rem;
-		padding: 0.85rem;
-		border: 2px solid #000;
-		background: #fff;
 	}
 
 	.head {
@@ -577,7 +572,7 @@
 		padding: 0.25rem 0;
 	}
 
-	.card.rejected {
+	.rejected {
 		opacity: 0.7;
 	}
 </style>

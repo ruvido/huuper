@@ -1,9 +1,8 @@
 <script>
 	import { onMount } from 'svelte';
-	import { isAuthenticated, pb, authRecord, fetchSetting } from './lib/pocketbase';
-	import { currentRoute, navigate, queryParams, getTargetRoute } from './lib/router';
-	import Header from './components/Header.svelte';
-	import Menu from './components/Menu.svelte';
+	import { isAuthenticated, pb, authRecord, fetchSetting, apiFetch } from './lib/pocketbase';
+	import { currentRoute, navigate, getTargetRoute } from './lib/router';
+	import BottomBar from './components/BottomBar.svelte';
 	import Login from './pages/Login.svelte';
 	import Signup from './pages/SignupDirect.svelte';
 	import PasswordReset from './pages/PasswordReset.svelte';
@@ -11,7 +10,7 @@
 	import PendingApproval from './pages/PendingApproval.svelte';
 	import EventAccept from './pages/EventAccept.svelte';
 	import TelegramConnect from './pages/TelegramConnect.svelte';
-	import Home from './pages/Home.svelte';
+	import Events from './pages/Events.svelte';
 	import Profile from './pages/Profile.svelte';
 	import Groups from './pages/Groups.svelte';
 	import GroupDetail from './pages/GroupDetail.svelte';
@@ -22,10 +21,13 @@
 	import Requests from './pages/Requests.svelte';
 	import RequestDetail from './pages/RequestDetail.svelte';
 
-	let menuOpen = false;
 	let authReady = false;
 	let renderReady = false;
 	let appTitle = 'Members';
+	let eventsAlert = false;
+	let groupsAlert = false;
+	let refreshingBadges = false;
+	let lastBadgeRoute = '';
 	const version = __APP_VERSION__;
 
 	// Refresh auth on app load to sync with server
@@ -54,6 +56,49 @@
 		authReady = true; // Signal auth is synced
 	});
 
+	function isFutureEvent(eventDate) {
+		if (!eventDate || typeof eventDate !== 'string') return false;
+		const normalized = eventDate.replace('T', ' ');
+		const [dateRaw] = normalized.split(' ');
+		const parts = dateRaw.split('-');
+		if (parts.length !== 3) return false;
+		const [year, month, day] = parts.map(Number);
+		if (!year || !month || !day) return false;
+		const now = new Date();
+		const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+		const eventDay = new Date(year, month - 1, day);
+		return eventDay > today;
+	}
+
+	async function refreshBadges() {
+		if (refreshingBadges || !$isAuthenticated) return;
+		refreshingBadges = true;
+		try {
+			const eventsResult = await pb.collection('events').getList(1, 200, {
+				filter: 'active = true',
+				sort: 'event_date'
+			});
+			const items = Array.isArray(eventsResult?.items) ? eventsResult.items : [];
+			eventsAlert = items.some((event) => isFutureEvent(event?.event_date));
+		} catch {
+			// Keep previous value if events fetch fails.
+		}
+
+		try {
+			const requestsResult = await apiFetch('/api/requests?per_page=1');
+			if (!requestsResult.ok) {
+				groupsAlert = false;
+			} else {
+				const data = await requestsResult.json();
+				groupsAlert = Array.isArray(data?.items) && data.items.length > 0;
+			}
+		} catch {
+			groupsAlert = false;
+		} finally {
+			refreshingBadges = false;
+		}
+	}
+
 	// Reset renderReady when route changes to re-run guards
 	$: if ($currentRoute) {
 		renderReady = false;
@@ -75,28 +120,25 @@
 		}
 	}
 
-	function toggleMenu() {
-		menuOpen = !menuOpen;
-	}
+	$: appRoute = typeof $currentRoute === 'string' && $currentRoute.startsWith('app/');
+	$: adminRoute = typeof $currentRoute === 'string'
+		&& ($currentRoute === 'admin' || $currentRoute.startsWith('admin/'));
+	$: showMainNav = $isAuthenticated && appRoute && !adminRoute;
 
-	function closeMenu() {
-		menuOpen = false;
-	}
-
-	// Close menu when auth state changes (e.g., logout)
 	$: if (!$isAuthenticated) {
-		menuOpen = false;
+		eventsAlert = false;
+		groupsAlert = false;
+		lastBadgeRoute = '';
+	}
+
+	$: if (authReady && $isAuthenticated && showMainNav && $currentRoute !== lastBadgeRoute) {
+		lastBadgeRoute = $currentRoute;
+		void refreshBadges();
 	}
 </script>
 
 <!-- Only render when guards have validated -->
 {#if renderReady}
-	<!-- Header: only visible when authenticated and not on onboarding/pending-approval/telegram-connect -->
-	{#if $isAuthenticated && $currentRoute.startsWith('app/')}
-		<Header onMenuClick={toggleMenu} title={appTitle} />
-		<Menu isOpen={menuOpen} onClose={closeMenu} />
-	{/if}
-
 	<main>
 		{#if $currentRoute === 'login'}
 			<Login />
@@ -114,8 +156,8 @@
 			<EventAccept />
 		{:else if $currentRoute === 'telegram-connect'}
 			<TelegramConnect />
-		{:else if $currentRoute === 'app/home'}
-			<Home />
+		{:else if $currentRoute === 'app/events'}
+			<Events />
 		{:else if $currentRoute === 'app/profile'}
 			<Profile />
 		{:else if $currentRoute === 'app/groups'}
@@ -124,12 +166,14 @@
 			<GroupRequests />
 		{:else if $currentRoute.startsWith('app/groups/')}
 			<GroupDetail />
-		{:else if $currentRoute === 'app/admin'}
+		{:else if $currentRoute === 'admin'}
 			<Admin />
-		{:else if $currentRoute === 'app/events'}
+		{:else if $currentRoute === 'admin/events'}
 			<AdminEvent />
-		{:else if $currentRoute === 'app/admin/requests' || $currentRoute.startsWith('app/admin/requests/')}
+		{:else if $currentRoute === 'admin/requests'}
 			<AdminRequests />
+		{:else if /^admin\/requests\/[^/]+$/.test($currentRoute)}
+			<RequestDetail />
 		{:else if /^app\/requests\/[^/]+$/.test($currentRoute)}
 			<RequestDetail />
 		{:else if $currentRoute === 'app/requests' || $currentRoute.startsWith('app/requests/')}
@@ -138,9 +182,13 @@
 			<Login />
 		{/if}
 	</main>
-{/if}
 
-<div class="version">{version}</div>
+	{#if showMainNav}
+		<BottomBar {eventsAlert} {groupsAlert} />
+	{/if}
+
+	<div class="version">{version}</div>
+{/if}
 
 <style>
 	:global(body) {
@@ -153,12 +201,10 @@
 	}
 
 	.version {
-		position: fixed;
-		top: 8px;
-		left: 8px;
+		margin: 0 auto;
+		padding: 0.75rem 0 6rem;
+		text-align: center;
 		font-size: 10px;
 		color: #999;
-		z-index: 9999;
-		pointer-events: none;
 	}
 </style>

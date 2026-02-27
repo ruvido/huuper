@@ -4,10 +4,9 @@
 	import { formatEventDate } from '../lib/date';
 	import { queryParams, navigate } from '../lib/router';
 	import DashboardLayout from '../components/DashboardLayout.svelte';
-	import StateCard from '../components/StateCard.svelte';
-	import AdminCard from '../components/AdminCard.svelte';
 	import StatRow from '../components/StatRow.svelte';
 	import ConfirmModal from '../components/modals/ConfirmModal.svelte';
+	import Card from '../components/Card.svelte';
 
 	let loading = true;
 	let error = '';
@@ -181,7 +180,7 @@
 	}
 
 	function goBack() {
-		navigate('app/admin');
+		navigate('admin');
 	}
 
 	$: if (eventId && eventId !== lastEventId) {
@@ -199,11 +198,11 @@
 
 <DashboardLayout title="Event">
 	{#if !eventId}
-		<StateCard>Missing event.</StateCard>
+		<Card variant="state">Missing event.</Card>
 	{:else if error}
-		<StateCard>{error}</StateCard>
+		<Card variant="state">{error}</Card>
 	{:else if loading}
-		<StateCard>Loading...</StateCard>
+		<Card variant="state">Loading...</Card>
 	{:else}
 		<div class="header">
 			<h1>{eventInfo?.title}</h1>
@@ -219,7 +218,7 @@
 			/>
 		</div>
 
-		<AdminCard>
+		<Card variant="admin">
 			<div class="list">
 				<div class="list-section">
 					<h2>Pending</h2>
@@ -244,9 +243,9 @@
 					{/if}
 				</div>
 			</div>
-		</AdminCard>
+		</Card>
 
-		<AdminCard>
+		<Card variant="admin">
 			<div class="list">
 				<div class="list-section">
 					<h2>Approved</h2>
@@ -283,9 +282,9 @@
 					{/if}
 				</div>
 			</div>
-		</AdminCard>
+		</Card>
 
-		<AdminCard>
+		<Card variant="admin">
 			<div class="list">
 				<div class="list-section">
 					<h2>Cancelled</h2>
@@ -304,7 +303,7 @@
 					{/if}
 				</div>
 			</div>
-		</AdminCard>
+		</Card>
 	{/if}
 
 	<button class="back" on:click={goBack}>Back</button>
