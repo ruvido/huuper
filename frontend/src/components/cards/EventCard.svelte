@@ -11,6 +11,9 @@
 	export let unsubscribing = false;
 	export let onRegister = () => {};
 	export let onUnsubscribe = () => {};
+	export let open = false;
+	export let onToggle = () => {};
+
 
 	function formatDatePart(raw) {
 		if (!raw) return '';
@@ -79,7 +82,7 @@
 	}
 </script>
 
-<details class="event-card">
+<details id={`event-${event?.id || ""}`} class="event-card" open={open} tabindex="-1" on:toggle={(event) => onToggle(!!event.currentTarget?.open)}>
 	<summary>
 		<div class="summary-left">
 			<h3>{event?.title}</h3>

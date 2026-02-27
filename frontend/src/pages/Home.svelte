@@ -18,6 +18,7 @@
 	let registeredById = {};
 	let registeringById = {};
 	let unsubscribingById = {};
+	let openById = {};
 	let confirmState = null;
 	let confirmConfig = null;
 
@@ -100,6 +101,22 @@
 		navigate(`app/groups/${encodeURIComponent(group.id)}`);
 	}
 
+	function setCardOpen(eventId, value) {
+		if (!eventId) return;
+		openById = { ...openById, [eventId]: !!value };
+	}
+
+	function scrollToEventCard(eventId) {
+		if (!eventId || typeof document === 'undefined') return;
+		const el = document.getElementById(`event-${eventId}`);
+		if (!el) return;
+		el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+		requestAnimationFrame(() => {
+			window.scrollBy({ top: -120, behavior: 'smooth' });
+			el.focus?.();
+		});
+	}
+
 	async function registerEvent(event) {
 		await mutateRegistration('register', event);
 	}
@@ -161,6 +178,8 @@
 
 				if (!res.ok) return;
 				registeredById = { ...registeredById, [event.id]: true };
+				setCardOpen(event.id, false);
+				scrollToEventCard(event.id);
 			}
 
 			if (isUnsubscribe) {
@@ -227,6 +246,8 @@
 						registering={!!registeringById[event.id]}
 						canUnsubscribe={!!registeredById[event.id]}
 						unsubscribing={!!unsubscribingById[event.id]}
+						open={!!openById[event.id]}
+						onToggle={(value) => setCardOpen(event.id, value)}
 						onRegister={(evt) => openConfirm(evt, 'register')}
 						onUnsubscribe={(evt) => openConfirm(evt, 'unsubscribe')}
 					/>
