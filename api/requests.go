@@ -53,9 +53,9 @@ type requestListItem struct {
 }
 
 const (
-	requestActionAdvance = "advance"
-	requestActionReject  = "reject"
-	requestActionPromote = "promote"
+	requestActionAdvance     = "advance"
+	requestActionReject      = "reject"
+	requestActionPromote     = "promote"
 	requestActionSetGuardian = "set_guardian"
 )
 
@@ -645,7 +645,7 @@ func loadSignupSettings(app *pocketbase.PocketBase) (signupSettingsConfig, error
 			if !ok {
 				continue
 			}
-			field := strings.TrimSpace(asString(step["field"]))
+			field := strings.TrimSpace(anyToString(step["field"]))
 			if field == "" {
 				continue
 			}
@@ -673,7 +673,7 @@ func loadProfileSchemaSettings(app *pocketbase.PocketBase) (profileSchemaConfig,
 		if !ok {
 			continue
 		}
-		key := strings.TrimSpace(asString(field["key"]))
+		key := strings.TrimSpace(anyToString(field["key"]))
 		if key == "" {
 			continue
 		}
@@ -860,15 +860,6 @@ func flowStepAt(flow requestsFlowConfig, stepIndex int) (requestsFlowStep, bool)
 		return requestsFlowStep{}, false
 	}
 	return flow.Steps[stepIndex], true
-}
-
-func asString(value any) string {
-	switch typed := value.(type) {
-	case string:
-		return typed
-	default:
-		return ""
-	}
 }
 
 func parseBoolQuery(raw string, fallback bool) (bool, error) {

@@ -62,11 +62,7 @@ func RegisterEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 			return apis.NewBadRequestError(errInvalidEvent, nil)
 		}
 
-		event, err := app.FindFirstRecordByFilter(
-			"events",
-			"slug = {:slug}",
-			map[string]any{"slug": slug},
-		)
+		event, err := findEventBySlug(app, slug)
 		if err != nil {
 			return apis.NewNotFoundError(errInvalidEvent, err)
 		}
@@ -128,14 +124,7 @@ func RegisterEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 			return apis.NewNotFoundError(errGeneric, err)
 		}
 
-		existing, err := app.FindFirstRecordByFilter(
-			"event_registrations",
-			"event = {:event} && email = {:email}",
-			map[string]any{
-				"event": event.Id,
-				"email": recipient,
-			},
-		)
+		existing, err := findEventRegistrationByEmail(app, event.Id, recipient, false)
 		if err == nil && existing != nil {
 			return apis.NewBadRequestError(errAlreadySubmitted, nil)
 		}

@@ -73,7 +73,7 @@ func validateLegacyRequestsFlowSettingData(data map[string]any) error {
 		return fmt.Errorf("settings.requests_flow statuses must be a non-empty array")
 	}
 	for i, raw := range statuses {
-		status := strings.TrimSpace(asString(raw))
+		status := strings.TrimSpace(anyToString(raw))
 		if status == "" {
 			return fmt.Errorf("settings.requests_flow statuses[%d] is empty", i)
 		}
@@ -111,7 +111,7 @@ func extractProfileSchemaKeys(data map[string]any) (map[string]struct{}, error) 
 		if !ok {
 			return nil, fmt.Errorf("invalid field entry")
 		}
-		key := strings.TrimSpace(asString(field["key"]))
+		key := strings.TrimSpace(anyToString(field["key"]))
 		if key == "" {
 			return nil, fmt.Errorf("field key is required")
 		}
@@ -155,7 +155,7 @@ func validateFlowSettingData(name string, data map[string]any, keys map[string]s
 			return fmt.Errorf("settings.%s has invalid step entry", name)
 		}
 
-		field := strings.TrimSpace(asString(step["field"]))
+		field := strings.TrimSpace(anyToString(step["field"]))
 		if field == "" {
 			return fmt.Errorf("settings.%s step field is required", name)
 		}

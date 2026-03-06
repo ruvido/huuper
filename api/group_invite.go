@@ -35,7 +35,7 @@ func DefaultGroupInviteHandler(app *pocketbase.PocketBase) func(e *core.RequestE
 		}
 
 		telegramData := parseJSONMap(group.Get("telegram"))
-		chatIDRaw := strings.TrimSpace(asString(telegramData["chat_id"]))
+		chatIDRaw := strings.TrimSpace(anyToString(telegramData["chat_id"]))
 		if chatIDRaw == "" {
 			return apis.NewBadRequestError("invalid_default_group", fmt.Errorf("missing telegram.chat_id"))
 		}
@@ -52,7 +52,7 @@ func DefaultGroupInviteHandler(app *pocketbase.PocketBase) func(e *core.RequestE
 
 		// Diagnostic only: if the authenticated user has a Telegram id, log current membership state.
 		authTelegram := parseJSONMap(e.Auth.Get("telegram"))
-		authTelegramID, authTelegramIDOK := parseInt64FromAny(authTelegram["id"])
+		authTelegramID, authTelegramIDOK := anyToInt64(authTelegram["id"])
 		if authTelegramIDOK {
 			member, memberErr := tg.GetChatMember(tgbotapi.GetChatMemberConfig{
 				ChatConfigWithUser: tgbotapi.ChatConfigWithUser{
@@ -109,29 +109,5 @@ func DefaultGroupInviteHandler(app *pocketbase.PocketBase) func(e *core.RequestE
 			"group_id":    group.Id,
 			"invite_link": link,
 		})
-	}
-}
-
-func parseInt64FromAny(value any) (int64, bool) {
-	switch v := value.(type) {
-	case int:
-		return int64(v), true
-	case int32:
-		return int64(v), true
-	case int64:
-		return v, true
-	case float64:
-		return int64(v), true
-	case json.Number:
-		n, err := v.Int64()
-		return n, err == nil
-	case string:
-		if strings.TrimSpace(v) == "" {
-			return 0, false
-		}
-		n, err := strconv.ParseInt(strings.TrimSpace(v), 10, 64)
-		return n, err == nil
-	default:
-		return 0, false
 	}
 }

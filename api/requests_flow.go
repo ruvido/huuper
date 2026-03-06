@@ -85,7 +85,7 @@ func parseRequestsFlowConfig(data map[string]any) (requestsFlowConfig, error) {
 			return requestsFlowConfig{}, fmt.Errorf("settings.requests_flow steps[%d] is invalid", i)
 		}
 
-		role := strings.TrimSpace(asString(entry["role"]))
+		role := strings.TrimSpace(anyToString(entry["role"]))
 		if role == "" {
 			return requestsFlowConfig{}, fmt.Errorf("settings.requests_flow steps[%d] missing role", i)
 		}
@@ -93,7 +93,7 @@ func parseRequestsFlowConfig(data map[string]any) (requestsFlowConfig, error) {
 			return requestsFlowConfig{}, fmt.Errorf("settings.requests_flow steps[%d] invalid role: %s", i, role)
 		}
 
-		action := strings.TrimSpace(asString(entry["action"]))
+		action := strings.TrimSpace(anyToString(entry["action"]))
 		if action == "" {
 			return requestsFlowConfig{}, fmt.Errorf("settings.requests_flow steps[%d] missing action", i)
 		}
@@ -101,7 +101,7 @@ func parseRequestsFlowConfig(data map[string]any) (requestsFlowConfig, error) {
 			return requestsFlowConfig{}, fmt.Errorf("settings.requests_flow steps[%d] invalid action: %s", i, action)
 		}
 
-		label := strings.TrimSpace(asString(entry["label"]))
+		label := strings.TrimSpace(anyToString(entry["label"]))
 		steps = append(steps, requestsFlowStep{Role: role, Action: action, Label: label})
 	}
 

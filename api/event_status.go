@@ -21,24 +21,13 @@ func EventStatusHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) e
 			return apis.NewBadRequestError("invalid_event", nil)
 		}
 
-		event, err := app.FindFirstRecordByFilter(
-			"events",
-			"slug = {:slug}",
-			map[string]any{"slug": slug},
-		)
+		event, err := findEventBySlug(app, slug)
 		if err != nil || event == nil {
 			return apis.NewNotFoundError("invalid_event", err)
 		}
 
 		if authRecord != nil {
-			registration, err := app.FindFirstRecordByFilter(
-				"event_registrations",
-				"event = {:event} && user = {:user} && status != 'cancelled' && status != 'rejected'",
-				map[string]any{
-					"event": event.Id,
-					"user":  authRecord.Id,
-				},
-			)
+			registration, err := findEventRegistrationByUser(app, event.Id, authRecord.Id, true)
 			if err == nil && registration != nil {
 				return e.JSON(http.StatusOK, map[string]any{"registered": true})
 			}
@@ -49,14 +38,7 @@ func EventStatusHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) e
 			return apis.NewBadRequestError("invalid_email", nil)
 		}
 
-		registration, err := app.FindFirstRecordByFilter(
-			"event_registrations",
-			"event = {:event} && email = {:email} && status != 'cancelled' && status != 'rejected'",
-			map[string]any{
-				"event": event.Id,
-				"email": email,
-			},
-		)
+		registration, err := findEventRegistrationByEmail(app, event.Id, email, true)
 		if err != nil || registration == nil {
 			return e.JSON(http.StatusOK, map[string]any{"registered": false})
 		}

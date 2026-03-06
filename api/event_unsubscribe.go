@@ -21,25 +21,14 @@ func EventUnsubscribeHandler(app *pocketbase.PocketBase) func(e *core.RequestEve
 			return apis.NewBadRequestError("invalid_event", nil)
 		}
 
-		event, err := app.FindFirstRecordByFilter(
-			"events",
-			"slug = {:slug}",
-			map[string]any{"slug": slug},
-		)
+		event, err := findEventBySlug(app, slug)
 		if err != nil || event == nil {
 			return apis.NewNotFoundError("invalid_event", err)
 		}
 
 		var record *core.Record
 		if authRecord != nil {
-			record, err = app.FindFirstRecordByFilter(
-				"event_registrations",
-				"event = {:event} && user = {:user}",
-				map[string]any{
-					"event": event.Id,
-					"user":  authRecord.Id,
-				},
-			)
+			record, err = findEventRegistrationByUser(app, event.Id, authRecord.Id, false)
 			if err == nil && record != nil {
 				if err := app.Delete(record); err != nil {
 					return apis.NewBadRequestError("error_generic", err)
@@ -53,14 +42,7 @@ func EventUnsubscribeHandler(app *pocketbase.PocketBase) func(e *core.RequestEve
 			return apis.NewBadRequestError("invalid_email", nil)
 		}
 
-		record, err = app.FindFirstRecordByFilter(
-			"event_registrations",
-			"event = {:event} && email = {:email}",
-			map[string]any{
-				"event": event.Id,
-				"email": email,
-			},
-		)
+		record, err = findEventRegistrationByEmail(app, event.Id, email, false)
 		if err != nil || record == nil {
 			return e.JSON(http.StatusOK, map[string]any{"unsubscribed": false})
 		}
