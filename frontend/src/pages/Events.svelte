@@ -1,10 +1,13 @@
 <script>
 	import { onMount } from 'svelte';
 	import { apiFetch, pb } from '../lib/pocketbase';
+	import { navigate } from '../lib/router';
 	import DashboardLayout from '../components/DashboardLayout.svelte';
 	import EventCard from '../components/cards/EventCard.svelte';
 	import ConfirmModal from '../components/modals/ConfirmModal.svelte';
 	import Card from '../components/Card.svelte';
+
+	export let adminMode = false;
 
 	let events = [];
 	let eventsLoading = false;
@@ -40,7 +43,9 @@
 			});
 			const items = result.items || [];
 			events = items.filter((event) => isFutureEvent(event.event_date));
-			await loadStatuses();
+			if (!adminMode) {
+				await loadStatuses();
+			}
 		} catch (err) {
 			eventsError = err.message || err.toString() || 'Failed to load events';
 		} finally {
@@ -180,9 +185,14 @@
 	onMount(() => {
 		loadEvents();
 	});
+
+	function openAdminEvent(event) {
+		if (!adminMode || !event?.id) return;
+		navigate(`admin/event?id=${encodeURIComponent(event.id)}`);
+	}
 </script>
 
-<DashboardLayout title="Eventi">
+<DashboardLayout title={adminMode ? 'Admin Events' : 'Eventi'}>
 	<section class="section">
 		<h2 class="section-title">Upcoming Events</h2>
 		{#if eventsError}
@@ -196,11 +206,13 @@
 				{#each events as event}
 					<EventCard
 						{event}
+						selectable={adminMode}
+						onSelect={openAdminEvent}
 						registered={!!registeredById[event.id]}
-						canRegister={!registeredById[event.id]}
-						showStatus={true}
+						canRegister={!adminMode && !registeredById[event.id]}
+						showStatus={!adminMode}
 						registering={!!registeringById[event.id]}
-						canUnsubscribe={!!registeredById[event.id]}
+						canUnsubscribe={!adminMode && !!registeredById[event.id]}
 						unsubscribing={!!unsubscribingById[event.id]}
 						open={!!openById[event.id]}
 						onToggle={(value) => setCardOpen(event.id, value)}
@@ -213,15 +225,17 @@
 	</section>
 </DashboardLayout>
 
-<ConfirmModal
-	show={!!confirmConfig}
-	title={confirmConfig?.title || 'Confirm'}
-	message={confirmConfig?.message || ''}
-	confirmLabel={confirmConfig?.confirmLabel || 'Confirm'}
-	loading={confirmConfig?.loading || false}
-	onConfirm={confirmConfig?.onConfirm}
-	onCancel={closeConfirm}
-/>
+{#if !adminMode}
+	<ConfirmModal
+		show={!!confirmConfig}
+		title={confirmConfig?.title || 'Confirm'}
+		message={confirmConfig?.message || ''}
+		confirmLabel={confirmConfig?.confirmLabel || 'Confirm'}
+		loading={confirmConfig?.loading || false}
+		onConfirm={confirmConfig?.onConfirm}
+		onCancel={closeConfirm}
+	/>
+{/if}
 
 <style>
 	.section {

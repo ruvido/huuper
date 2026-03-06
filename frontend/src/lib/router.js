@@ -18,7 +18,10 @@ const appRoutes = [
 const adminRoutes = [
 	defaultAdminRoute,
 	'admin/events',
-	'admin/requests'
+	'admin/event',
+	'admin/groups',
+	'admin/requests',
+	'admin/profile'
 ];
 
 function scrollToTop() {
@@ -54,6 +57,7 @@ export function resolveNextRoute(next) {
 	if (next === 'app') return defaultAppRoute;
 	if (next === 'admin') return defaultAdminRoute;
 	if (next.startsWith('app/groups/')) return next;
+	if (next.startsWith('admin/groups/')) return next;
 	if (next.startsWith('app/requests/')) return next;
 	if (next.startsWith('admin/requests/')) return next;
 	if (next.startsWith(appPrefix) && appRoutes.includes(next)) return next;
@@ -89,9 +93,9 @@ export function getTargetRoute(isAuthenticated, user, currentRoute) {
 		return defaultAppRoute;
 	}
 	if (currentRoute.startsWith('app/groups/')) return currentRoute;
+	if (currentRoute.startsWith('admin/groups/')) return isAdmin ? currentRoute : defaultAppRoute;
 	if (currentRoute.startsWith('app/requests/')) return currentRoute;
 	if (currentRoute.startsWith('admin/requests/')) return currentRoute;
-	if (isAdmin && currentRoute === defaultAppRoute) return defaultAdminRoute;
 	if (currentRoute === 'app') return isAdmin ? defaultAdminRoute : defaultAppRoute;
 	if (currentRoute.startsWith(appPrefix)) {
 		if (appRoutes.includes(currentRoute)) return currentRoute;

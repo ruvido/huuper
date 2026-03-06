@@ -1,16 +1,33 @@
 <script>
-	import { navigate } from '../lib/router';
+	import { currentRoute, navigate } from '../lib/router';
 
 	export let title = '';
 	export let showBack = false;
 	export let onBack = null;
+	$: route = typeof $currentRoute === 'string' ? $currentRoute : '';
+	$: showBuildDate = route === 'admin' || route.startsWith('admin/');
+	const buildDateLabel = (() => {
+		const raw = typeof __BUILD_DATE__ === 'string' ? __BUILD_DATE__.trim() : '';
+		if (!raw) return '';
+		const dt = new Date(raw);
+		if (Number.isNaN(dt.getTime())) return raw;
+		return dt.toLocaleString('it-IT', {
+			year: 'numeric',
+			month: '2-digit',
+			day: '2-digit',
+			hour: '2-digit',
+			minute: '2-digit'
+		});
+	})();
 
 	function handleBack() {
 		if (typeof onBack === 'function') onBack();
 	}
 
 	function goToProfile() {
-		navigate('app/profile');
+		const route = typeof $currentRoute === 'string' ? $currentRoute : '';
+		const scope = route === 'admin' || route.startsWith('admin/') ? 'admin' : 'app';
+		navigate(`${scope}/profile`);
 	}
 </script>
 
@@ -25,7 +42,12 @@
 				</button>
 			{/if}
 		</div>
-		<h1 class="top-title" title={title}>{title}</h1>
+			<div class="top-center">
+				<h1 class="top-title" title={title}>{title}</h1>
+				{#if showBuildDate && buildDateLabel}
+					<div class="build-date" title={__BUILD_DATE__}>Build {buildDateLabel}</div>
+				{/if}
+			</div>
 		<div class="top-right">
 			<button class="profile" type="button" aria-label="Profile" on:click={goToProfile}>
 				<svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
@@ -75,6 +97,21 @@
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
+	}
+
+	.top-center {
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		line-height: 1.1;
+	}
+
+	.build-date {
+		font-size: 0.66rem;
+		color: #666;
+		white-space: nowrap;
 	}
 
 	.back,

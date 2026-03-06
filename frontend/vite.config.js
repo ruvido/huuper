@@ -6,12 +6,14 @@ import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const version = readFileSync(resolve(__dirname, '../VERSION'), 'utf-8').trim()
+const buildDate = new Date().toISOString()
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [svelte()],
   define: {
-    __APP_VERSION__: JSON.stringify(version)
+    __APP_VERSION__: JSON.stringify(version),
+    __BUILD_DATE__: JSON.stringify(buildDate)
   },
   build: {
     outDir: '../pb_public',

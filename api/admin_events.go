@@ -18,6 +18,10 @@ type adminRegistrationItem struct {
 	Data    map[string]any `json:"data"`
 }
 
+type adminRejectRegistrationPayload struct {
+	Note string `json:"note"`
+}
+
 // AdminEventDetailsHandler returns the event and its registrations.
 func AdminEventDetailsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
@@ -122,6 +126,45 @@ func AdminCancelRegistrationHandler(app *pocketbase.PocketBase) func(e *core.Req
 		}
 
 		return e.JSON(http.StatusOK, map[string]any{"status": "cancelled"})
+	}
+}
+
+// AdminRejectRegistrationHandler marks a registration as rejected and stores the reason in data.rejected.
+func AdminRejectRegistrationHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		if _, err := requireAdmin(e); err != nil {
+			return err
+		}
+
+		regId := e.Request.PathValue("id")
+		if regId == "" {
+			return apis.NewBadRequestError("invalid_registration", nil)
+		}
+
+		var payload adminRejectRegistrationPayload
+		if err := e.BindBody(&payload); err != nil {
+			return apis.NewBadRequestError("invalid_payload", err)
+		}
+
+		note := strings.TrimSpace(payload.Note)
+		if note == "" {
+			return apis.NewBadRequestError("invalid_rejected_note", nil)
+		}
+
+		record, err := app.FindRecordById("event_registrations", regId)
+		if err != nil || record == nil {
+			return apis.NewNotFoundError("invalid_registration", err)
+		}
+
+		data := parseJSONMap(record.Get("data"))
+		data["rejected"] = note
+		record.Set("data", data)
+		record.Set("status", "rejected")
+		if err := app.Save(record); err != nil {
+			return apis.NewBadRequestError("failed_update", err)
+		}
+
+		return e.JSON(http.StatusOK, map[string]any{"status": "rejected"})
 	}
 }
 

@@ -33,7 +33,7 @@ func EventStatusHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) e
 		if authRecord != nil {
 			registration, err := app.FindFirstRecordByFilter(
 				"event_registrations",
-				"event = {:event} && user = {:user} && status != 'cancelled'",
+				"event = {:event} && user = {:user} && status != 'cancelled' && status != 'rejected'",
 				map[string]any{
 					"event": event.Id,
 					"user":  authRecord.Id,
@@ -51,7 +51,7 @@ func EventStatusHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) e
 
 		registration, err := app.FindFirstRecordByFilter(
 			"event_registrations",
-			"event = {:event} && email = {:email} && status != 'cancelled'",
+			"event = {:event} && email = {:email} && status != 'cancelled' && status != 'rejected'",
 			map[string]any{
 				"event": event.Id,
 				"email": email,

@@ -79,7 +79,7 @@
 	}
 </script>
 
-<DashboardLayout title="Profile">
+<DashboardLayout title="Admin Profile">
 	<Card>
 		<div class="avatar">
 			{user?.email?.charAt(0).toUpperCase()}

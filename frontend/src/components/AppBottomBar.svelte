@@ -5,38 +5,19 @@
 	export let groupsAlert = false;
 
 	$: route = $currentRoute || '';
-	$: isAdminRoute = route === 'admin' || route.startsWith('admin/');
-	$: dashboardActive = route === 'admin';
-	$: eventsActive = isAdminRoute
-		? route === 'admin/events' || route === 'admin/event'
-		: route === 'app/events';
-	$: groupsActive = isAdminRoute
-		? route === 'admin/groups' || route.startsWith('admin/groups/')
-		: route === 'app/groups' || route.startsWith('app/groups/');
-
-	function goToDashboard() {
-		navigate('admin');
-	}
+	$: eventsActive = route === 'app/events';
+	$: groupsActive = route === 'app/groups' || route.startsWith('app/groups/');
 
 	function goToEvents() {
-		navigate(isAdminRoute ? 'admin/events' : 'app/events');
+		navigate('app/events');
 	}
 
 	function goToGroups() {
-		navigate(isAdminRoute ? 'admin/groups' : 'app/groups');
+		navigate('app/groups');
 	}
 </script>
 
-<nav class="bottom-bar" class:admin={isAdminRoute} aria-label="Main">
-	{#if isAdminRoute}
-		<button class="tab" class:active={dashboardActive} on:click={goToDashboard} aria-label="Dashboard">
-			<span class="icon-wrap">
-				<svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
-					<path d="M8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 2 8h1v6a1 1 0 0 0 1 1h3v-4h2v4h3a1 1 0 0 0 1-1V8h1a.5.5 0 0 0 .354-.854z"/>
-				</svg>
-			</span>
-		</button>
-	{/if}
+<nav class="bottom-bar" aria-label="App Main">
 	<button class="tab" class:active={eventsActive} on:click={goToEvents} aria-label="Events">
 		<span class="icon-wrap">
 			<svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
@@ -71,10 +52,6 @@
 		background: #fff;
 		border-top: 1px solid #e6e6e6;
 		z-index: 120;
-	}
-
-	.bottom-bar.admin {
-		grid-template-columns: repeat(3, minmax(0, 1fr));
 	}
 
 	.tab {

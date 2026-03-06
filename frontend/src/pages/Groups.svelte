@@ -1,15 +1,26 @@
 <script>
 	import { onMount, onDestroy } from 'svelte';
-	import { pb } from '../lib/pocketbase';
+	import { apiFetch, pb } from '../lib/pocketbase';
 	import { navigate } from '../lib/router';
 	import DashboardLayout from '../components/DashboardLayout.svelte';
 	import GroupCard from '../components/cards/GroupCard.svelte';
 	import Card from '../components/Card.svelte';
 
+	export let adminMode = false;
+
 	let groups = [];
+	let visibleGroups = [];
+	let requestsCountByGroupId = {};
 	let loaded = false;
 	let error = '';
 	let unsubscribeUserGroups;
+	let inviteDialogOpen = false;
+	let inviteDialogLink = '';
+	let inviteDialogName = '';
+	let inviteDialogMessage = '';
+	let inviteDialogBusy = false;
+	let syncBusy = false;
+	let syncMessage = '';
 
 	onMount(async () => {
 		await loadGroups();
@@ -44,9 +55,60 @@
 				sort: '-created',
 				expand: 'group'
 			});
-			groups = userGroupsResult.items
+			const memberGroups = userGroupsResult.items
 				.map((item) => item?.expand?.group || null)
 				.filter(Boolean);
+			groups = memberGroups;
+
+			let defaultGroup = null;
+			try {
+				const defaultResult = await pb.collection('groups').getList(1, 1, {
+					filter: `type = "default"`,
+					sort: 'created'
+				});
+				defaultGroup = Array.isArray(defaultResult?.items) ? defaultResult.items[0] || null : null;
+			} catch {
+				// Ignore default group lookup errors
+			}
+
+			const byId = new Map();
+			for (const group of memberGroups) {
+				if (group?.id) byId.set(group.id, { group, isMember: true });
+			}
+			if (defaultGroup?.id && !byId.has(defaultGroup.id)) {
+				byId.set(defaultGroup.id, { group: defaultGroup, isMember: false });
+			}
+
+			const rank = (type) => {
+				const value = typeof type === 'string' ? type.trim() : '';
+				if (value === 'default') return 0;
+				if (value === 'local') return 1;
+				return 2;
+			};
+
+			visibleGroups = Array.from(byId.values()).sort((a, b) => {
+				const r = rank(a.group?.type) - rank(b.group?.type);
+				if (r !== 0) return r;
+				const aName = (a.group?.name || '').toLowerCase();
+				const bName = (b.group?.name || '').toLowerCase();
+				return aName.localeCompare(bName);
+			});
+
+			const countEntries = await Promise.all(
+				memberGroups.map(async (group) => {
+					if (!group?.id || group.assistant !== currentUser.id) {
+						return [group?.id || '', 0];
+					}
+
+					const response = await apiFetch(`/api/groups/${encodeURIComponent(group.id)}/requests-count`);
+					if (!response.ok) {
+						return [group.id, 0];
+					}
+					const payload = await response.json();
+					return [group.id, Number(payload?.count || 0)];
+				})
+			);
+			requestsCountByGroupId = Object.fromEntries(countEntries.filter(([id]) => !!id));
 		} catch (err) {
 			error = err.message || err.toString() || 'Failed to load groups';
 		} finally {
@@ -56,22 +118,232 @@
 
 	function goToGroup(group) {
 		if (!group?.id) return;
-		navigate(`app/groups/${encodeURIComponent(group.id)}`);
+		const scope = adminMode ? 'admin' : 'app';
+		navigate(`${scope}/groups/${encodeURIComponent(group.id)}`);
+	}
+
+	function openInviteDialog(group) {
+		inviteDialogLink = '';
+		inviteDialogName = group?.name || 'Default group';
+		inviteDialogMessage = '';
+		inviteDialogOpen = true;
+	}
+
+	function closeInviteDialog() {
+		inviteDialogOpen = false;
+		inviteDialogBusy = false;
+	}
+
+	async function fetchFreshInviteLink() {
+		const response = await apiFetch('/api/groups/default-invite');
+		if (!response.ok) {
+			throw new Error('Failed to generate invite link');
+		}
+		const payload = await response.json();
+		const link = typeof payload?.invite_link === 'string' ? payload.invite_link.trim() : '';
+		if (!link) {
+			throw new Error('Invite link is empty');
+		}
+		inviteDialogLink = link;
+		return link;
+	}
+
+	async function openJoinPage() {
+		inviteDialogBusy = true;
+		inviteDialogMessage = '';
+		try {
+			const link = await fetchFreshInviteLink();
+			window.open(link, '_blank', 'noopener');
+		} catch {
+			inviteDialogMessage = 'Failed to open invite link';
+		} finally {
+			inviteDialogBusy = false;
+		}
+	}
+
+	async function copyInviteLink() {
+		inviteDialogBusy = true;
+		inviteDialogMessage = '';
+		try {
+			const link = inviteDialogLink || await fetchFreshInviteLink();
+			await navigator.clipboard.writeText(link);
+			inviteDialogMessage = 'Link copied';
+		} catch {
+			inviteDialogMessage = 'Copy failed';
+		} finally {
+			inviteDialogBusy = false;
+		}
+	}
+
+	async function syncMemberships() {
+		if (!adminMode || syncBusy) return;
+		syncBusy = true;
+		syncMessage = '';
+		try {
+			const response = await apiFetch('/api/admin/groups/sync-memberships', { method: 'POST' });
+			if (!response.ok) {
+				throw new Error('Sync failed');
+			}
+			syncMessage = 'Membership sync completed';
+			await loadGroups();
+		} catch {
+			syncMessage = 'Membership sync failed';
+		} finally {
+			syncBusy = false;
+		}
 	}
 </script>
 
-<DashboardLayout title="Groups">
+<DashboardLayout title={adminMode ? 'Admin Groups' : 'Groups'}>
 	{#if error}
 		<Card variant="state">{error}</Card>
-	{:else if loaded && groups.length === 0}
+	{:else if loaded && visibleGroups.length === 0}
 		<Card variant="state">
 			<p>No groups found</p>
 		</Card>
 	{:else}
 		<div class="stack-list">
-			{#each groups as group}
-				<GroupCard {group} isMember={true} onOpen={goToGroup} />
+			{#each visibleGroups as item}
+				<GroupCard
+					group={item.group}
+					isMember={item.isMember}
+					onOpen={item.isMember ? goToGroup : null}
+					onInviteClick={openInviteDialog}
+					inviteLink=""
+					requestsCount={requestsCountByGroupId[item.group.id] || 0}
+					showRequestsBadge={item.isMember && item.group.assistant === pb.authStore.record?.id}
+				/>
 			{/each}
 		</div>
 	{/if}
+
+	{#if adminMode}
+		<Card>
+			<div class="admin-sync">
+				<button type="button" class="sync-button" on:click={syncMemberships} disabled={syncBusy}>
+					{syncBusy ? 'Syncing...' : 'Sync memberships'}
+				</button>
+				{#if syncMessage}
+					<p class="sync-message">{syncMessage}</p>
+				{/if}
+			</div>
+		</Card>
+	{/if}
 </DashboardLayout>
+
+{#if inviteDialogOpen}
+	<div
+		class="invite-overlay"
+		role="button"
+		tabindex="0"
+		on:click={closeInviteDialog}
+		on:keydown={(e) => {
+			if (e.key === 'Enter' || e.key === ' ') closeInviteDialog();
+		}}
+	>
+		<div
+			class="invite-dialog"
+			role="dialog"
+			aria-modal="true"
+			aria-label="Open invite link"
+			tabindex="-1"
+			on:click|stopPropagation
+			on:keydown|stopPropagation={() => {}}
+		>
+			<h3>{inviteDialogName}</h3>
+			<p>Open the invite page, then tap Join Group in Telegram.</p>
+			<div class="invite-actions">
+				<button type="button" class="invite-primary" on:click={openJoinPage} disabled={inviteDialogBusy}>Open Join Group page</button>
+				<button type="button" class="invite-secondary" on:click={copyInviteLink} disabled={inviteDialogBusy}>Copy invite link</button>
+				<button type="button" class="invite-secondary" on:click={closeInviteDialog} disabled={inviteDialogBusy}>Close</button>
+			</div>
+			{#if inviteDialogMessage}
+				<p class="invite-message">{inviteDialogMessage}</p>
+			{/if}
+		</div>
+	</div>
+{/if}
+
+<style>
+	.admin-sync {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.sync-button {
+		border: 2px solid #000;
+		background: #fff;
+		color: #000;
+		padding: 0.6rem 0.8rem;
+		font-size: 0.95rem;
+		font-weight: 700;
+		cursor: pointer;
+	}
+
+	.sync-button:disabled {
+		opacity: 0.6;
+		cursor: default;
+	}
+
+	.sync-message {
+		margin: 0;
+		font-size: 0.85rem;
+		color: #333;
+	}
+
+	.invite-overlay {
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.55);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 1rem;
+		z-index: 2000;
+	}
+
+	.invite-dialog {
+		background: #fff;
+		border: 2px solid #000;
+		width: min(28rem, 100%);
+		padding: 1rem;
+	}
+
+	.invite-dialog h3 {
+		margin: 0 0 0.75rem;
+		font-size: 1rem;
+	}
+
+	.invite-dialog p {
+		margin: 0 0 0.75rem;
+	}
+
+	.invite-actions {
+		display: grid;
+		gap: 0.5rem;
+	}
+
+	.invite-primary,
+	.invite-secondary {
+		border: 2px solid #000;
+		padding: 0.65rem 0.75rem;
+		font-weight: 600;
+		cursor: pointer;
+	}
+
+	.invite-primary {
+		background: #000;
+		color: #fff;
+	}
+
+	.invite-secondary {
+		background: #fff;
+		color: #000;
+	}
+
+	.invite-message {
+		margin-top: 0.75rem;
+		font-size: 0.9rem;
+	}
+</style>

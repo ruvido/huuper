@@ -17,6 +17,10 @@
 	let confirmTarget = null;
 	let cancelConfirmOpen = false;
 	let cancelConfirmTarget = null;
+	let rejectDialogOpen = false;
+	let rejectTarget = null;
+	let rejectNote = '';
+	let rejectLoading = false;
 	let lastEventId = null;
 	let cancelingId = null;
 
@@ -83,10 +87,14 @@
 	$: cancelledItems = registrations
 		.filter((r) => resolveStatus(r) === 'cancelled')
 		.sort((a, b) => parseCreated(a) - parseCreated(b));
+	$: rejectedItems = registrations
+		.filter((r) => resolveStatus(r) === 'rejected')
+		.sort((a, b) => parseCreated(b) - parseCreated(a));
 	$: pendingCount = pendingItems.length;
 	$: approvedCount = approvedItems.length;
 	$: cancelledCount = cancelledItems.length;
-	$: totalCount = pendingCount + approvedCount + cancelledCount;
+	$: rejectedCount = rejectedItems.length;
+	$: totalCount = pendingCount + approvedCount;
 
 	async function loadDetails() {
 		if (!eventId) return;
@@ -125,6 +133,19 @@
 	function closeCancelConfirm() {
 		cancelConfirmOpen = false;
 		cancelConfirmTarget = null;
+	}
+
+	function openRejectDialog(registration) {
+		rejectTarget = registration;
+		rejectNote = '';
+		rejectDialogOpen = true;
+	}
+
+	function closeRejectDialog() {
+		if (rejectLoading) return;
+		rejectDialogOpen = false;
+		rejectTarget = null;
+		rejectNote = '';
 	}
 
 	async function confirmApprove() {
@@ -176,6 +197,45 @@
 			error = err.message || err.toString() || 'Failed to cancel';
 		} finally {
 			cancelingId = null;
+		}
+	}
+
+	async function rejectRegistration() {
+		if (!rejectTarget || rejectLoading) return;
+		const note = rejectNote.trim();
+		if (!note) {
+			error = 'Please add a reject note';
+			return;
+		}
+		const targetId = rejectTarget.id;
+		closeRejectDialog();
+
+		rejectLoading = true;
+		error = '';
+		try {
+			const response = await apiFetch(
+				`/api/admin/registrations/${encodeURIComponent(targetId)}/reject`,
+				{
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ note })
+				}
+			);
+			if (!response.ok) {
+				throw new Error('Failed to reject');
+			}
+			registrations = registrations.map((item) =>
+				item.id === targetId
+					? { ...item, status: 'rejected', data: { ...(item.data || {}), rejected: note } }
+					: item
+			);
+			if (typeof window !== 'undefined') {
+				window.scrollTo({ top: 0, behavior: 'smooth' });
+			}
+		} catch (err) {
+			error = err.message || err.toString() || 'Failed to reject';
+		} finally {
+			rejectLoading = false;
 		}
 	}
 
@@ -237,6 +297,7 @@
 								</div>
 								<div class="row-actions">
 									<button class="approve" on:click={() => openConfirm(reg)}>Approve</button>
+									<button class="reject" on:click={() => openRejectDialog(reg)}>Reject</button>
 								</div>
 							</div>
 						{/each}
@@ -304,6 +365,30 @@
 				</div>
 			</div>
 		</Card>
+
+		<Card variant="admin">
+			<div class="list">
+				<div class="list-section">
+					<h2>Rejected</h2>
+					{#if rejectedCount === 0}
+						<p class="empty">No rejected registrations.</p>
+					{:else}
+						{#each rejectedItems as reg}
+							<div class="row">
+								<div class="row-info">
+									<p class="name">{displayName(reg)}</p>
+									<p class="email">{displayRegion(reg)}</p>
+									{#if typeof reg?.data?.rejected === 'string' && reg.data.rejected.trim()}
+										<p class="rejected-note">{reg.data.rejected}</p>
+									{/if}
+								</div>
+								<div class="row-actions"></div>
+							</div>
+						{/each}
+					{/if}
+				</div>
+			</div>
+		</Card>
 	{/if}
 
 	<button class="back" on:click={goBack}>Back</button>
@@ -328,6 +413,43 @@
 	onConfirm={cancelRegistration}
 	onCancel={closeCancelConfirm}
 />
+
+{#if rejectDialogOpen}
+	<div
+		class="reject-overlay"
+		role="button"
+		tabindex="0"
+		on:click={closeRejectDialog}
+		on:keydown={(e) => {
+			if (e.key === 'Enter' || e.key === ' ') closeRejectDialog();
+		}}
+	>
+		<div
+			class="reject-dialog"
+			role="dialog"
+			aria-modal="true"
+			aria-label="Reject registration"
+			tabindex="-1"
+			on:click|stopPropagation
+			on:keydown|stopPropagation={() => {}}
+		>
+			<h3>Reject registration</h3>
+			<p>Add a short note about why we are rejecting this registration.</p>
+			<textarea
+				bind:value={rejectNote}
+				rows="4"
+				placeholder="Reason..."
+				disabled={rejectLoading}
+				></textarea>
+				<div class="reject-actions">
+					<button type="button" class="reject-cancel" on:click={closeRejectDialog} disabled={rejectLoading}>Cancel</button>
+					<button type="button" class="reject-confirm" on:click={rejectRegistration} disabled={rejectLoading}>
+						{rejectLoading ? 'Saving...' : 'Reject'}
+					</button>
+				</div>
+		</div>
+	</div>
+{/if}
 
 <style>
 	h1 {
@@ -432,6 +554,12 @@
 		text-overflow: ellipsis;
 	}
 
+	.rejected-note {
+		margin: 0.3rem 0 0 0;
+		font-size: 0.85rem;
+		color: #555;
+	}
+
 	.meta {
 		margin: 0 0 0.2rem 0;
 		font-size: 0.7rem;
@@ -451,6 +579,19 @@
 
 	.approve:hover {
 		background: #333;
+	}
+
+	.reject {
+		border: 2px solid #000;
+		background: #fff;
+		color: #000;
+		padding: 0.5rem 0.9rem;
+		font-weight: 700;
+		cursor: pointer;
+	}
+
+	.reject:hover {
+		background: #f1f1f1;
 	}
 
 	.remove {
@@ -492,6 +633,70 @@
 		margin: 0;
 		font-size: 0.9rem;
 		color: #333;
+	}
+
+	.reject-overlay {
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.5);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 1rem;
+		z-index: 1000;
+	}
+
+	.reject-dialog {
+		width: min(32rem, 100%);
+		background: #fff;
+		border: 2px solid #000;
+		padding: 1rem;
+		display: grid;
+		gap: 0.75rem;
+	}
+
+	.reject-dialog h3 {
+		margin: 0;
+		font-size: 1rem;
+	}
+
+	.reject-dialog p {
+		margin: 0;
+		font-size: 0.9rem;
+		color: #333;
+	}
+
+	.reject-dialog textarea {
+		width: 100%;
+		border: 1px solid #000;
+		padding: 0.6rem;
+		resize: vertical;
+		font-family: inherit;
+		font-size: 0.9rem;
+	}
+
+	.reject-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.5rem;
+	}
+
+	.reject-cancel,
+	.reject-confirm {
+		border: 2px solid #000;
+		padding: 0.45rem 0.8rem;
+		font-weight: 700;
+		cursor: pointer;
+	}
+
+	.reject-cancel {
+		background: #fff;
+		color: #000;
+	}
+
+	.reject-confirm {
+		background: #000;
+		color: #fff;
 	}
 
 	@media (max-width: 480px) {

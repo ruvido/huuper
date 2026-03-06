@@ -13,6 +13,14 @@ import (
 var bot *tgbotapi.BotAPI
 var app *pocketbase.PocketBase
 
+type MembershipSyncStats struct {
+	UsersChecked int `json:"users_checked"`
+	GroupsChecked int `json:"groups_checked"`
+	Created int `json:"created"`
+	Updated int `json:"updated"`
+	Errors int `json:"errors"`
+}
+
 // GetBot returns the bot instance
 func GetBot() *tgbotapi.BotAPI {
 	return bot
@@ -305,7 +313,7 @@ func handleChatMemberUpdate(update *tgbotapi.ChatMemberUpdated) {
 		go sendWelcomeMessage(chatID)
 
 		// Sync all connected users with new group
-		go syncAllUsersWithNewGroup()
+			go SyncAllUsersMemberships()
 	}
 
 	// Bot lost admin or was removed (member -> not admin, or kicked/left)
@@ -448,7 +456,23 @@ func handleUserChatMemberUpdate(update *tgbotapi.ChatMemberUpdated) {
 
 }
 
-func syncAllUsersWithNewGroup() {
+// SyncAllUsersMemberships re-checks Telegram memberships for all users
+// with a connected Telegram account and restores missing user_groups records.
+func SyncAllUsersMemberships() {
+	_, _ = SyncAllUsersMembershipsWithStats()
+}
+
+// SyncAllUsersMembershipsWithStats re-checks Telegram memberships for all users
+// with a connected Telegram account and restores missing user_groups records.
+func SyncAllUsersMembershipsWithStats() (MembershipSyncStats, error) {
+	stats := MembershipSyncStats{}
+	if app == nil {
+		return stats, fmt.Errorf("pocketbase app not initialized")
+	}
+	if bot == nil {
+		return stats, fmt.Errorf("telegram bot not initialized")
+	}
+
 	users, err := app.FindRecordsByFilter(
 		"users",
 		"telegram.id != null && telegram.id != ''",
@@ -457,40 +481,60 @@ func syncAllUsersWithNewGroup() {
 		0,
 	)
 	if err != nil {
-		return
+		return stats, err
 	}
 
 	for _, user := range users {
-		syncUserGroupMemberships(user)
+		stats.UsersChecked++
+		partial := syncUserGroupMemberships(user)
+		stats.GroupsChecked += partial.GroupsChecked
+		stats.Created += partial.Created
+		stats.Updated += partial.Updated
+		stats.Errors += partial.Errors
 	}
+
+	return stats, nil
 }
 
-func syncUserGroupMemberships(user *core.Record) {
+func syncUserGroupMemberships(user *core.Record) MembershipSyncStats {
+	stats := MembershipSyncStats{}
+
 	// Get user's telegram data
 	var telegramData struct {
 		ID int64 `json:"id"`
 	}
 
 	if err := user.UnmarshalJSONField("telegram", &telegramData); err != nil {
-		return
+		stats.Errors++
+		return stats
 	}
 
 	if telegramData.ID == 0 {
-		return
+		return stats
 	}
 
-	// Get all telegram groups
-	groups, err := app.FindRecordsByFilter("groups", "type = 'telegram'", "-created", 0, 0)
+	// Get all groups and process those that have a Telegram chat_id.
+	groups, err := app.FindRecordsByFilter(
+		"groups",
+		"",
+		"-created",
+		0,
+		0,
+	)
 	if err != nil {
-		return
+		stats.Errors++
+		return stats
 	}
 
 	for _, group := range groups {
+		stats.GroupsChecked++
+
 		var telegramGroupData struct {
 			ChatID string `json:"chat_id"`
 		}
 
 		if err := group.UnmarshalJSONField("telegram", &telegramGroupData); err != nil {
+			stats.Errors++
 			continue
 		}
 
@@ -499,7 +543,10 @@ func syncUserGroupMemberships(user *core.Record) {
 		}
 
 		var chatID int64
-		fmt.Sscanf(telegramGroupData.ChatID, "%d", &chatID)
+		if _, err := fmt.Sscanf(telegramGroupData.ChatID, "%d", &chatID); err != nil || chatID == 0 {
+			stats.Errors++
+			continue
+		}
 
 		chatMember, err := bot.GetChatMember(tgbotapi.GetChatMemberConfig{
 			ChatConfigWithUser: tgbotapi.ChatConfigWithUser{
@@ -509,6 +556,7 @@ func syncUserGroupMemberships(user *core.Record) {
 		})
 
 		if err != nil {
+			stats.Errors++
 			continue
 		}
 
@@ -534,12 +582,26 @@ func syncUserGroupMemberships(user *core.Record) {
 					userGroupRecord.Set("user", user.Id)
 					userGroupRecord.Set("group", group.Id)
 					userGroupRecord.Set("role", role)
-					app.Save(userGroupRecord)
+					if err := app.Save(userGroupRecord); err != nil {
+						stats.Errors++
+					} else {
+						stats.Created++
+					}
+				} else {
+					stats.Errors++
+				}
+			} else if existingRecord.GetString("role") != role {
+				existingRecord.Set("role", role)
+				if err := app.Save(existingRecord); err != nil {
+					stats.Errors++
+				} else {
+					stats.Updated++
 				}
 			}
 		}
 	}
 
+	return stats
 }
 
 func sendWelcomeMessage(chatID int64) {

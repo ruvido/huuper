@@ -86,7 +86,7 @@ func eventRecipientEmails(app *pocketbase.PocketBase, eventID string, target str
 		filter = "event = {:event} && status = 'pending'"
 	}
 	if target == "all" {
-		filter = "event = {:event} && status != 'cancelled'"
+		filter = "event = {:event} && status != 'cancelled' && status != 'rejected'"
 	}
 
 	records, err := app.FindRecordsByFilter(

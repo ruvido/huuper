@@ -56,6 +56,7 @@ const (
 	requestActionAdvance = "advance"
 	requestActionReject  = "reject"
 	requestActionPromote = "promote"
+	requestActionSetGuardian = "set_guardian"
 )
 
 // ListRequestsHandler returns requests visible to the authenticated user.
@@ -332,6 +333,10 @@ func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 			if err := applyAdvanceAction(app, e.Auth, record, data, payload); err != nil {
 				return err
 			}
+		case requestActionSetGuardian:
+			if err := applySetGuardianAction(app, e.Auth, record, data, strings.TrimSpace(payload.GuardianID)); err != nil {
+				return err
+			}
 		case requestActionReject:
 			if err := applyRejectAction(app, e.Auth, record, data, strings.TrimSpace(payload.Reason)); err != nil {
 				return err
@@ -506,6 +511,33 @@ func applyGuardianAssignment(app *pocketbase.PocketBase, record *core.Record, da
 		guardianPayload["assigned_by"] = adminDisplayName(actor)
 	}
 	data["guardian"] = guardianPayload
+	return nil
+}
+
+func applySetGuardianAction(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any, guardianID string) error {
+	if record.GetBool("rejected") {
+		return apis.NewBadRequestError("request_rejected", nil)
+	}
+
+	ok, err := hasRoleForRequest(app, actor, record, requestRoleAssistant)
+	if err != nil {
+		return apis.NewBadRequestError("role_resolution_failed", err)
+	}
+	if !ok {
+		return apis.NewForbiddenError("forbidden_transition", nil)
+	}
+
+	if guardianID == "" {
+		record.Set("guardian", "")
+		delete(data, "guardian")
+		record.Set("data", data)
+		return nil
+	}
+
+	if err := applyGuardianAssignment(app, record, data, actor, guardianID); err != nil {
+		return err
+	}
+	record.Set("data", data)
 	return nil
 }
 

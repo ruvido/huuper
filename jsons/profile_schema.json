@@ -1,7 +1,5 @@
 {
-  "name": "profile_schema",
-  "data": {
-    "fields": [
+  "fields": [
       {
         "key": "full_name",
         "type": "text",
@@ -257,6 +255,5 @@
         "title": "La tua foto!",
         "required": true
       }
-    ]
-  }
+  ]
 }

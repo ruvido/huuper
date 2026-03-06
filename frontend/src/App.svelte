@@ -2,7 +2,8 @@
 	import { onMount } from 'svelte';
 	import { isAuthenticated, pb, authRecord, fetchSetting, apiFetch } from './lib/pocketbase';
 	import { currentRoute, navigate, getTargetRoute } from './lib/router';
-	import BottomBar from './components/BottomBar.svelte';
+	import AppBottomBar from './components/AppBottomBar.svelte';
+	import AdminBottomBar from './components/AdminBottomBar.svelte';
 	import Login from './pages/Login.svelte';
 	import Signup from './pages/SignupDirect.svelte';
 	import PasswordReset from './pages/PasswordReset.svelte';
@@ -12,6 +13,7 @@
 	import TelegramConnect from './pages/TelegramConnect.svelte';
 	import Events from './pages/Events.svelte';
 	import Profile from './pages/Profile.svelte';
+	import AdminProfile from './pages/AdminProfile.svelte';
 	import Groups from './pages/Groups.svelte';
 	import GroupDetail from './pages/GroupDetail.svelte';
 	import GroupRequests from './pages/GroupRequests.svelte';
@@ -123,7 +125,7 @@
 	$: appRoute = typeof $currentRoute === 'string' && $currentRoute.startsWith('app/');
 	$: adminRoute = typeof $currentRoute === 'string'
 		&& ($currentRoute === 'admin' || $currentRoute.startsWith('admin/'));
-	$: showMainNav = $isAuthenticated && appRoute && !adminRoute;
+	$: showMainNav = $isAuthenticated && (appRoute || adminRoute);
 
 	$: if (!$isAuthenticated) {
 		eventsAlert = false;
@@ -160,16 +162,26 @@
 			<Events />
 		{:else if $currentRoute === 'app/profile'}
 			<Profile />
+		{:else if $currentRoute === 'admin/profile'}
+			<AdminProfile />
 		{:else if $currentRoute === 'app/groups'}
 			<Groups />
+		{:else if /^admin\/groups\/[^/]+\/requests$/.test($currentRoute)}
+			<GroupRequests />
 		{:else if /^app\/groups\/[^/]+\/requests$/.test($currentRoute)}
 			<GroupRequests />
+		{:else if $currentRoute.startsWith('admin/groups/')}
+			<GroupDetail />
 		{:else if $currentRoute.startsWith('app/groups/')}
 			<GroupDetail />
 		{:else if $currentRoute === 'admin'}
 			<Admin />
 		{:else if $currentRoute === 'admin/events'}
+			<Events adminMode={true} />
+		{:else if $currentRoute === 'admin/event'}
 			<AdminEvent />
+		{:else if $currentRoute === 'admin/groups'}
+			<Groups adminMode={true} />
 		{:else if $currentRoute === 'admin/requests'}
 			<AdminRequests />
 		{:else if /^admin\/requests\/[^/]+$/.test($currentRoute)}
@@ -183,8 +195,10 @@
 		{/if}
 	</main>
 
-	{#if showMainNav}
-		<BottomBar {eventsAlert} {groupsAlert} />
+	{#if appRoute}
+		<AppBottomBar {eventsAlert} {groupsAlert} />
+	{:else if adminRoute}
+		<AdminBottomBar {eventsAlert} {groupsAlert} />
 	{/if}
 
 	<div class="version">{version}</div>

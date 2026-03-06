@@ -15,15 +15,14 @@ Self-hosted webapp to manage private Telegram/Discord groups.
 - **Backend**: PocketBase (Go framework)
 - **Frontend**: Svelte with hash routing
 - **Database**: SQLite (via PocketBase)
-- **Deploy**: Single binary
+- **Deploy**: Docker (release-based)
 
 ## Getting Started
 
 ### Prerequisites
 
 - Go 1.21+
-- Node.js 18+
-- npm
+- bun
 
 ### Installation
 
@@ -42,12 +41,12 @@ cp .env.example .env
 3. Install frontend dependencies:
 ```bash
 cd frontend
-npm install
+bun install
 ```
 
 4. Build the frontend:
 ```bash
-npm run build
+bun run build
 ```
 
 5. Run the server:
@@ -63,7 +62,7 @@ The app will be available at `http://127.0.0.1:8000`
 ```bash
 # Build frontend
 cd frontend
-npm run build
+bun run build
 
 # Build Go binary
 cd ..
@@ -77,7 +76,7 @@ go build -o bin/huuper main.go
 ### Deploy
 
 ```bash
-./deploy.sh
+./deploy/rsync.sh
 ```
 
 Per dettagli e override VPS vedi `DEPLOY.md`.

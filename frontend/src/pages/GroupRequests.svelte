@@ -10,8 +10,11 @@
 	let members = [];
 	let requests = [];
 	let lastGroupId = '';
+	let currentScope = 'app';
 
-	$: groupId = parseGroupId($currentRoute);
+	$: routeContext = parseRouteContext($currentRoute);
+	$: groupId = routeContext.id;
+	$: currentScope = routeContext.scope;
 	$: actorId = pb.authStore.record?.id || '';
 	$: isAdmin = !!pb.authStore.record?.admin;
 	$: isAssistant = !!(group?.assistant && actorId && group.assistant === actorId);
@@ -24,10 +27,11 @@
 		void loadAll();
 	}
 
-	function parseGroupId(route) {
-		if (typeof route !== 'string') return '';
-		const match = route.match(/^app\/groups\/([^/]+)\/requests$/);
-		return match?.[1] || '';
+	function parseRouteContext(route) {
+		if (typeof route !== 'string') return { scope: 'app', id: '' };
+		const match = route.match(/^(app|admin)\/groups\/([^/]+)\/requests$/);
+		if (!match) return { scope: 'app', id: '' };
+		return { scope: match[1], id: match[2] || '' };
 	}
 
 	function displayName(item) {
@@ -76,7 +80,7 @@
 
 	function openRequest(item) {
 		if (!item?.id) return;
-		navigate(`app/requests/${encodeURIComponent(item.id)}`);
+		navigate(`${currentScope}/requests/${encodeURIComponent(item.id)}`);
 	}
 </script>
 

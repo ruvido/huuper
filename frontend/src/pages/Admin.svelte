@@ -17,7 +17,7 @@
 
 	function goToNextEvent() {
 		if (!summary?.events?.next?.id) return;
-		navigate(`admin/events?id=${encodeURIComponent(summary.events.next.id)}`);
+		navigate(`admin/event?id=${encodeURIComponent(summary.events.next.id)}`);
 	}
 
 	async function loadSummary() {

@@ -13,6 +13,8 @@
 	export let onUnsubscribe = () => {};
 	export let open = false;
 	export let onToggle = () => {};
+	export let selectable = false;
+	export let onSelect = null;
 
 
 	function formatDatePart(raw) {
@@ -80,10 +82,16 @@
 		e?.preventDefault?.();
 		onUnsubscribe(eventItem);
 	}
+
+	function handleSummaryClick(e) {
+		if (!selectable || typeof onSelect !== 'function') return;
+		e?.preventDefault?.();
+		onSelect(event);
+	}
 </script>
 
 <details id={`event-${event?.id || ""}`} class="event-card" open={open} tabindex="-1" on:toggle={(event) => onToggle(!!event.currentTarget?.open)}>
-	<summary>
+	<summary on:click={handleSummaryClick}>
 		<div class="summary-left">
 			<h3>{event?.title}</h3>
 			{#if summaryMeta}

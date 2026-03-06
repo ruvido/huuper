@@ -1,61 +1,86 @@
-# Deploy Guide
+# Deploy Guide (Docker + Releases)
 
-Deploy is deterministic: build locally, sync artifacts to VPS, start container on VPS.
+Deploy is deterministic and release-based:
+- build artifacts locally
+- upload to `releases/<release_id>` on VPS
+- atomically switch `current` symlink
+- restart Docker service
 
 ## Defaults
 
 - `VPS_HOST=fiber`
-- `VPS_PATH=/home/ruvido/dev/huuper`
+- `VPS_PATH=/home/ruvido/apps/huuper`
 - `SERVICE_NAME=huuper`
-- `BIN_NAME=huuper`
-- `BIN_DIR=bin`
+- `APP_HOST_PORT=8090`
+- `TARGET_GOARCH=amd64`
 
-You can override any of them per command.
+## Remote Layout
+
+Under `$VPS_PATH`:
+
+- `deploy/` Docker files (`docker-compose.yml`, `Dockerfile`)
+- `releases/<release_id>/` immutable artifacts (`bin`, `migrations`, `pb_public`)
+- `current -> releases/<release_id>` active release
+- `shared/pb_data/` persistent PocketBase data
+- `shared/.env` runtime environment file (required)
 
 ## One Command Deploy
 
 ```bash
-./deploy.sh
+./deploy/rsync.sh
 ```
 
 What it does:
 
-1. Stops remote container (`docker compose down`).
-2. Builds frontend locally (`frontend/npm ci && npm run build`).
-3. Builds Linux binary locally (`bin/huuper`).
-4. Rsyncs `docker-compose.yml`, `Dockerfile`, `bin/`, `migrations/`, `pb_public/` to VPS.
-5. Starts remote container with `docker compose up -d --build --force-recreate`.
+1. Builds frontend locally with bun.
+2. Builds Linux binary locally.
+3. Uploads artifacts to a new release folder on VPS.
+4. Updates `current` symlink atomically.
+5. Runs `docker compose up -d --build --force-recreate`.
+6. Waits for `/api/health` success.
 
 ## Required on VPS
 
-Inside `/home/ruvido/dev/huuper` on VPS:
+Create `.env` locally in project root before deploy.
+`deploy/rsync.sh` copies it automatically to `$VPS_PATH/shared/.env`.
 
-- `.env` must exist and be valid.
-- `pb_data/` must exist (or will be created by docker volume mount flow).
+```bash
+cp .env.example .env
+# edit .env values
+```
+
+`shared/pb_data/` is created automatically if missing.
+
+## Rollback
+
+List releases:
+
+```bash
+ssh fiber "ls -1 /home/ruvido/apps/huuper/releases"
+```
+
+Rollback to a release:
+
+```bash
+./rollback.sh <release_id>
+```
 
 ## Override Example
 
 ```bash
-VPS_HOST=ruvido@fiber VPS_PATH=/home/ruvido/dev/huuper ./deploy.sh
+VPS_HOST=ruvido@fiber VPS_PATH=/home/ruvido/apps/huuper ./deploy/rsync.sh
 ```
 
 ## Troubleshooting
 
-### Check remote status
+Status:
 
 ```bash
-ssh fiber "cd /home/ruvido/dev/huuper && docker compose ps"
+ssh fiber "cd /home/ruvido/apps/huuper/deploy && docker compose -f docker-compose.yml ps"
 ```
 
-### Check logs
+Logs:
 
 ```bash
-ssh fiber "cd /home/ruvido/dev/huuper && docker compose logs --tail=200 huuper"
-```
-
-### Force clean rebuild
-
-```bash
-ssh fiber "cd /home/ruvido/dev/huuper && docker compose down"
-./deploy.sh
+ssh fiber "cd /home/ruvido/apps/huuper/deploy && docker compose -f docker-compose.yml logs --tail=200 huuper"
 ```
