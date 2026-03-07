@@ -1,9 +1,11 @@
 <script>
 	import { apiFetch, pb } from '../lib/pocketbase';
-	import { currentRoute } from '../lib/router';
+import { currentRoute, navigate } from '../lib/router';
 	import DashboardLayout from '../components/DashboardLayout.svelte';
 	import Card from '../components/Card.svelte';
-	import ConfirmModal from '../components/modals/ConfirmModal.svelte';
+	import GroupCard from '../components/cards/GroupCard.svelte';
+	import ActionDialog from '../components/modals/ActionDialog.svelte';
+	import { renderContent } from '../lib/markdown';
 
 	const FACT_KEYS = ['region', 'birth_year', 'marital_status', 'children'];
 	const RESERVED_DATA_KEYS = new Set([
@@ -20,15 +22,20 @@
 	let loading = true;
 	let error = '';
 	let request = null;
-	let members = [];
-	let groupRequests = [];
-	let guardianCountsById = {};
+	let groupName = '';
+	let groupMembers = [];
 	let actionLoading = false;
 	let actionError = '';
-	let confirmOpen = false;
-	let confirmTitle = '';
-	let confirmMessage = '';
-	let pendingGuardianId = '';
+	let rejectDialogOpen = false;
+	let rejectReason = '';
+	let guardianAssignDialogOpen = false;
+	let pendingGuardian = null;
+	let groupPickerOpen = false;
+	let assignDialogOpen = false;
+	let assignTargetGroup = null;
+	let groups = [];
+	let groupsLoading = false;
+	let groupsError = '';
 	let lastRequestId = '';
 
 	function asTrimmedString(value) {
@@ -43,13 +50,6 @@
 		if (typeof route !== 'string') return '';
 		const match = route.match(/^(?:app|admin)\/requests\/([^/]+)$/);
 		return match?.[1] || '';
-	}
-
-	function formatStatus(status) {
-		const value = asTrimmedString(status);
-		if (!value) return '';
-		const clean = value.replace(/^\d+-/, '').replaceAll('_', ' ');
-		return clean ? clean.charAt(0).toUpperCase() + clean.slice(1) : '';
 	}
 
 	function formatDate(value) {
@@ -105,44 +105,83 @@
 		return 'Unknown';
 	}
 
-	function isGuardianEntry(requestItem) {
-		return asTrimmedString(requestItem?.guardian) !== '';
+	function guardianDisplayName(item) {
+		const data = asObject(item?.data);
+		const guardianData = asObject(data?.guardian);
+		const fromData = asTrimmedString(guardianData?.name);
+		if (fromData) return fromData;
+		const fromString = asTrimmedString(data?.guardian);
+		if (fromString) return fromString;
+		return '';
 	}
 
-	function openGuardianConfirm(userId) {
-		const guardianId = asTrimmedString(userId);
-		if (!guardianId || actionLoading) return;
-		const member = members.find((item) => asTrimmedString(item?.id) === guardianId);
-		const name = displayName(member);
-
-		pendingGuardianId = guardianId;
-		if (selectedGuardianId === guardianId) {
-			confirmTitle = 'Remove guardian';
-			confirmMessage = `${name} will be removed as guardian for this request.`;
-		} else {
-			confirmTitle = 'Set guardian';
-			confirmMessage = `${name} will become guardian for this request.`;
-		}
-		confirmOpen = true;
+	function workflow(item) {
+		return asObject(item?.workflow);
 	}
 
-	function closeGuardianConfirm() {
+	function nextAction(item) {
+		return asTrimmedString(workflow(item)?.next_action);
+	}
+
+	function nextActionNotes(item) {
+		return asTrimmedString(workflow(item)?.next_action_notes);
+	}
+
+	function canAdvance(item) {
+		const wf = workflow(item);
+		return !item?.rejected && !!wf?.has_next_step && !!wf?.can_advance;
+	}
+
+	function canReject(item) {
+		return isAdmin && !item?.rejected;
+	}
+
+	function canPromote(item) {
+		if (!isAdmin || item?.rejected) return false;
+		const wf = workflow(item);
+		const action = nextAction(item);
+		if (!wf?.has_next_step) return true;
+		return action === 'admin_approved' && !!wf?.can_advance;
+	}
+
+	function canAccept(item) {
+		if (canPromote(item)) return true;
+		if (!canAdvance(item)) return false;
+		return requiresGroupSelection(item);
+	}
+
+	function canSetGuardian(item) {
+		return !isAdmin && canAdvance(item) && nextAction(item) === 'assign_guardian';
+	}
+
+	function requiresGroupSelection(item) {
+		return nextAction(item) === 'assign_group';
+	}
+
+	function openGuardianAssignDialog(member) {
+		if (!member?.id || actionLoading) return;
+		pendingGuardian = member;
+		guardianAssignDialogOpen = true;
+	}
+
+	function closeGuardianAssignDialog() {
 		if (actionLoading) return;
-		confirmOpen = false;
-		pendingGuardianId = '';
+		guardianAssignDialogOpen = false;
+		pendingGuardian = null;
 	}
 
-	async function confirmGuardianAction() {
-		const guardianId = asTrimmedString(pendingGuardianId);
-		if (!guardianId) return;
-		await setGuardian(guardianId);
+	async function confirmGuardianAssign() {
+		const guardianId = asTrimmedString(pendingGuardian?.id);
+		if (!guardianId || actionLoading) return;
+		const ok = await postAction({ action: 'set_guardian', guardian: guardianId });
+		if (ok) {
+			closeGuardianAssignDialog();
+		}
 	}
 
-	async function setGuardian(userId) {
+	async function postAction(payload) {
 		const reqId = asTrimmedString(request?.id);
-		const guardianId = asTrimmedString(userId);
-		if (!reqId || !guardianId || actionLoading) return;
-
+		if (!reqId || actionLoading) return false;
 		actionLoading = true;
 		actionError = '';
 		try {
@@ -151,22 +190,97 @@
 				headers: {
 					'Content-Type': 'application/json'
 				},
-				body: JSON.stringify({
-					action: 'set_guardian',
-					guardian: selectedGuardianId === guardianId ? '' : guardianId
-				})
+				body: JSON.stringify(payload)
 			});
 			if (!response.ok) {
-				const payload = await response.json().catch(() => ({}));
-				throw new Error(asTrimmedString(payload?.message) || 'Failed to assign guardian');
+				const errorPayload = await response.json().catch(() => ({}));
+				throw new Error(asTrimmedString(errorPayload?.message) || 'Action failed');
 			}
 			await loadAll();
-			confirmOpen = false;
-			pendingGuardianId = '';
+			return true;
 		} catch (err) {
-			actionError = err?.message || err?.toString() || 'Failed to assign guardian';
+			actionError = err?.message || err?.toString() || 'Action failed';
+			return false;
 		} finally {
 			actionLoading = false;
+		}
+	}
+
+	async function handleAcceptAction() {
+		if (!canAccept(request)) return;
+		if (canPromote(request)) {
+			await postAction({ action: 'promote' });
+			return;
+		}
+		if (requiresGroupSelection(request)) {
+			await openGroupPicker();
+			return;
+		}
+		await postAction({ action: 'advance' });
+	}
+
+	async function openGroupPicker() {
+		groupPickerOpen = true;
+		await loadGroups();
+	}
+
+	function closeGroupPicker() {
+		if (actionLoading) return;
+		groupPickerOpen = false;
+		assignDialogOpen = false;
+		assignTargetGroup = null;
+	}
+
+	function openAssignDialog(group) {
+		if (!group?.id || actionLoading) return;
+		assignTargetGroup = group;
+		assignDialogOpen = true;
+	}
+
+	function closeAssignDialog() {
+		if (actionLoading) return;
+		assignDialogOpen = false;
+		assignTargetGroup = null;
+	}
+
+	async function confirmAssignGroup() {
+		const groupId = asTrimmedString(assignTargetGroup?.id);
+		if (!groupId || actionLoading) return;
+		const ok = await postAction({ action: 'advance', group: groupId });
+		if (ok) {
+			assignDialogOpen = false;
+			assignTargetGroup = null;
+			groupPickerOpen = false;
+		}
+	}
+
+	async function handleRejectAction() {
+		if (!canReject(request) || actionLoading) return;
+		rejectReason = '';
+		rejectDialogOpen = true;
+	}
+
+	function closeRejectDialog() {
+		if (actionLoading) return;
+		rejectDialogOpen = false;
+		rejectReason = '';
+	}
+
+	function setRejectReason(value) {
+		rejectReason = typeof value === 'string' ? value : '';
+	}
+
+	async function confirmRejectAction() {
+		const reason = asTrimmedString(rejectReason);
+		if (!reason || !canReject(request) || actionLoading) return;
+		const ok = await postAction({ action: 'reject', reason });
+		if (ok) {
+			rejectDialogOpen = false;
+			rejectReason = '';
+			const scope = typeof $currentRoute === 'string' && $currentRoute.startsWith('admin/')
+				? 'admin'
+				: 'app';
+			navigate(`${scope}/requests`);
 		}
 	}
 
@@ -181,16 +295,14 @@
 		return 'Request';
 	})();
 	$: requestData = asObject(request?.data);
-	$: groupId = asTrimmedString(request?.group);
-	$: selectedGuardianId = asTrimmedString(request?.guardian);
 	$: emailValue = asTrimmedString(request?.email);
 	$: createdValue = formatDate(request?.created);
 	$: facts = FACT_KEYS.map((key) => asTrimmedString(requestData?.[key])).filter(Boolean);
 	$: mobileValue = asTrimmedString(requestData?.mobile);
 	$: motivationValue = asTrimmedString(requestData?.motivation);
 	$: extraEntries = Object.entries(requestData).filter(([key, value]) => !RESERVED_DATA_KEYS.has(key) && hasValue(value));
-	$: requestList = groupRequests.filter((item) => !isGuardianEntry(item));
-	$: mentoringList = groupRequests.filter((item) => isGuardianEntry(item));
+	$: guardianNotes = nextActionNotes(request);
+	$: showGuardianNotes = !isAdmin && guardianNotes !== '';
 
 	$: if (requestId && requestId !== lastRequestId) {
 		lastRequestId = requestId;
@@ -198,6 +310,10 @@
 	}
 
 	function goBack() {
+		if (groupPickerOpen) {
+			closeGroupPicker();
+			return;
+		}
 		window.history.back();
 	}
 
@@ -207,32 +323,38 @@
 		error = '';
 		actionError = '';
 		request = null;
-		members = [];
-		groupRequests = [];
-		guardianCountsById = {};
+		groupName = '';
+		groupMembers = [];
 		try {
 			request = await fetchRequestById(requestId);
 			const currentGroupId = asTrimmedString(request?.group);
 			if (currentGroupId) {
-				const [membersData, guardiansData, requestsData] = await Promise.all([
-					fetchJSONOrThrow(`/api/groups/${encodeURIComponent(currentGroupId)}/members`),
-					fetchJSONOrThrow(`/api/groups/${encodeURIComponent(currentGroupId)}/guardians`),
-					fetchJSONOrThrow(`/api/requests?group_id=${encodeURIComponent(currentGroupId)}`)
+				const [groupData, membersData] = await Promise.all([
+					pb.collection('groups').getOne(currentGroupId),
+					fetchJSONOrThrow(`/api/groups/${encodeURIComponent(currentGroupId)}/members`)
 				]);
-
-				members = Array.isArray(membersData?.items) ? membersData.items : [];
-				groupRequests = Array.isArray(requestsData?.items) ? requestsData.items : [];
-				const guardians = Array.isArray(guardiansData?.items) ? guardiansData.items : [];
-				guardianCountsById = Object.fromEntries(
-					guardians
-						.map((item) => [asTrimmedString(item?.id), Number(item?.proteges_count || 0)])
-						.filter(([id]) => !!id)
-				);
+				groupName = asTrimmedString(groupData?.name);
+				groupMembers = Array.isArray(membersData?.items) ? membersData.items : [];
 			}
 		} catch (err) {
 			error = err?.message || err?.toString() || 'Failed to load request';
 		} finally {
 			loading = false;
+		}
+	}
+
+	async function loadGroups() {
+		if (groupsLoading) return;
+		groupsLoading = true;
+		groupsError = '';
+		try {
+			const result = await pb.collection('groups').getList(1, 500, { sort: 'name' });
+			groups = Array.isArray(result?.items) ? result.items : [];
+		} catch (err) {
+			groups = [];
+			groupsError = err?.message || err?.toString() || 'Failed to load groups';
+		} finally {
+			groupsLoading = false;
 		}
 	}
 </script>
@@ -246,10 +368,29 @@
 	{:else if !request}
 		<Card variant="state">Request not found.</Card>
 	{:else}
-		<Card variant="admin">
+		{#if groupPickerOpen}
+			<Card variant="admin">
+				<div class="group-picker">
+					<h3>Select group</h3>
+					{#if groupsError}
+						<p class="action-error">{groupsError}</p>
+					{:else if groupsLoading}
+						<p class="row">Loading groups...</p>
+					{:else if groups.length === 0}
+						<p class="row">No groups found.</p>
+					{:else}
+						<div class="stack-list">
+							{#each groups as group}
+								<GroupCard group={group} isMember={false} onOpen={openAssignDialog} showInviteForDefault={false} />
+							{/each}
+						</div>
+					{/if}
+				</div>
+			</Card>
+		{:else}
+			<Card variant="admin">
 			<div class="data">
 				<p class="name">{requestTitle}</p>
-				<p class="status">{formatStatus(request.status)}</p>
 				<div class="meta">
 					{#if emailValue}
 						<span class="meta-item">{emailValue}</span>
@@ -281,88 +422,99 @@
 					</div>
 				{/if}
 
-				{#if requestList.length > 0}
-					<div class="section">
-						<h3>Request</h3>
-						<div class="rows">
-							{#each requestList as item}
-								<p class="row">{displayName(item)}</p>
-							{/each}
-						</div>
-					</div>
-				{/if}
+				<div class="section">
+					<h3>Group</h3>
+					<p class="row">{groupName || '-'}</p>
+				</div>
 
-				{#if mentoringList.length > 0}
-					<div class="section">
-						<h3>Mentoring</h3>
-						<div class="rows">
-							{#each mentoringList as item}
-								<p class="row">{displayName(item)}</p>
-							{/each}
+				<div class="section">
+					<h3>Guardian</h3>
+					<p class="row">{guardianDisplayName(request) || 'Not yet assigned'}</p>
+					{#if showGuardianNotes}
+						<div class="guide markdown" aria-label="Guardian notes text">
+							{@html renderContent(guardianNotes)}
 						</div>
-					</div>
-				{/if}
+					{/if}
+					{#if canSetGuardian(request) && !guardianDisplayName(request)}
+						{#if groupMembers.length === 0}
+							<p class="row">No members available.</p>
+						{:else}
+							<div class="guardian-list">
+								{#each groupMembers as member}
+									<button
+										type="button"
+										class="guardian-item"
+										on:click={() => openGuardianAssignDialog(member)}
+										disabled={actionLoading}
+									>
+										{displayName(member)}
+									</button>
+								{/each}
+							</div>
+						{/if}
+					{/if}
+				</div>
 
-				{#if members.length > 0}
+				{#if canAccept(request) || canReject(request)}
 					<div class="section">
-						<h3>Members</h3>
 						{#if actionError}
 							<p class="action-error">{actionError}</p>
 						{/if}
-						<div class="member-list">
-							{#each members as member}
-								<div class="member-item">
-									<div class="member-text">
-										<p class="member-name">{displayName(member)}</p>
-										{#if guardianCountsById[member.id] > 0 && selectedGuardianId !== member.id}
-											<p class="member-meta">
-												<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
-													<path d="M12.5 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7m.5-5v1h1a.5.5 0 0 1 0 1h-1v1a.5.5 0 0 1-1 0v-1h-1a.5.5 0 0 1 0-1h1v-1a.5.5 0 0 1 1 0m-2-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0"/>
-													<path d="M2 13c0 1 1 1 1 1h5.256A4.5 4.5 0 0 1 8 12.5a4.5 4.5 0 0 1 1.544-3.393Q8.844 9.002 8 9c-5 0-6 3-6 4"/>
-												</svg>
-												<span>{guardianCountsById[member.id]}</span>
-											</p>
-										{/if}
-									</div>
-									<button
-										class="assign-btn"
-										type="button"
-										disabled={actionLoading}
-										aria-label={selectedGuardianId === member.id ? 'Remove guardian' : 'Set guardian'}
-										on:click={() => openGuardianConfirm(member.id)}
-									>
-										{#if selectedGuardianId === member.id}
-											<svg class="icon-remove" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
-												<path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293z"/>
-											</svg>
-										{:else}
-											<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
-												<path fill-rule="evenodd" d="M15.854 5.146a.5.5 0 0 1 0 .708l-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 0 1 .708-.708L12.5 7.793l2.646-2.647a.5.5 0 0 1 .708 0"/>
-												<path d="M1 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6"/>
-											</svg>
-										{/if}
-									</button>
-								</div>
-							{/each}
+						<div class="actions-row" class:single={!canAccept(request) || !canReject(request)}>
+							{#if canAccept(request)}
+								<button type="button" class="accept-btn" disabled={actionLoading} on:click={handleAcceptAction}>Accept</button>
+							{/if}
+							{#if canReject(request)}
+								<button type="button" class="reject-btn" disabled={actionLoading} on:click={handleRejectAction}>Reject</button>
+							{/if}
 						</div>
 					</div>
 				{/if}
+
 			</div>
-		</Card>
+			</Card>
+		{/if}
 	{/if}
 </DashboardLayout>
 
-<ConfirmModal
-	show={confirmOpen}
-	title={confirmTitle}
-	message={confirmMessage}
-	confirmLabel="Confirm"
+<ActionDialog
+	show={guardianAssignDialogOpen}
+	title={`Assign request to ${displayName(pendingGuardian)} as guardian?`}
+	confirmLabel="Assign"
 	loading={actionLoading}
-	onConfirm={confirmGuardianAction}
-	onCancel={closeGuardianConfirm}
+	onConfirm={confirmGuardianAssign}
+	onCancel={closeGuardianAssignDialog}
+/>
+
+<ActionDialog
+	show={assignDialogOpen}
+	title={`Assign request to ${asTrimmedString(assignTargetGroup?.name) || 'group'}?`}
+	confirmLabel="Assign"
+	loading={actionLoading}
+	onConfirm={confirmAssignGroup}
+	onCancel={closeAssignDialog}
+/>
+
+<ActionDialog
+	show={rejectDialogOpen}
+	title="Reject request"
+	message="Reject motivation"
+	confirmLabel="Reject"
+	loading={actionLoading}
+	showTextField={true}
+	textValue={rejectReason}
+	textPlaceholder="Write reject motivation"
+	onTextChange={setRejectReason}
+	onConfirm={confirmRejectAction}
+	onCancel={closeRejectDialog}
 />
 
 <style>
+	.group-picker {
+		display: grid;
+		gap: 0.75rem;
+	}
+
 	.data {
 		display: grid;
 		gap: 0.8rem;
@@ -372,12 +524,6 @@
 		margin: 0;
 		font-size: 1.3rem;
 		font-weight: 800;
-	}
-
-	.status {
-		margin: 0;
-		font-size: 0.95rem;
-		font-weight: 700;
 	}
 
 	.meta {
@@ -427,6 +573,37 @@
 		line-height: 1.4;
 	}
 
+	.guide {
+		font-size: var(--ui-font-size);
+		color: #111;
+		line-height: 1.4;
+	}
+
+	.guide :global(h1),
+	.guide :global(h2),
+	.guide :global(h3),
+	.guide :global(h4),
+	.guide :global(h5),
+	.guide :global(h6) {
+		margin: 0.35rem 0 0;
+		font-size: 0.96rem;
+		font-weight: 800;
+		line-height: 1.4;
+	}
+
+	.guide :global(p),
+	.guide :global(ul),
+	.guide :global(ol) {
+		margin: 0.3rem 0 0;
+		font-size: var(--ui-font-size);
+		line-height: 1.4;
+	}
+
+	.guide :global(li) {
+		margin: 0.15rem 0;
+		line-height: 1.4;
+	}
+
 	.section {
 		display: grid;
 		gap: 0.45rem;
@@ -439,77 +616,25 @@
 		font-weight: 800;
 	}
 
-	.rows {
-		display: grid;
-		gap: 0.35rem;
-	}
-
 	.row {
 		margin: 0;
 		font-size: 0.9rem;
 	}
 
-	.member-list {
+	.guardian-list {
 		display: grid;
-		gap: 0.5rem;
+		gap: 0.45rem;
+		padding-top: 0.35rem;
 	}
 
-	.member-item {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 0.6rem;
+	.guardian-item {
+		border: 1px solid #000;
+		background: #fff;
+		text-align: left;
 		padding: 0.55rem 0.65rem;
-		border: 1px solid #d5d5d5;
-		border-radius: 0.6rem;
-	}
-
-	.member-text {
-		min-width: 0;
-	}
-
-	.member-name {
-		margin: 0;
-		font-size: 0.9rem;
-		font-weight: 700;
-	}
-
-	.member-meta {
-		margin: 0.15rem 0 0;
-		font-size: 0.8rem;
-		display: inline-flex;
-		align-items: center;
-		gap: 0.25rem;
-	}
-
-	.member-meta svg {
-		display: block;
-	}
-
-	.assign-btn {
-		border: none;
-		background: transparent;
-		color: #111;
-		width: 2rem;
-		height: 2rem;
-		padding: 0;
+		font: inherit;
+		font-weight: 600;
 		cursor: pointer;
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-	}
-
-	.assign-btn svg {
-		display: block;
-	}
-
-	.icon-remove {
-		color: #d50000;
-	}
-
-	.assign-btn:disabled {
-		opacity: 0.55;
-		cursor: default;
 	}
 
 	.action-error {
@@ -517,5 +642,44 @@
 		font-size: 0.85rem;
 		color: #b00020;
 		font-weight: 700;
+	}
+
+	.actions-row {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.6rem;
+		margin-top: 2rem;
+		justify-content: center;
+	}
+
+	.actions-row.single {
+		grid-template-columns: minmax(0, 14rem);
+		justify-content: center;
+	}
+
+	.accept-btn,
+	.reject-btn {
+		border: 1px solid #000;
+		padding: 0.55rem 0.65rem;
+		font: inherit;
+		font-weight: 700;
+		cursor: pointer;
+	}
+
+	.accept-btn {
+		background: #000;
+		color: #fff;
+	}
+
+	.reject-btn {
+		background: #fff;
+		color: #000;
+	}
+
+	@media (min-width: 768px) and (max-width: 1024px) {
+		.actions-row {
+			grid-template-columns: repeat(2, minmax(0, 14rem));
+			justify-content: center;
+		}
 	}
 </style>

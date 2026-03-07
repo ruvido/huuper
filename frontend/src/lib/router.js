@@ -24,6 +24,17 @@ const adminRoutes = [
 	'admin/profile'
 ];
 
+function mapAppRouteToAdmin(route) {
+	if (typeof route !== 'string') return defaultAdminRoute;
+	if (route === 'app' || route === defaultAppRoute) return 'admin/events';
+	if (route === 'app/groups') return 'admin/groups';
+	if (route === 'app/requests') return 'admin/requests';
+	if (route === 'app/profile') return 'admin/profile';
+	if (route.startsWith('app/groups/')) return `admin/${route.slice(4)}`;
+	if (route.startsWith('app/requests/')) return `admin/${route.slice(4)}`;
+	return defaultAdminRoute;
+}
+
 function scrollToTop() {
 	requestAnimationFrame(() => {
 		window.scrollTo(0, 0);
@@ -88,6 +99,9 @@ export function getTargetRoute(isAuthenticated, user, currentRoute) {
 	}
 
 	const isAdmin = !!user?.admin;
+	if (isAdmin && currentRoute.startsWith(appPrefix)) {
+		return mapAppRouteToAdmin(currentRoute);
+	}
 
 	if ((currentRoute === defaultAdminRoute || currentRoute.startsWith(adminPrefix)) && !isAdmin) {
 		return defaultAppRoute;

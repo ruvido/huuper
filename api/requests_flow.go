@@ -27,12 +27,14 @@ const (
 	requestStatusMentoring        = "4-mentoring"
 	requestStatusGroupApproved    = "5-group_approved"
 	requestStatusAdminApproved    = "6-admin_approved"
+	requestStatusRejected         = "rejected"
 )
 
 type requestsFlowStep struct {
 	Role   string `json:"role"`
 	Action string `json:"action"`
 	Label  string `json:"label"`
+	Notes  string `json:"notes,omitempty"`
 }
 
 type requestsFlowConfig struct {
@@ -102,7 +104,8 @@ func parseRequestsFlowConfig(data map[string]any) (requestsFlowConfig, error) {
 		}
 
 		label := strings.TrimSpace(anyToString(entry["label"]))
-		steps = append(steps, requestsFlowStep{Role: role, Action: action, Label: label})
+		notes := strings.TrimSpace(anyToString(entry["notes"]))
+		steps = append(steps, requestsFlowStep{Role: role, Action: action, Label: label, Notes: notes})
 	}
 
 	return requestsFlowConfig{
@@ -173,6 +176,13 @@ func statusForStepIndex(stepIndex int, steps []requestsFlowStep) string {
 		return status
 	}
 	return requestStatusSubmitted
+}
+
+func requestStatusForItem(rejected bool, stepIndex int, steps []requestsFlowStep) string {
+	if rejected {
+		return requestStatusRejected
+	}
+	return statusForStepIndex(stepIndex, steps)
 }
 
 func normalizeStatusValue(status string) string {

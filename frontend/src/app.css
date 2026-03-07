@@ -9,6 +9,9 @@
 	--icon-size: 20px;
 	--ui-font-size: 14px;
 	--card-radius: 0.5rem;
+	--bottom-tab-color: #666;
+	--bottom-tab-active-color: #444;
+	--sync-button-width: 320px;
 }
 
 body {

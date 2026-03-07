@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const version = readFileSync(resolve(__dirname, '../VERSION'), 'utf-8').trim()
 const buildDate = new Date().toISOString()
+const fastBuild = process.env.FAST_BUILD === '1'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -18,8 +19,8 @@ export default defineConfig({
   build: {
     outDir: '../pb_public',
     emptyOutDir: true,
-  },
-  optimizeDeps: {
-    exclude: ['@jsquash/jpeg', '@jsquash/png', '@jsquash/webp', '@jsquash/resize']
+    reportCompressedSize: false,
+    minify: fastBuild ? false : 'esbuild',
+    cssMinify: !fastBuild,
   }
 })

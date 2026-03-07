@@ -9,9 +9,10 @@
 	export let showRequestsBadge = false;
 	export let inviteLink = '';
 	export let onInviteClick = null;
+	export let showInviteForDefault = true;
 	$: clickable = typeof onOpen === 'function';
 	$: isDefaultGroup = typeof group?.type === 'string' && group.type === 'default';
-	$: showInviteLink = !isMember && isDefaultGroup;
+	$: showInviteLink = showInviteForDefault && !isMember && isDefaultGroup;
 
 	function handleOpen() {
 		if (clickable) {

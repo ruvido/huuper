@@ -15,7 +15,7 @@
 
 <style>
 	.dashboard-page {
-		min-height: 100vh;
+		min-height: 100%;
 		background: #fff;
 		padding: 4.25rem clamp(1rem, 4vw, 2rem) 5.5rem;
 	}

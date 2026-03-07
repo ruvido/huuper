@@ -204,6 +204,11 @@
 		navigate(`${base}/${encodeURIComponent(item.id)}`);
 	}
 
+	function handleCardClick(item) {
+		if (!adminMode) return;
+		openRequest(item);
+	}
+
 	function setSelectedGroup(id, value) {
 		selectedGroupById = { ...selectedGroupById, [id]: value };
 	}
@@ -332,102 +337,118 @@
 </script>
 
 <DashboardLayout {title}>
-	{#if error}
-		<Card variant="state">{error}</Card>
-	{:else if loading}
-		<Card variant="state">Loading requests...</Card>
-	{:else if requests.length === 0}
-		<Card variant="state">No requests.</Card>
-	{:else}
-		<div class="list">
+	<div class="requests-view">
+		{#if error}
+			<Card variant="state">{error}</Card>
+		{:else if loading}
+			<Card variant="state">Loading requests...</Card>
+		{:else if requests.length === 0}
+			<div class="empty-wrap">
+				<p class="empty-state">No requests.</p>
+			</div>
+		{:else}
+			<div class="list">
 			{#each visibleRequests as item (item.id)}
 				<Card variant="item">
-					<div class="head">
-						<div>
-							<p class="name">{displayName(item)}</p>
-							{#if displayRegion(item)}
-								<p class="meta">{displayRegion(item)}</p>
+					<div
+							class="request-card"
+							class:clickable={adminMode}
+							role={adminMode ? 'button' : undefined}
+							on:click={() => handleCardClick(item)}
+							on:keydown={(e) => {
+							if (!adminMode) return;
+							if (e.key === 'Enter' || e.key === ' ') handleCardClick(item);
+						}}
+					>
+						<div class="head">
+							<div>
+								<p class="name">{displayName(item)}</p>
+								{#if displayRegion(item)}
+									<p class="meta">{displayRegion(item)}</p>
+								{/if}
+							</div>
+							{#if !adminMode}
+								<button class="details" type="button" on:click={() => openRequest(item)}>Details</button>
 							{/if}
 						</div>
-						<button class="details" type="button" on:click={() => openRequest(item)}>Details</button>
-					</div>
 
-					{#if totalSteps(item) > 0}
-						<div class="progress-track" role="presentation">
-							<div class="progress-fill" style={`width: ${progressPercent(item)}%`}></div>
-						</div>
-						<div class="steps" aria-hidden="true">
-							{#each Array(totalSteps(item)) as _, index}
-								<span class="step" class:active={index < visualStepIndex(item)}>{index + 1}</span>
-							{/each}
-						</div>
-						<p class="step-meta">{currentStepMeta(item)}</p>
-					{/if}
+						{#if !adminMode && totalSteps(item) > 0}
+							<div class="progress-track" role="presentation">
+								<div class="progress-fill" style={`width: ${progressPercent(item)}%`}></div>
+							</div>
+							<div class="steps" aria-hidden="true">
+								{#each Array(totalSteps(item)) as _, index}
+									<span class="step" class:active={index < visualStepIndex(item)}>{index + 1}</span>
+								{/each}
+							</div>
+							<p class="step-meta">{currentStepMeta(item)}</p>
+						{/if}
 
-					{#if canTransition(item) || canPromote(item) || canReject(item)}
-						<div class="actions">
-							{#if canTransition(item) && !isPromoteStep(item)}
-								{#if needsGroup(item)}
-									<select
-										value={selectedGroup(item)}
-										on:change={(e) => setSelectedGroup(item.id, e.currentTarget.value)}
-										disabled={isActionLoading(item)}
-									>
-										<option value="">Select group</option>
-										{#each groupOptions as option}
-											<option value={option.id}>{option.label}</option>
-										{/each}
-									</select>
-								{/if}
+						{#if !adminMode && (canTransition(item) || canPromote(item) || canReject(item))}
+							<div class="actions">
+								{#if canTransition(item) && !isPromoteStep(item)}
+									{#if needsGroup(item)}
+										<select
+											value={selectedGroup(item)}
+											on:change={(e) => setSelectedGroup(item.id, e.currentTarget.value)}
+											disabled={isActionLoading(item)}
+										>
+											<option value="">Select group</option>
+											{#each groupOptions as option}
+												<option value={option.id}>{option.label}</option>
+											{/each}
+										</select>
+									{/if}
 
-								{#if needsGuardian(item)}
-									<select
-										bind:value={selectedGuardianById[item.id]}
-										on:change={(e) => setSelectedGuardian(item.id, e.currentTarget.value)}
-										disabled={isActionLoading(item)}
-									>
-										<option value="">Select guardian</option>
-										{#each (guardianOptionsByGroup[asTrimmedString(item.group)] || []) as option}
-											<option value={option.id}>{option.label}</option>
-										{/each}
-									</select>
-								{/if}
+									{#if needsGuardian(item)}
+										<select
+											bind:value={selectedGuardianById[item.id]}
+											on:change={(e) => setSelectedGuardian(item.id, e.currentTarget.value)}
+											disabled={isActionLoading(item)}
+										>
+											<option value="">Select guardian</option>
+											{#each (guardianOptionsByGroup[asTrimmedString(item.group)] || []) as option}
+												<option value={option.id}>{option.label}</option>
+											{/each}
+										</select>
+									{/if}
 
-								{#if needsMentoringNotes(item)}
-									<textarea
-										rows="3"
-										placeholder="Mentoring notes"
-										value={mentoringNotes(item)}
-										on:input={(e) => setMentoringNotes(item.id, e.currentTarget.value)}
-										disabled={isActionLoading(item)}
-									></textarea>
-								{/if}
+									{#if needsMentoringNotes(item)}
+										<textarea
+											rows="3"
+											placeholder="Mentoring notes"
+											value={mentoringNotes(item)}
+											on:input={(e) => setMentoringNotes(item.id, e.currentTarget.value)}
+											disabled={isActionLoading(item)}
+										></textarea>
+									{/if}
 
-								<button type="button" disabled={!canSubmitNext(item) || isActionLoading(item)} on:click={() => handleNext(item)}>
-									{nextLabel(item)}
-								</button>
-							{/if}
-
-							{#if canPromote(item)}
-								<button type="button" disabled={isActionLoading(item)} on:click={() => handlePromote(item)}>Promote</button>
-							{/if}
-
-							{#if canReject(item)}
-								<div class="reject-row">
-									<input
-										type="text"
-										placeholder="Reject reason"
-										value={rejectReason(item)}
-										on:input={(e) => setRejectReason(item.id, e.currentTarget.value)}
-										disabled={isActionLoading(item)}
-									/>
-									<button type="button" disabled={!rejectReason(item) || isActionLoading(item)} on:click={() => handleReject(item)}>
-										Reject
+									<button type="button" disabled={!canSubmitNext(item) || isActionLoading(item)} on:click={() => handleNext(item)}>
+										{nextLabel(item)}
 									</button>
-								</div>
-							{/if}
-						</div>
-					{/if}
+								{/if}
+
+								{#if canPromote(item)}
+									<button type="button" disabled={isActionLoading(item)} on:click={() => handlePromote(item)}>Promote</button>
+								{/if}
+
+								{#if canReject(item)}
+									<div class="reject-row">
+										<input
+											type="text"
+											placeholder="Reject reason"
+											value={rejectReason(item)}
+											on:input={(e) => setRejectReason(item.id, e.currentTarget.value)}
+											disabled={isActionLoading(item)}
+										/>
+										<button type="button" disabled={!rejectReason(item) || isActionLoading(item)} on:click={() => handleReject(item)}>
+											Reject
+										</button>
+									</div>
+								{/if}
+							</div>
+						{/if}
+					</div>
 				</Card>
 			{/each}
 
@@ -436,36 +457,54 @@
 				{#each rejectedRequests as item (item.id)}
 					<div class="rejected">
 						<Card variant="item">
-							<div class="head">
-								<div>
-									<p class="name">{displayName(item)}</p>
-									{#if displayRegion(item)}
-										<p class="meta">{displayRegion(item)}</p>
+							<div
+									class="request-card"
+									class:clickable={adminMode}
+									role={adminMode ? 'button' : undefined}
+									on:click={() => handleCardClick(item)}
+									on:keydown={(e) => {
+									if (!adminMode) return;
+									if (e.key === 'Enter' || e.key === ' ') handleCardClick(item);
+								}}
+							>
+								<div class="head">
+									<div>
+										<p class="name">{displayName(item)}</p>
+										{#if displayRegion(item)}
+											<p class="meta">{displayRegion(item)}</p>
+										{/if}
+									</div>
+									{#if !adminMode}
+										<button class="details" type="button" on:click={() => openRequest(item)}>Details</button>
 									{/if}
 								</div>
-								<button class="details" type="button" on:click={() => openRequest(item)}>Details</button>
-							</div>
 
-							{#if totalSteps(item) > 0}
-								<div class="progress-track" role="presentation">
-									<div class="progress-fill" style={`width: ${progressPercent(item)}%`}></div>
-								</div>
-								<div class="steps" aria-hidden="true">
-									{#each Array(totalSteps(item)) as _, index}
-										<span class="step" class:active={index < visualStepIndex(item)}>{index + 1}</span>
-									{/each}
-								</div>
-								<p class="step-meta">{currentStepMeta(item)}</p>
-							{/if}
+								{#if !adminMode && totalSteps(item) > 0}
+									<div class="progress-track" role="presentation">
+										<div class="progress-fill" style={`width: ${progressPercent(item)}%`}></div>
+									</div>
+									<div class="steps" aria-hidden="true">
+										{#each Array(totalSteps(item)) as _, index}
+											<span class="step" class:active={index < visualStepIndex(item)}>{index + 1}</span>
+										{/each}
+									</div>
+										<p class="step-meta">{currentStepMeta(item)}</p>
+									{/if}
+							</div>
 						</Card>
 					</div>
 				{/each}
 			{/if}
-		</div>
-	{/if}
+			</div>
+		{/if}
+	</div>
 </DashboardLayout>
 
 <style>
+	.requests-view {
+		font-size: var(--ui-font-size);
+	}
+
 	.list {
 		display: grid;
 		gap: 0.65rem;
@@ -478,11 +517,23 @@
 		gap: 0.75rem;
 	}
 
+	.request-card {
+		border: none;
+		background: transparent;
+		padding: 0;
+		width: 100%;
+		text-align: left;
+	}
+
+	.request-card.clickable {
+		cursor: pointer;
+	}
+
 	.details {
 		border: 1px solid #000;
 		background: #fff;
 		padding: 0.35rem 0.6rem;
-		font-size: 0.8rem;
+		font-size: var(--ui-font-size);
 		font-weight: 700;
 		cursor: pointer;
 	}
@@ -494,7 +545,7 @@
 
 	.meta {
 		margin: 0.2rem 0 0;
-		font-size: 0.9rem;
+		font-size: var(--ui-font-size);
 	}
 
 	.progress-track {
@@ -522,7 +573,7 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		font-size: 0.75rem;
+		font-size: var(--ui-font-size);
 		font-weight: 700;
 	}
 
@@ -533,7 +584,7 @@
 
 	.step-meta {
 		margin: 0;
-		font-size: 0.85rem;
+		font-size: var(--ui-font-size);
 		font-weight: 600;
 		color: #222;
 	}
@@ -552,7 +603,7 @@
 		border: 1px solid #000;
 		background: #fff;
 		padding: 0.6rem 0.7rem;
-		font-size: 0.9rem;
+		font-size: var(--ui-font-size);
 	}
 
 	textarea {
@@ -574,5 +625,18 @@
 
 	.rejected {
 		opacity: 0.7;
+	}
+
+	.empty-wrap {
+		min-height: calc(100dvh - 16rem);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.empty-state {
+		margin: 0;
+		text-align: center;
+		font-size: var(--ui-font-size);
 	}
 </style>

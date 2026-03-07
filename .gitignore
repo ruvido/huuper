@@ -1,4 +1,5 @@
 # PocketBase
+.cache
 pb_data*
 pocketbase
 bin

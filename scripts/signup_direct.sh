@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASE_URL="${BASE_URL:-https://branco.realmen.it}"
+#BASE_URL="${BASE_URL:-https://branco.realmen.it}"
+BASE_URL="${BASE_URL:-http://localhost:9090}"
 AUTO_LOGIN="${AUTO_LOGIN:-1}"
 
 if [ $# -lt 2 ]; then

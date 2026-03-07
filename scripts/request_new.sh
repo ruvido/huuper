@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASE_URL="${BASE_URL:-http://localhost:8090}"
+BASE_URL="${BASE_URL:-http://localhost:9090}"
 seed="$(date +%s)$RANDOM"
 
 first_names=(
@@ -29,8 +29,17 @@ motivations=(
 )
 
 pick() {
-  local -n arr="$1"
-  echo "${arr[$((RANDOM % ${#arr[@]}))]}"
+  local arr_name="$1"
+  local arr_len=0
+  local idx=0
+
+  eval "arr_len=\${#${arr_name}[@]}"
+  if [ "${arr_len}" -le 0 ]; then
+    return 1
+  fi
+
+  idx=$((RANDOM % arr_len))
+  eval "printf '%s\n' \"\${${arr_name}[${idx}]}\""
 }
 
 first_name="$(pick first_names)"

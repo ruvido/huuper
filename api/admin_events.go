@@ -18,7 +18,7 @@ type adminRegistrationItem struct {
 	Data    map[string]any `json:"data"`
 }
 
-type adminRejectRegistrationPayload struct {
+type adminRegistrationNotePayload struct {
 	Note string `json:"note"`
 }
 
@@ -111,6 +111,15 @@ func AdminCancelRegistrationHandler(app *pocketbase.PocketBase) func(e *core.Req
 			return apis.NewBadRequestError("invalid_registration", nil)
 		}
 
+		var payload adminRegistrationNotePayload
+		if err := e.BindBody(&payload); err != nil {
+			return apis.NewBadRequestError("invalid_payload", err)
+		}
+		note := strings.TrimSpace(payload.Note)
+		if note == "" {
+			return apis.NewBadRequestError("invalid_cancelled_note", nil)
+		}
+
 		record, err := app.FindRecordById("event_registrations", regId)
 		if err != nil || record == nil {
 			return apis.NewNotFoundError("invalid_registration", err)
@@ -120,6 +129,9 @@ func AdminCancelRegistrationHandler(app *pocketbase.PocketBase) func(e *core.Req
 			return e.JSON(http.StatusOK, map[string]any{"status": "already_cancelled"})
 		}
 
+		data := parseJSONMap(record.Get("data"))
+		data["cancelled"] = note
+		record.Set("data", data)
 		record.Set("status", "cancelled")
 		if err := app.Save(record); err != nil {
 			return apis.NewBadRequestError("failed_update", err)
@@ -141,7 +153,7 @@ func AdminRejectRegistrationHandler(app *pocketbase.PocketBase) func(e *core.Req
 			return apis.NewBadRequestError("invalid_registration", nil)
 		}
 
-		var payload adminRejectRegistrationPayload
+		var payload adminRegistrationNotePayload
 		if err := e.BindBody(&payload); err != nil {
 			return apis.NewBadRequestError("invalid_payload", err)
 		}

@@ -65,12 +65,12 @@
 		padding: 0.75rem 1rem;
 		font-size: 0.95rem;
 		font-weight: 600;
-		color: #666;
+		color: var(--bottom-tab-color);
 		cursor: pointer;
 	}
 
 	.tab.active {
-		color: #000;
+		color: var(--bottom-tab-active-color);
 	}
 
 	.icon-wrap {

@@ -2,10 +2,10 @@
 	import { onMount, tick } from 'svelte';
 	import { apiFetch } from '../lib/pocketbase';
 	import { formatEventDate } from '../lib/date';
-	import { queryParams, navigate } from '../lib/router';
+	import { queryParams } from '../lib/router';
 	import DashboardLayout from '../components/DashboardLayout.svelte';
 	import StatRow from '../components/StatRow.svelte';
-	import ConfirmModal from '../components/modals/ConfirmModal.svelte';
+	import ActionDialog from '../components/modals/ActionDialog.svelte';
 	import Card from '../components/Card.svelte';
 
 	let loading = true;
@@ -15,12 +15,11 @@
 	let confirmOpen = false;
 	let confirmLoading = false;
 	let confirmTarget = null;
-	let cancelConfirmOpen = false;
-	let cancelConfirmTarget = null;
-	let rejectDialogOpen = false;
-	let rejectTarget = null;
-	let rejectNote = '';
-	let rejectLoading = false;
+	let noteDialogOpen = false;
+	let noteDialogMode = 'reject';
+	let noteDialogTarget = null;
+	let noteText = '';
+	let noteLoading = false;
 	let lastEventId = null;
 	let cancelingId = null;
 
@@ -125,27 +124,22 @@
 		confirmTarget = null;
 	}
 
-	function openCancelConfirm(registration) {
-		cancelConfirmTarget = registration;
-		cancelConfirmOpen = true;
+	function openNoteDialog(mode, registration) {
+		noteDialogMode = mode === 'cancel' ? 'cancel' : 'reject';
+		noteDialogTarget = registration;
+		noteText = '';
+		noteDialogOpen = true;
 	}
 
-	function closeCancelConfirm() {
-		cancelConfirmOpen = false;
-		cancelConfirmTarget = null;
+	function closeNoteDialog() {
+		if (noteLoading) return;
+		noteDialogOpen = false;
+		noteDialogTarget = null;
+		noteText = '';
 	}
 
-	function openRejectDialog(registration) {
-		rejectTarget = registration;
-		rejectNote = '';
-		rejectDialogOpen = true;
-	}
-
-	function closeRejectDialog() {
-		if (rejectLoading) return;
-		rejectDialogOpen = false;
-		rejectTarget = null;
-		rejectNote = '';
+	function setNoteText(value) {
+		noteText = typeof value === 'string' ? value : '';
 	}
 
 	async function confirmApprove() {
@@ -176,41 +170,52 @@
 	}
 
 	async function cancelRegistration() {
-		if (!cancelConfirmTarget || cancelingId) return;
-		cancelingId = cancelConfirmTarget.id;
+		if (!noteDialogTarget || noteDialogMode !== 'cancel' || noteLoading) return;
+		const note = noteText.trim();
+		if (!note) {
+			error = 'Please add a cancel note';
+			return false;
+		}
+		cancelingId = noteDialogTarget.id;
 		error = '';
+		noteLoading = true;
 		try {
 			const response = await apiFetch(
-				`/api/admin/registrations/${encodeURIComponent(cancelConfirmTarget.id)}/cancel`,
+				`/api/admin/registrations/${encodeURIComponent(noteDialogTarget.id)}/cancel`,
 				{
-					method: 'POST'
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ note })
 				}
 			);
 			if (!response.ok) {
 				throw new Error('Failed to cancel');
 			}
 			registrations = registrations.map((item) =>
-				item.id === cancelConfirmTarget.id ? { ...item, status: 'cancelled' } : item
+				item.id === noteDialogTarget.id
+					? { ...item, status: 'cancelled', data: { ...(item.data || {}), cancelled: note } }
+					: item
 			);
-			closeCancelConfirm();
+			return true;
 		} catch (err) {
 			error = err.message || err.toString() || 'Failed to cancel';
+			return false;
 		} finally {
 			cancelingId = null;
+			noteLoading = false;
 		}
 	}
 
 	async function rejectRegistration() {
-		if (!rejectTarget || rejectLoading) return;
-		const note = rejectNote.trim();
+		if (!noteDialogTarget || noteDialogMode !== 'reject' || noteLoading) return;
+		const note = noteText.trim();
 		if (!note) {
 			error = 'Please add a reject note';
-			return;
+			return false;
 		}
-		const targetId = rejectTarget.id;
-		closeRejectDialog();
+		const targetId = noteDialogTarget.id;
 
-		rejectLoading = true;
+		noteLoading = true;
 		error = '';
 		try {
 			const response = await apiFetch(
@@ -232,15 +237,13 @@
 			if (typeof window !== 'undefined') {
 				window.scrollTo({ top: 0, behavior: 'smooth' });
 			}
+			return true;
 		} catch (err) {
 			error = err.message || err.toString() || 'Failed to reject';
+			return false;
 		} finally {
-			rejectLoading = false;
+			noteLoading = false;
 		}
-	}
-
-	function goBack() {
-		navigate('admin');
 	}
 
 	$: if (eventId && eventId !== lastEventId) {
@@ -297,7 +300,7 @@
 								</div>
 								<div class="row-actions">
 									<button class="approve" on:click={() => openConfirm(reg)}>Approve</button>
-									<button class="reject" on:click={() => openRejectDialog(reg)}>Reject</button>
+									<button class="reject" on:click={() => openNoteDialog('reject', reg)}>Reject</button>
 								</div>
 							</div>
 						{/each}
@@ -333,7 +336,7 @@
 										class="remove"
 										disabled={cancelingId === reg.id}
 										aria-label="Remove registration"
-										on:click={() => openCancelConfirm(reg)}
+										on:click={() => openNoteDialog('cancel', reg)}
 									>
 										x
 									</button>
@@ -357,6 +360,9 @@
 								<div class="row-info">
 									<p class="name">{displayName(reg)}</p>
 									<p class="email">{displayRegion(reg)}</p>
+									{#if typeof reg?.data?.cancelled === 'string' && reg.data.cancelled.trim()}
+										<p class="rejected-note">{reg.data.cancelled}</p>
+									{/if}
 								</div>
 								<div class="row-actions"></div>
 							</div>
@@ -391,10 +397,9 @@
 		</Card>
 	{/if}
 
-	<button class="back" on:click={goBack}>Back</button>
 </DashboardLayout>
 
-<ConfirmModal
+<ActionDialog
 	show={confirmOpen}
 	title="Approve registration"
 	message="Are you sure you want to approve this registration?"
@@ -404,52 +409,22 @@
 	onCancel={closeConfirm}
 />
 
-<ConfirmModal
-	show={cancelConfirmOpen}
-	title="Cancel registration"
-	message="Are you sure you want to cancel this registration?"
-	confirmLabel="Cancel"
-	loading={cancelingId !== null}
-	onConfirm={cancelRegistration}
-	onCancel={closeCancelConfirm}
+<ActionDialog
+	show={noteDialogOpen}
+	title={noteDialogMode === 'cancel' ? 'Cancel registration' : 'Reject registration'}
+	message={noteDialogMode === 'cancel'
+		? 'Add a short note about why we are cancelling this registration.'
+		: 'Add a short note about why we are rejecting this registration.'}
+	confirmLabel={noteDialogMode === 'cancel' ? 'Cancel registration' : 'Reject'}
+	loading={noteLoading}
+	showTextField={true}
+	textValue={noteText}
+	textPlaceholder="Reason..."
+	onTextChange={setNoteText}
+	onConfirm={noteDialogMode === 'cancel' ? cancelRegistration : rejectRegistration}
+	onCancel={closeNoteDialog}
+	closeOnConfirm={true}
 />
-
-{#if rejectDialogOpen}
-	<div
-		class="reject-overlay"
-		role="button"
-		tabindex="0"
-		on:click={closeRejectDialog}
-		on:keydown={(e) => {
-			if (e.key === 'Enter' || e.key === ' ') closeRejectDialog();
-		}}
-	>
-		<div
-			class="reject-dialog"
-			role="dialog"
-			aria-modal="true"
-			aria-label="Reject registration"
-			tabindex="-1"
-			on:click|stopPropagation
-			on:keydown|stopPropagation={() => {}}
-		>
-			<h3>Reject registration</h3>
-			<p>Add a short note about why we are rejecting this registration.</p>
-			<textarea
-				bind:value={rejectNote}
-				rows="4"
-				placeholder="Reason..."
-				disabled={rejectLoading}
-				></textarea>
-				<div class="reject-actions">
-					<button type="button" class="reject-cancel" on:click={closeRejectDialog} disabled={rejectLoading}>Cancel</button>
-					<button type="button" class="reject-confirm" on:click={rejectRegistration} disabled={rejectLoading}>
-						{rejectLoading ? 'Saving...' : 'Reject'}
-					</button>
-				</div>
-		</div>
-	</div>
-{/if}
 
 <style>
 	h1 {
@@ -614,89 +589,10 @@
 		background: #f1f1f1;
 	}
 
-	.back {
-		margin-top: 1rem;
-		width: 100%;
-		padding: 0.9rem 1rem;
-		background: #000;
-		color: #fff;
-		border: 2px solid #000;
-		font-weight: 700;
-		cursor: pointer;
-	}
-
-	.back:hover {
-		background: #333;
-	}
-
 	.empty {
 		margin: 0;
 		font-size: 0.9rem;
 		color: #333;
-	}
-
-	.reject-overlay {
-		position: fixed;
-		inset: 0;
-		background: rgba(0, 0, 0, 0.5);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding: 1rem;
-		z-index: 1000;
-	}
-
-	.reject-dialog {
-		width: min(32rem, 100%);
-		background: #fff;
-		border: 2px solid #000;
-		padding: 1rem;
-		display: grid;
-		gap: 0.75rem;
-	}
-
-	.reject-dialog h3 {
-		margin: 0;
-		font-size: 1rem;
-	}
-
-	.reject-dialog p {
-		margin: 0;
-		font-size: 0.9rem;
-		color: #333;
-	}
-
-	.reject-dialog textarea {
-		width: 100%;
-		border: 1px solid #000;
-		padding: 0.6rem;
-		resize: vertical;
-		font-family: inherit;
-		font-size: 0.9rem;
-	}
-
-	.reject-actions {
-		display: flex;
-		justify-content: flex-end;
-		gap: 0.5rem;
-	}
-
-	.reject-cancel,
-	.reject-confirm {
-		border: 2px solid #000;
-		padding: 0.45rem 0.8rem;
-		font-weight: 700;
-		cursor: pointer;
-	}
-
-	.reject-cancel {
-		background: #fff;
-		color: #000;
-	}
-
-	.reject-confirm {
-		background: #000;
-		color: #fff;
 	}
 
 	@media (max-width: 480px) {

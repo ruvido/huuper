@@ -1,10 +1,4 @@
 <script>
-	import Cropper from 'svelte-easy-crop';
-	import { decode as decodeJpeg, encode as encodeJpeg } from '@jsquash/jpeg';
-	import { decode as decodePng } from '@jsquash/png';
-	import { decode as decodeWebp } from '@jsquash/webp';
-	import resize from '@jsquash/resize';
-
 	export let show = false;
 	export let image = '';
 	export let onConfirm;
@@ -18,6 +12,8 @@
 	let croppedAreaPixels = null;
 	let loading = false;
 	let error = '';
+	let CropperComponent = null;
+	let cropperLoading = false;
 
 	// Reset state when modal is shown
 	$: if (show) {
@@ -26,6 +22,22 @@
 		croppedAreaPixels = null;
 		error = '';
 		loading = false;
+	}
+
+	$: if (show && !CropperComponent && !cropperLoading) {
+		void loadCropper();
+	}
+
+	async function loadCropper() {
+		cropperLoading = true;
+		try {
+			const module = await import('svelte-easy-crop');
+			CropperComponent = module.default;
+		} catch {
+			error = 'Errore nel caricamento del ritaglio';
+		} finally {
+			cropperLoading = false;
+		}
 	}
 
 	function handleCropComplete(e) {
@@ -44,20 +56,16 @@
 		return { x: startX, y: startY, width, height };
 	}
 
-	function cropImageData(imageData, area) {
-		const { x, y, width, height } = clampCropArea(imageData, area);
-		const croppedData = new Uint8ClampedArray(width * height * 4);
-
-		for (let row = 0; row < height; row++) {
-			const srcOffset = ((y + row) * imageData.width + x) * 4;
-			const dstOffset = row * width * 4;
-			croppedData.set(
-				imageData.data.subarray(srcOffset, srcOffset + width * 4),
-				dstOffset
-			);
-		}
-
-		return new ImageData(croppedData, width, height);
+	function canvasToBlob(canvas, type, quality) {
+		return new Promise((resolve, reject) => {
+			canvas.toBlob((blob) => {
+				if (blob) {
+					resolve(blob);
+					return;
+				}
+				reject(new Error('Impossibile creare il file immagine'));
+			}, type, quality);
+		});
 	}
 
 	function getResizeDimensions(width, height) {
@@ -79,36 +87,26 @@
 	}
 
 	async function decodeImageFile(file) {
-		const buffer = await file.arrayBuffer();
-		const mime = (file.type || '').toLowerCase();
-		const name = (file.name || '').toLowerCase();
-		const hints = [mime, name];
-		const attempts = [];
-
-		if (hints.some(value => value.includes('png'))) {
-			attempts.push(() => decodePng(buffer));
-		}
-
-		if (hints.some(value => value.includes('webp'))) {
-			attempts.push(() => decodeWebp(buffer));
-		}
-
-		if (hints.some(value => value.includes('jpg') || value.includes('jpeg'))) {
-			attempts.push(() => decodeJpeg(buffer, { preserveOrientation: true }));
-		}
-
-		attempts.push(() => decodeJpeg(buffer, { preserveOrientation: true }));
-
-		let lastError;
-		for (const decodeFn of attempts) {
-			try {
-				return await decodeFn();
-			} catch (err) {
-				lastError = err;
+		try {
+			if (typeof createImageBitmap === 'function') {
+				return await createImageBitmap(file);
 			}
+		} catch {
+			// Fallback to HTMLImageElement for older browsers.
 		}
 
-		throw lastError || new Error('Formato immagine non supportato');
+		const objectUrl = URL.createObjectURL(file);
+		try {
+			const image = await new Promise((resolve, reject) => {
+				const img = new Image();
+				img.onload = () => resolve(img);
+				img.onerror = () => reject(new Error('Formato immagine non supportato'));
+				img.src = objectUrl;
+			});
+			return image;
+		} finally {
+			URL.revokeObjectURL(objectUrl);
+		}
 	}
 
 	// Export a function that parent can call with the original file
@@ -119,12 +117,24 @@
 		error = '';
 
 		try {
-			const imageData = await decodeImageFile(originalFile);
-			const cropped = cropImageData(imageData, croppedAreaPixels);
-			const { width, height } = getResizeDimensions(cropped.width, cropped.height);
-			const resized = await resize(cropped, { width, height });
-			const jpegBuffer = await encodeJpeg(resized, { quality: JPEG_QUALITY });
-			const blob = new Blob([jpegBuffer], { type: 'image/jpeg' });
+			const image = await decodeImageFile(originalFile);
+			const { x, y, width, height } = clampCropArea(
+				{ width: image.width, height: image.height },
+				croppedAreaPixels
+			);
+			const targetSize = getResizeDimensions(width, height);
+			const canvas = document.createElement('canvas');
+			canvas.width = targetSize.width;
+			canvas.height = targetSize.height;
+			const ctx = canvas.getContext('2d');
+			if (!ctx) {
+				throw new Error('Canvas non disponibile');
+			}
+			ctx.imageSmoothingEnabled = true;
+			ctx.imageSmoothingQuality = 'high';
+			ctx.drawImage(image, x, y, width, height, 0, 0, targetSize.width, targetSize.height);
+
+			const blob = await canvasToBlob(canvas, 'image/jpeg', JPEG_QUALITY / 100);
 			const fileName = originalFile.name.replace(/\.[^/.]+$/, '.jpg');
 			const file = new File([blob], fileName, { type: 'image/jpeg' });
 
@@ -167,13 +177,18 @@
 		<div class="crop-modal">
 			<h2>Ritaglia foto</h2>
 			<div class="crop-area">
-				<Cropper
-					{image}
-					bind:crop
-					bind:zoom
-					aspect={1}
-					oncropcomplete={handleCropComplete}
-				/>
+				{#if CropperComponent}
+					<svelte:component
+						this={CropperComponent}
+						{image}
+						bind:crop
+						bind:zoom
+						aspect={1}
+						oncropcomplete={handleCropComplete}
+					/>
+				{:else}
+					<p class="loading">Caricamento editor...</p>
+				{/if}
 			</div>
 			{#if error}
 				<p class="error">{error}</p>
@@ -270,5 +285,14 @@
 		font-size: 0.875rem;
 		margin: 0.5rem 0;
 		text-align: center;
+	}
+
+	.loading {
+		color: #fff;
+		font-size: 0.95rem;
+		height: 100%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 	}
 </style>

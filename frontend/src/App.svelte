@@ -4,24 +4,6 @@
 	import { currentRoute, navigate, getTargetRoute } from './lib/router';
 	import AppBottomBar from './components/AppBottomBar.svelte';
 	import AdminBottomBar from './components/AdminBottomBar.svelte';
-	import Login from './pages/Login.svelte';
-	import Signup from './pages/SignupDirect.svelte';
-	import PasswordReset from './pages/PasswordReset.svelte';
-	import Onboarding from './pages/Onboarding.svelte';
-	import PendingApproval from './pages/PendingApproval.svelte';
-	import EventAccept from './pages/EventAccept.svelte';
-	import TelegramConnect from './pages/TelegramConnect.svelte';
-	import Events from './pages/Events.svelte';
-	import Profile from './pages/Profile.svelte';
-	import AdminProfile from './pages/AdminProfile.svelte';
-	import Groups from './pages/Groups.svelte';
-	import GroupDetail from './pages/GroupDetail.svelte';
-	import GroupRequests from './pages/GroupRequests.svelte';
-	import Admin from './pages/Admin.svelte';
-	import AdminEvent from './pages/AdminEvent.svelte';
-	import AdminRequests from './pages/AdminRequests.svelte';
-	import Requests from './pages/Requests.svelte';
-	import RequestDetail from './pages/RequestDetail.svelte';
 
 	let authReady = false;
 	let renderReady = false;
@@ -30,7 +12,32 @@
 	let groupsAlert = false;
 	let refreshingBadges = false;
 	let lastBadgeRoute = '';
+	let ActivePage = null;
+	let activePageProps = {};
+	let routeLoadToken = 0;
+	let lastRouteViewKey = '';
 	const version = __APP_VERSION__;
+	const pageCache = new Map();
+	const pageLoaders = {
+		Login: () => import('./pages/Login.svelte'),
+		Signup: () => import('./pages/SignupDirect.svelte'),
+		PasswordReset: () => import('./pages/PasswordReset.svelte'),
+		Onboarding: () => import('./pages/Onboarding.svelte'),
+		PendingApproval: () => import('./pages/PendingApproval.svelte'),
+		EventAccept: () => import('./pages/EventAccept.svelte'),
+		TelegramConnect: () => import('./pages/TelegramConnect.svelte'),
+		Events: () => import('./pages/Events.svelte'),
+		Profile: () => import('./pages/Profile.svelte'),
+		AdminProfile: () => import('./pages/AdminProfile.svelte'),
+		Groups: () => import('./pages/Groups.svelte'),
+		GroupDetail: () => import('./pages/GroupDetail.svelte'),
+		GroupRequests: () => import('./pages/GroupRequests.svelte'),
+		Admin: () => import('./pages/Admin.svelte'),
+		AdminEvent: () => import('./pages/AdminEvent.svelte'),
+		AdminRequests: () => import('./pages/AdminRequests.svelte'),
+		Requests: () => import('./pages/Requests.svelte'),
+		RequestDetail: () => import('./pages/RequestDetail.svelte'),
+	};
 
 	// Refresh auth on app load to sync with server
 	onMount(async () => {
@@ -137,71 +144,90 @@
 		lastBadgeRoute = $currentRoute;
 		void refreshBadges();
 	}
+
+	function resolveRouteView(route) {
+		if (route === 'login') return { page: 'Login', props: {} };
+		if (route === 'signup') return { page: 'Signup', props: {} };
+		if (route === 'signup-direct') return { page: 'Signup', props: { defaultStatus: 'active', showFooter: false, pageTitle: 'Sign Up (beta direct)' } };
+		if (route === 'password-reset') return { page: 'PasswordReset', props: {} };
+		if (route === 'onboarding') return { page: 'Onboarding', props: {} };
+		if (route === 'pending-approval') return { page: 'PendingApproval', props: {} };
+		if (route === 'event-accept') return { page: 'EventAccept', props: {} };
+		if (route === 'telegram-connect') return { page: 'TelegramConnect', props: {} };
+		if (route === 'app/events') return { page: 'Events', props: {} };
+		if (route === 'app/profile') return { page: 'Profile', props: {} };
+		if (route === 'admin/profile') return { page: 'AdminProfile', props: {} };
+		if (route === 'app/groups') return { page: 'Groups', props: {} };
+		if (/^admin\/groups\/[^/]+\/requests$/.test(route)) return { page: 'GroupRequests', props: {} };
+		if (/^app\/groups\/[^/]+\/requests$/.test(route)) return { page: 'GroupRequests', props: {} };
+		if (route.startsWith('admin/groups/')) return { page: 'GroupDetail', props: {} };
+		if (route.startsWith('app/groups/')) return { page: 'GroupDetail', props: {} };
+		if (route === 'admin') return { page: 'Admin', props: {} };
+		if (route === 'admin/events') return { page: 'Events', props: { adminMode: true } };
+		if (route === 'admin/event') return { page: 'AdminEvent', props: {} };
+		if (route === 'admin/groups') return { page: 'Groups', props: { adminMode: true } };
+		if (route === 'admin/requests') return { page: 'AdminRequests', props: {} };
+		if (/^admin\/requests\/[^/]+$/.test(route)) return { page: 'RequestDetail', props: {} };
+		if (/^app\/requests\/[^/]+$/.test(route)) return { page: 'RequestDetail', props: {} };
+		if (route === 'app/requests' || route.startsWith('app/requests/')) return { page: 'Requests', props: {} };
+		return { page: 'Login', props: {} };
+	}
+
+	async function loadActivePage(view) {
+		const token = ++routeLoadToken;
+		ActivePage = null;
+		activePageProps = view.props;
+
+		if (pageCache.has(view.page)) {
+			ActivePage = pageCache.get(view.page);
+			return;
+		}
+
+		try {
+			const loader = pageLoaders[view.page];
+			if (!loader) throw new Error('Missing page loader');
+			const mod = await loader();
+			if (token !== routeLoadToken) return;
+			pageCache.set(view.page, mod.default);
+			ActivePage = mod.default;
+		} catch {
+			if (token !== routeLoadToken) return;
+			const mod = await pageLoaders.Login();
+			pageCache.set('Login', mod.default);
+			activePageProps = {};
+			ActivePage = mod.default;
+		}
+	}
+
+	$: routeView = resolveRouteView($currentRoute || '');
+	$: routeViewKey = routeView ? `${routeView.page}:${JSON.stringify(routeView.props || {})}` : '';
+	$: if (renderReady && routeView && routeViewKey !== lastRouteViewKey) {
+		lastRouteViewKey = routeViewKey;
+		void loadActivePage(routeView);
+	}
 </script>
 
 <!-- Only render when guards have validated -->
 {#if renderReady}
-	<main>
-		{#if $currentRoute === 'login'}
-			<Login />
-		{:else if $currentRoute === 'signup'}
-			<Signup />
-		{:else if $currentRoute === 'signup-direct'}
-			<Signup defaultStatus="active" showFooter={false} pageTitle="Sign Up (beta direct)" />
-		{:else if $currentRoute === 'password-reset'}
-			<PasswordReset />
-		{:else if $currentRoute === 'onboarding'}
-			<Onboarding />
-		{:else if $currentRoute === 'pending-approval'}
-			<PendingApproval />
-		{:else if $currentRoute === 'event-accept'}
-			<EventAccept />
-		{:else if $currentRoute === 'telegram-connect'}
-			<TelegramConnect />
-		{:else if $currentRoute === 'app/events'}
-			<Events />
-		{:else if $currentRoute === 'app/profile'}
-			<Profile />
-		{:else if $currentRoute === 'admin/profile'}
-			<AdminProfile />
-		{:else if $currentRoute === 'app/groups'}
-			<Groups />
-		{:else if /^admin\/groups\/[^/]+\/requests$/.test($currentRoute)}
-			<GroupRequests />
-		{:else if /^app\/groups\/[^/]+\/requests$/.test($currentRoute)}
-			<GroupRequests />
-		{:else if $currentRoute.startsWith('admin/groups/')}
-			<GroupDetail />
-		{:else if $currentRoute.startsWith('app/groups/')}
-			<GroupDetail />
-		{:else if $currentRoute === 'admin'}
-			<Admin />
-		{:else if $currentRoute === 'admin/events'}
-			<Events adminMode={true} />
-		{:else if $currentRoute === 'admin/event'}
-			<AdminEvent />
-		{:else if $currentRoute === 'admin/groups'}
-			<Groups adminMode={true} />
-		{:else if $currentRoute === 'admin/requests'}
-			<AdminRequests />
-		{:else if /^admin\/requests\/[^/]+$/.test($currentRoute)}
-			<RequestDetail />
-		{:else if /^app\/requests\/[^/]+$/.test($currentRoute)}
-			<RequestDetail />
-		{:else if $currentRoute === 'app/requests' || $currentRoute.startsWith('app/requests/')}
-			<Requests />
-		{:else}
-			<Login />
-		{/if}
-	</main>
+	<div class="app-shell">
+		<div class="cards-block">
+			<main>
+				{#if ActivePage}
+					<svelte:component this={ActivePage} {...activePageProps} />
+				{:else}
+					<div class="page-loading" aria-live="polite">Loading...</div>
+				{/if}
+			</main>
+		</div>
+
+		<div class="version" class:with-nav={showMainNav}>{version}</div>
+	</div>
 
 	{#if appRoute}
 		<AppBottomBar {eventsAlert} {groupsAlert} />
 	{:else if adminRoute}
-		<AdminBottomBar {eventsAlert} {groupsAlert} />
+		<AdminBottomBar {eventsAlert} requestsAlert={groupsAlert} />
 	{/if}
-
-	<div class="version">{version}</div>
 {/if}
 
 <style>
@@ -209,16 +235,39 @@
 		overflow-x: hidden;
 	}
 
+	.app-shell {
+		min-height: 100vh;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.cards-block {
+		flex: 1 0 auto;
+		display: flex;
+		flex-direction: column;
+	}
+
 	main {
 		width: 100%;
 		max-width: 100%;
 	}
 
+	.page-loading {
+		padding: 2rem 1rem;
+		text-align: center;
+		font-size: 0.95rem;
+		color: #666;
+	}
+
 	.version {
-		margin: 0 auto;
-		padding: 0.75rem 0 6rem;
+		margin-top: 0;
+		padding: 0.75rem 0;
 		text-align: center;
 		font-size: 10px;
 		color: #999;
+	}
+
+	.version.with-nav {
+		margin-bottom: 4.75rem;
 	}
 </style>

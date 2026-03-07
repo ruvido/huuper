@@ -96,16 +96,17 @@
 
 			const countEntries = await Promise.all(
 				memberGroups.map(async (group) => {
-					if (!group?.id || group.assistant !== currentUser.id) {
+					if (!group?.id) {
 						return [group?.id || '', 0];
 					}
 
-					const response = await apiFetch(`/api/groups/${encodeURIComponent(group.id)}/requests-count`);
+					const response = await apiFetch(`/api/requests?group_id=${encodeURIComponent(group.id)}&per_page=1`);
 					if (!response.ok) {
 						return [group.id, 0];
 					}
 					const payload = await response.json();
-					return [group.id, Number(payload?.count || 0)];
+					const items = Array.isArray(payload?.items) ? payload.items : [];
+					return [group.id, items.length];
 				})
 			);
 			requestsCountByGroupId = Object.fromEntries(countEntries.filter(([id]) => !!id));
@@ -211,23 +212,21 @@
 					onInviteClick={openInviteDialog}
 					inviteLink=""
 					requestsCount={requestsCountByGroupId[item.group.id] || 0}
-					showRequestsBadge={item.isMember && item.group.assistant === pb.authStore.record?.id}
+					showRequestsBadge={item.isMember}
 				/>
 			{/each}
 		</div>
 	{/if}
 
 	{#if adminMode}
-		<Card>
-			<div class="admin-sync">
-				<button type="button" class="sync-button" on:click={syncMemberships} disabled={syncBusy}>
-					{syncBusy ? 'Syncing...' : 'Sync memberships'}
-				</button>
-				{#if syncMessage}
-					<p class="sync-message">{syncMessage}</p>
-				{/if}
-			</div>
-		</Card>
+		<div class="admin-sync">
+			<button type="button" class="sync-button" on:click={syncMemberships} disabled={syncBusy}>
+				{syncBusy ? 'Syncing...' : 'Sync memberships'}
+			</button>
+			{#if syncMessage}
+				<p class="sync-message">{syncMessage}</p>
+			{/if}
+		</div>
 	{/if}
 </DashboardLayout>
 
@@ -269,16 +268,18 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
+		align-items: center;
 	}
 
 	.sync-button {
 		border: 2px solid #000;
-		background: #fff;
-		color: #000;
+		background: #000;
+		color: #fff;
 		padding: 0.6rem 0.8rem;
 		font-size: 0.95rem;
 		font-weight: 700;
 		cursor: pointer;
+		width: min(100%, var(--sync-button-width));
 	}
 
 	.sync-button:disabled {
@@ -290,6 +291,12 @@
 		margin: 0;
 		font-size: 0.85rem;
 		color: #333;
+	}
+
+	@media (min-width: 768px) and (max-width: 1024px) {
+		.sync-button {
+			width: min(100%, var(--sync-button-width));
+		}
 	}
 
 	.invite-overlay {
