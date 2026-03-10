@@ -1,136 +1,116 @@
 # PLAN
 
-Operational continuation plan for the data-driven Realmen onboarding flow.
+## Obiettivo
+Refactoring iterativo del backend per renderlo piu' DRY, robusto, sicuro, discoverable e coerente nel namespacing, senza introdurre scope creep o astrazioni inutili.
 
-## Current State
+## Vincoli
+- Seguire `AGENTS.md`.
+- Nessun big-bang refactor.
+- Nessun cambio strutturale senza proposta e conferma.
+- Nessuna dipendenza nuova se non strettamente necessaria.
+- Ogni iterazione deve lasciare il backend compilabile.
 
-- `requests` collection exists (admin-only access) with:
-  - `guardian` relation -> `users`
-  - `data` JSON
-- `groups` has `assistant` relation -> `users` (`MaxSelect: 1`)
-- Settings upsert migrations added for:
-  - `requests_flow`
-  - `users` (`pact_required`)
-  - `signup` (minimal public form fields)
-- New API endpoints exist:
-  - `POST /api/requests/submit` (public)
-  - `POST /api/requests/{id}/action` (auth)
-- `action` supports:
-  - `transition`
-  - `reject`
+## Target architetturale
+- Backend pronto per web, CLI, mobile o desktop.
+- API chiare e stabili.
+- Due entrypoint di accesso principali:
+  - `admin=true`: controllo completo sulle risorse applicative.
+  - `admin!=true`: accesso limitato al proprio profilo e alle proprie relazioni autorizzate.
+- Policy di accesso centralizzata, non dispersa negli handler.
+- Tree backend organizzato per domini e responsabilita' chiare.
 
-## Critical Decisions (Locked)
+## Workflow multiagent
 
-- Flow is data-driven from `settings.requests_flow`.
-- Public intake fields are data-driven from `settings.signup`.
-- `rejected` must be a top-level bool field on `requests` (NOT inside `data`).
-- `assistant` is unique per group via `groups.assistant` single relation.
-- Keep architecture minimal: no extra log collections for now.
+### 1. Architecture Guardian
+Scopo:
+- verificare che ogni proposta rispetti semplicita', DRY, no custom code e no scope drift.
 
-## Immediate Priority
+Output:
+- via libera o blocco motivato
+- tradeoff espliciti
 
-Implement and verify the `requests.rejected` migration and runtime consistency.
+### 2. Repo Mapper
+Scopo:
+- mappare route, handler, helper condivisi, collection PocketBase, policy esistenti e duplicazioni.
 
-### Why
+Output:
+- inventory del backend
+- mappa dei confini di dominio
+- elenco duplicazioni e naming incoerenti
 
-- API logic already moved to top-level `rejected`.
-- DB must include the field for all existing environments.
+### 3. Access Model Agent
+Scopo:
+- definire la matrice di accesso per `public`, `me`, `admin` e per i ruoli derivati.
 
-### Action
+Output:
+- tabella endpoint -> ruolo/capability -> risorsa visibile
+- proposta di helper centralizzati per authz
 
-1. Run migration `1764500005_requests_rejected_field.go`.
-2. Verify backfill from `data.rejected` to top-level `rejected`.
-3. Verify `data.rejected` is no longer used in new records.
+### 4. API Contract Agent
+Scopo:
+- definire namespacing, convenzioni di naming, shape delle risposte, error model, filtri e paginazione.
 
-### Verify (DB)
+Output:
+- contratto API target
+- delta tra stato attuale e stato desiderato
 
-Use sqlite checks on active DB:
+### 5. Refactor Agent
+Scopo:
+- applicare refactor piccoli, lineari e verificabili.
 
-```sql
-PRAGMA table_info(requests);
-SELECT id, rejected, json_extract(data, '$.status') AS status FROM requests LIMIT 20;
-```
+Output:
+- patch limitate
+- riduzione della duplicazione
+- miglioramento di discoverability e robustezza
 
-## Next Implementation Steps
+### 6. Review Agent
+Scopo:
+- verificare regressioni, rischi, incompletezze e allineamento con le convenzioni.
 
-1. Complete `action` API with `promote`.
-   - Input: `{ "action": "promote" }`
-   - Allowed: admin only
-   - Allowed status: `6-admin_approved`
-   - Behavior:
-     - create/update `users` record
-     - apply `settings.users.pact_required`
-     - remove request (or mark completed if deletion policy changes)
+Output:
+- findings ordinati per severita'
+- rischi residui
+- decisione go/no-go per la prossima iterazione
 
-2. Add list API for dashboard.
-   - `GET /api/requests`
-   - Filters (query params):
-     - `status`
-     - `rejected`
-     - `group_id`
-     - `guardian`
-   - Sorting:
-     - default `-updated`
+## Ordine di lavoro
+1. Mappare lo stato corrente.
+2. Definire la matrice di accesso.
+3. Definire il namespacing target.
+4. Consolidare helper di authz e validazione.
+5. Riorganizzare route e handler per dominio.
+6. Allineare naming, payload ed errori.
+7. Verificare build e regressioni.
 
-3. Frontend dashboard minimum.
-   - Build columns from `requests_flow.statuses`.
-   - Card actions:
-     - next step (`transition`)
-     - reject (`reject`)
-     - promote (`promote`, when eligible)
+## Iterazioni consigliate
 
-## API Contracts (Current)
+### Iterazione 1
+- Inventory backend.
+- Matrice accessi attuale.
+- Elenco duplicazioni e incoerenze.
+- Nessun refactor strutturale.
 
-### Submit
+### Iterazione 2
+- Consolidamento authz.
+- Estrarre helper condivisi per visibilita', ownership e ruoli.
+- Ridurre duplicazione tra handler.
 
-`POST /api/requests/submit`
+### Iterazione 3
+- Proposta di namespacing target.
+- Proposta di riorganizzazione del tree.
+- Conferma prima di toccare struttura e path.
 
-Body:
+### Iterazione 4
+- Refactor dei route group e naming handler.
+- Allineamento dei path al modello approvato.
 
-```json
-{
-  "name": "Mario Rossi",
-  "email": "mario.rossi@example.com",
-  "mobile": "+393331112233",
-  "region": "Lombardia",
-  "birth_year": "1990",
-  "marital_status": "Single",
-  "children": "No",
-  "motivation": "..."
-}
-```
+### Iterazione 5
+- Pulizia convenzioni API.
+- Uniformare errori, paginazione, filtri e response shape.
 
-### Action: transition
-
-`POST /api/requests/{id}/action`
-
-```json
-{
-  "action": "transition",
-  "target_status": "2-group_assigned"
-}
-```
-
-### Action: reject
-
-`POST /api/requests/{id}/action`
-
-```json
-{
-  "action": "reject",
-  "reason": "..."
-}
-```
-
-## Known Risks / Notes
-
-- Ensure the active runtime DB path is correct (`pb_data` nesting issue happened before).
-- Do not rely on `settings.onboarding` for request flow; use `settings.requests_flow`.
-- Keep `settings` keys stable; avoid renaming once frontend starts consuming them.
-
-## Definition of Done (Near Term)
-
-1. `requests.rejected` field exists in DB and is populated correctly.
-2. `action=transition` and `action=reject` fully operate against top-level `rejected`.
-3. `action=promote` implemented and validated end-to-end.
-4. Dashboard can load and act on requests without hardcoded statuses.
+## Definition of Done
+- Le policy `admin` vs `me` sono esplicite e centralizzate.
+- Il namespacing delle API e' coerente e discoverable.
+- Il tree backend e' organizzato per domini comprensibili.
+- Gli handler delegano policy e validazione a helper condivisi.
+- Le API restano robuste e adatte a piu' client.
+- Ogni step e' stato verificato con build e review.

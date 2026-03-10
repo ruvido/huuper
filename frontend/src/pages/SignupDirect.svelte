@@ -1,6 +1,7 @@
 <script>
 	import { pb } from '../lib/pocketbase';
 	import { navigate, defaultAppRoute } from '../lib/router';
+	import { normalizeEmailInput } from '../lib/email';
 	import AuthLayout from '../components/AuthLayout.svelte';
 	import FormGroup from '../components/FormGroup.svelte';
 	import Button from '../components/Button.svelte';
@@ -38,9 +39,12 @@
 		loading = true;
 
 		try {
+			const normalizedEmail = normalizeEmailInput(email);
+			email = normalizedEmail;
+
 			// Create user with configured status
 			const formData = new FormData();
-			formData.append('email', email);
+			formData.append('email', normalizedEmail);
 			formData.append('password', password);
 			formData.append('passwordConfirm', passwordConfirm);
 			formData.append('status', defaultStatus);
@@ -48,7 +52,7 @@
 			await pb.collection('users').create(formData);
 
 			// Auto-login
-			await pb.collection('users').authWithPassword(email, password);
+			await pb.collection('users').authWithPassword(normalizedEmail, password);
 
 			// Redirect to default app route (will check for empty data there)
 			navigate(defaultAppRoute);

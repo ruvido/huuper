@@ -1,6 +1,7 @@
 <script>
 	import { pb } from '../lib/pocketbase';
 	import { navigate, defaultAppRoute, queryParams, resolveNextRoute } from '../lib/router';
+	import { normalizeEmailInput } from '../lib/email';
 	import AuthLayout from '../components/AuthLayout.svelte';
 	import FormGroup from '../components/FormGroup.svelte';
 	import Button from '../components/Button.svelte';
@@ -28,7 +29,9 @@
 		loading = true;
 
 		try {
-			await pb.collection('users').authWithPassword(email, password);
+			const normalizedEmail = normalizeEmailInput(email);
+			email = normalizedEmail;
+			await pb.collection('users').authWithPassword(normalizedEmail, password);
 			// Navigate to next route (if any) - App.svelte will handle onboarding redirect if needed
 			navigate(resolveNextRoute($queryParams?.next) || defaultAppRoute);
 		} catch (err) {

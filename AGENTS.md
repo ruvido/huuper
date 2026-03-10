@@ -1,71 +1,63 @@
 # AGENTS
 
-Repository guidance for contributors and automated agents.
+## Scopo
+Linee guida minime per contribuire al progetto in modo coerente, semplice e mantenibile.
 
-## Purpose
-Minimal guidelines to contribute to the project consistently, while keeping simplicity, clarity, and alignment with the repository stack.
+## Principi
+- Less is more.
+- DRY sempre: evitare duplicazioni di logica, dati e processi.
+- Preferire soluzioni state of the art ma semplici da operare in self-hosting.
+- Quando c'e' dubbio, scegliere l'opzione piu' semplice, piu' chiara e con meno moving parts.
 
-## Principles
-- **Less is more**: keep code simple, clear, and minimal.
-- **DRY always**: avoid duplication of logic, data, and processes.
-- **Official docs first**: follow PocketBase/Go/Svelte official conventions.
-- Prefer state-of-the-art solutions that remain simple to operate in self-hosting.
-- When in doubt, choose the simplest and clearest option with the fewest moving parts.
+## Regole operative
+- No custom code quando esiste una soluzione standard o affidabile gia' disponibile.
+- Non prendere iniziativa architetturale o di scope senza discuterne prima.
+- Prima di implementare cambi strutturali, proporre opzioni e attendere conferma.
+- Tenere i cambi piccoli, iterativi e verificabili.
+- Non introdurre automazioni opache difficili da mantenere.
+- Non aggiungere dipendenze nuove se non strettamente necessario.
 
-## Stack (Repository Constraints)
-- Backend: PocketBase (Go framework) with custom APIs/hooks in Go.
-- Frontend: Svelte with hash routing.
-- Deploy: single Go binary.
+## Scope attuale
+- In questa fase il focus e' backend.
+- Frontend e mobile sono fuori scope, salvo richiesta esplicita.
 
-## Operational Rules
-- No custom code when a standard/reliable solution already exists.
-- Do not make architectural or scope decisions without discussing first.
-- Before implementing structural changes, propose options and wait for confirmation.
-- Keep changes small and focused; avoid redundancy.
-- Do not introduce opaque automation that is hard to maintain.
-- Do not add new dependencies unless strictly necessary.
+## Architettura dati
+- Source of truth dei dati applicativi: PocketBase per metadata, relazioni, auth e permessi.
+- Il database non deve sostituire confini di dominio chiari nell'applicazione.
+- PocketBase e' la scelta predefinita per metadata + auth.
 
-## Key Notes (Repo-Specific)
-- Server-side logic must be in Go (no JS SDK on the server).
-- Use `.env` to set default admin credentials.
-- Frontend package manager is **bun only** (do not use npm).
-- Keep the original routing and project tree.
+## Backend
+- Backend in Go con PocketBase framework.
+- La logica server-side deve stare in Go.
+- Usare `.env` per configurazioni locali e credenziali di bootstrap dove previsto.
+- Preferire refactor iterativi piccoli con build verde a ogni step.
+- Centralizzare autorizzazione, validazione e access rules; evitare duplicazione negli handler.
+- Mantenere il tree strutturato e sensato, senza refactor strutturali non discussi.
 
-## Frontend
-- Use semantic CSS.
-- Minimize the number of classes.
-- Keep hash routing (`#/...`) as currently configured in the project.
-- Follow the existing frontend folder structure in the repository (no structural refactors unless explicitly requested).
+## API Design
+- Le API devono essere chiare, robuste, prevedibili e adatte a interfacce web, CLI, mobile o desktop.
+- Il namespacing deve essere esplicito e stabile.
+- Gli endpoint admin hanno potere globale sulle risorse applicative.
+- Gli endpoint non admin devono esporre solo cio' che riguarda il profilo dell'utente autenticato e le sue relazioni autorizzate.
+- Naming, payload, errori e regole di accesso devono essere coerenti tra domini diversi.
 
-## Do / Don't
-Do:
-- Prefer existing helpers/components.
-- Keep logic linear.
-- Document only what is non-obvious.
-- Propose options before structural changes.
-
-Don't:
-- Duplicate code.
-- Add clever abstractions.
-- Drift from official conventions.
-- Introduce feature creep.
-- Introduce fallback logic or automatic behavior not explicitly requested.
+## Cosa evitare
+- Feature creep.
+- Astrazioni furbe o premature.
+- Duplicazione di logica tra handler.
+- Fallback impliciti o comportamento automatico non richiesto.
+- Drift rispetto alle convenzioni ufficiali di Go e PocketBase.
 
 ## Collaboration Constraint
-- Do not introduce automatic behavior, inferred UX changes, or fallback logic unless explicitly requested.
-- If a change is ambiguous, ask before implementing.
+- Se una modifica e' ambigua, fermarsi e chiarire.
+- Se una modifica tocca struttura, policy o naming cross-cutting, proporre prima le opzioni.
 
-## When Unsure
-Check official docs first:
+## Decision policy
+- In caso di dubbio scegliere l'opzione piu' semplice, piu' chiara, con meno moving parts.
+- Prima ufficializzare una convenzione, verificare che migliori davvero discoverability, robustezza e manutenzione.
+
+## Riferimenti
 - https://pocketbase.io/docs/
 - https://pocketbase.io/docs/use-as-framework/
-- https://svelte.dev/docs/svelte/
-- https://svelte.dev/docs/kit/configuration#router
-
-## Useful Commands
-```bash
-./pocketbase serve              # Start dev
-cd frontend && bun install      # Install frontend deps
-cd frontend && bun run build    # Build frontend
-go build -o pocketbase main.go  # Build binary
-```
+- https://go.dev/doc/
+- https://core.telegram.org/bots/api

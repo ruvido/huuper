@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { pb, fetchSetting } from '../lib/pocketbase';
 	import { navigate, queryParams } from '../lib/router';
+	import { normalizeEmailInput } from '../lib/email';
 	import AuthLayout from '../components/AuthLayout.svelte';
 	import FormGroup from '../components/FormGroup.svelte';
 	import Button from '../components/Button.svelte';
@@ -74,7 +75,9 @@
 	});
 
 	async function handleRequest() {
-		if (!email) {
+		const normalizedEmail = normalizeEmailInput(email);
+		email = normalizedEmail;
+		if (!normalizedEmail) {
 			error = copy.errors.required_email;
 			return;
 		}
@@ -84,7 +87,7 @@
 		emailError = '';
 
 		try {
-			await pb.collection('users').requestPasswordReset(email);
+			await pb.collection('users').requestPasswordReset(normalizedEmail);
 			requestSent = true;
 		} catch (err) {
 			if (err?.status === 400) {

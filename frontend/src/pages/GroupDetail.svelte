@@ -3,6 +3,8 @@
 	import { currentRoute, navigate } from '../lib/router';
 	import DashboardLayout from '../components/DashboardLayout.svelte';
 	import Card from '../components/Card.svelte';
+	import ActionDialog from '../components/modals/ActionDialog.svelte';
+	import { adminUsersCopy } from '../lib/copy/adminUsers';
 
 	let loading = true;
 	let error = '';
@@ -11,6 +13,10 @@
 	let requests = [];
 	let lastGroupId = '';
 	let currentScope = 'app';
+	let deleteDialogOpen = false;
+	let memberToDelete = null;
+	let deletingMember = false;
+	let deleteError = '';
 
 	$: routeContext = parseRouteContext($currentRoute);
 	$: groupId = routeContext.id;
@@ -45,6 +51,10 @@
 		return item?.email || 'Unknown';
 	}
 
+	function deleteAriaLabel(item) {
+		return `${adminUsersCopy.deleteButtonAriaPrefix} ${displayName(item)}`;
+	}
+
 	function formatStatus(status) {
 		if (!status || typeof status !== 'string') return '';
 		const clean = status.replace(/^\d+-/, '').replaceAll('_', ' ');
@@ -60,6 +70,44 @@
 	function openRequest(item) {
 		if (!item?.id) return;
 		navigate(`${currentScope}/requests/${encodeURIComponent(item.id)}`);
+	}
+
+	function openDeleteDialog(member) {
+		if (!isAdmin || !member?.id) return;
+		memberToDelete = member;
+		deleteDialogOpen = true;
+		deleteError = '';
+	}
+
+	function closeDeleteDialog() {
+		if (deletingMember) return;
+		deleteDialogOpen = false;
+		memberToDelete = null;
+		deleteError = '';
+	}
+
+	async function confirmDeleteMember() {
+		const userId = memberToDelete?.id || '';
+		if (!isAdmin || !userId || deletingMember) return false;
+		deletingMember = true;
+		deleteError = '';
+		try {
+			const response = await apiFetch(`/api/admin/users/${encodeURIComponent(userId)}`, {
+				method: 'DELETE'
+			});
+			if (!response.ok) {
+				const payload = await response.json().catch(() => ({}));
+				throw new Error(payload?.message || adminUsersCopy.deleteErrorGeneric);
+			}
+			await loadAll();
+			closeDeleteDialog();
+			return true;
+		} catch (err) {
+			deleteError = err?.message || adminUsersCopy.deleteErrorGeneric;
+			return false;
+		} finally {
+			deletingMember = false;
+		}
 	}
 
 	async function loadAll() {
@@ -137,7 +185,22 @@
 					{:else}
 						{#each members as member}
 							<Card variant="item">
-								<p class="name">{displayName(member)}</p>
+								<div class="member-row">
+									<p class="name">{displayName(member)}</p>
+									{#if isAdmin}
+										<button
+											type="button"
+											class="member-delete"
+											on:click={() => openDeleteDialog(member)}
+											aria-label={deleteAriaLabel(member)}
+										>
+											<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+												<path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
+												<path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
+											</svg>
+										</button>
+									{/if}
+								</div>
 							</Card>
 						{/each}
 					{/if}
@@ -146,6 +209,16 @@
 		</Card>
 	{/if}
 </DashboardLayout>
+
+<ActionDialog
+	show={deleteDialogOpen}
+	title={adminUsersCopy.deleteDialogTitle}
+	message={deleteError || adminUsersCopy.deleteDialogMessage}
+	confirmLabel={adminUsersCopy.deleteDialogConfirmLabel}
+	loading={deletingMember}
+	onConfirm={confirmDeleteMember}
+	onCancel={closeDeleteDialog}
+/>
 
 <style>
 	h2 {
@@ -189,6 +262,24 @@
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
+	}
+
+	.member-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.6rem;
+	}
+
+	.member-delete {
+		border: none;
+		background: transparent;
+		padding: 0.2rem;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		color: #c40000;
+		cursor: pointer;
 	}
 
 	.empty {

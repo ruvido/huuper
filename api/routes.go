@@ -20,6 +20,7 @@ func RegisterRoutes(app *pocketbase.PocketBase, se *core.ServeEvent) {
 	se.Router.POST("/api/admin/registrations/{id}/reject", AdminRejectRegistrationHandler(app)).Bind(apis.RequireAuth())
 	se.Router.POST("/api/admin/registrations/{id}/cancel", AdminCancelRegistrationHandler(app)).Bind(apis.RequireAuth())
 	se.Router.POST("/api/admin/groups/sync-memberships", AdminSyncGroupMembershipsHandler(app)).Bind(apis.RequireAuth())
+	se.Router.DELETE("/api/admin/users/{id}", AdminDeleteUserHandler(app)).Bind(apis.RequireAuth())
 
 	se.Router.GET("/api/events/{slug}/status", EventStatusHandler(app)).Bind(apis.RequireAuth())
 	se.Router.POST("/api/events/{slug}/unsubscribe", EventUnsubscribeHandler(app)).Bind(apis.RequireAuth())
