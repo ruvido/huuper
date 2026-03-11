@@ -174,9 +174,9 @@ func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 			return apis.NewBadRequestError("invalid_request", nil)
 		}
 
-		record, err := app.FindRecordById("requests", id)
-		if err != nil || record == nil {
-			return apis.NewNotFoundError("request_not_found", err)
+		record, err := backendinternal.VisibleRequestForActor(app, actor, id)
+		if err != nil {
+			return err
 		}
 
 		var payload backendrequests.ActionPayload

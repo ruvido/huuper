@@ -73,8 +73,8 @@ func DefaultGroupInvite(app *pocketbase.PocketBase, actor *core.Record) (string,
 	if invite.ExpireDate > 0 && int64(invite.ExpireDate) <= nowUnix {
 		return "", "", apis.NewBadRequestError("invite_link_generation_failed", fmt.Errorf("created invite link is expired"))
 	}
-	log.Printf("[default-invite] user=%s chat_id=%d created invite link=%s is_primary=%v is_revoked=%v expire_date=%d member_limit=%d creates_join_request=%v",
-		strings.TrimSpace(actor.Id), chatID, link, invite.IsPrimary, invite.IsRevoked, invite.ExpireDate, invite.MemberLimit, invite.CreatesJoinRequest)
+	log.Printf("[default-invite] user=%s chat_id=%d created invite is_primary=%v is_revoked=%v expire_date=%d member_limit=%d creates_join_request=%v",
+		strings.TrimSpace(actor.Id), chatID, invite.IsPrimary, invite.IsRevoked, invite.ExpireDate, invite.MemberLimit, invite.CreatesJoinRequest)
 
 	return group.Id, link, nil
 }

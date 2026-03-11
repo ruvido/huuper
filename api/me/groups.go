@@ -62,7 +62,7 @@ func GroupMembersHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) 
 
 		response, err := groupinternal.MembersResponseForGroup(app, group.Id)
 		if err != nil {
-			return apis.NewBadRequestError("failed_guardians", err)
+			return apis.NewBadRequestError("failed_members", err)
 		}
 		return e.JSON(http.StatusOK, response)
 	}
