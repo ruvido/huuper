@@ -1,4 +1,4 @@
-package internal
+package events
 
 import (
 	"strings"
@@ -7,9 +7,9 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
-const ActiveEventRegistrationFilterSuffix = "status != 'cancelled' && status != 'rejected'"
+const ActiveRegistrationFilterSuffix = "status != 'cancelled' && status != 'rejected'"
 
-func FindEventBySlug(app *pocketbase.PocketBase, slug string) (*core.Record, error) {
+func FindBySlug(app *pocketbase.PocketBase, slug string) (*core.Record, error) {
 	rawSlug := strings.TrimSpace(slug)
 	if rawSlug == "" {
 		return nil, nil
@@ -22,10 +22,10 @@ func FindEventBySlug(app *pocketbase.PocketBase, slug string) (*core.Record, err
 	)
 }
 
-func FindEventRegistrationByUser(app *pocketbase.PocketBase, eventID string, userID string, activeOnly bool) (*core.Record, error) {
+func FindRegistrationByUser(app *pocketbase.PocketBase, eventID string, userID string, activeOnly bool) (*core.Record, error) {
 	filter := "event = {:event} && user = {:user}"
 	if activeOnly {
-		filter += " && " + ActiveEventRegistrationFilterSuffix
+		filter += " && " + ActiveRegistrationFilterSuffix
 	}
 	return app.FindFirstRecordByFilter(
 		"event_registrations",
@@ -37,10 +37,10 @@ func FindEventRegistrationByUser(app *pocketbase.PocketBase, eventID string, use
 	)
 }
 
-func FindEventRegistrationByEmail(app *pocketbase.PocketBase, eventID string, email string, activeOnly bool) (*core.Record, error) {
+func FindRegistrationByEmail(app *pocketbase.PocketBase, eventID string, email string, activeOnly bool) (*core.Record, error) {
 	filter := "event = {:event} && email = {:email}"
 	if activeOnly {
-		filter += " && " + ActiveEventRegistrationFilterSuffix
+		filter += " && " + ActiveRegistrationFilterSuffix
 	}
 	return app.FindFirstRecordByFilter(
 		"event_registrations",

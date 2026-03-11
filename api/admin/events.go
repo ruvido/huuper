@@ -1,17 +1,18 @@
-package api
+package admin
 
 import (
 	"net/http"
 	"strings"
 
 	backendinternal "members/internal"
+	eventinternal "members/internal/events"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 )
 
-type adminRegistrationItem struct {
+type registrationItem struct {
 	ID      string         `json:"id"`
 	Email   string         `json:"email"`
 	Status  string         `json:"status"`
@@ -20,23 +21,22 @@ type adminRegistrationItem struct {
 	Data    map[string]any `json:"data"`
 }
 
-type adminRegistrationNotePayload struct {
+type registrationNotePayload struct {
 	Note string `json:"note"`
 }
 
-// AdminEventDetailsHandler returns the event and its registrations.
-func AdminEventDetailsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+func EventDetailsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		if _, err := backendinternal.RequireAdmin(e); err != nil {
 			return err
 		}
 
-		eventId := e.Request.PathValue("id")
-		if eventId == "" {
+		eventID := e.Request.PathValue("id")
+		if eventID == "" {
 			return apis.NewBadRequestError("invalid_event", nil)
 		}
 
-		event, err := app.FindRecordById("events", eventId)
+		event, err := app.FindRecordById("events", eventID)
 		if err != nil || event == nil {
 			return apis.NewNotFoundError("invalid_event", err)
 		}
@@ -47,13 +47,13 @@ func AdminEventDetailsHandler(app *pocketbase.PocketBase) func(e *core.RequestEv
 			"created",
 			0,
 			0,
-			map[string]any{"event": eventId},
+			map[string]any{"event": eventID},
 		)
 		if err != nil {
 			return apis.NewBadRequestError("failed_registrations", err)
 		}
 
-		items := make([]adminRegistrationItem, 0, len(registrations))
+		items := make([]registrationItem, 0, len(registrations))
 		for _, record := range registrations {
 			items = append(items, mapRegistration(app, record))
 		}
@@ -72,19 +72,18 @@ func AdminEventDetailsHandler(app *pocketbase.PocketBase) func(e *core.RequestEv
 	}
 }
 
-// AdminApproveRegistrationHandler marks a registration as accepted.
-func AdminApproveRegistrationHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+func ApproveRegistrationHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		if _, err := backendinternal.RequireAdmin(e); err != nil {
 			return err
 		}
 
-		regId := e.Request.PathValue("id")
-		if regId == "" {
+		regID := e.Request.PathValue("id")
+		if regID == "" {
 			return apis.NewBadRequestError("invalid_registration", nil)
 		}
 
-		record, err := app.FindRecordById("event_registrations", regId)
+		record, err := app.FindRecordById("event_registrations", regID)
 		if err != nil || record == nil {
 			return apis.NewNotFoundError("invalid_registration", err)
 		}
@@ -93,7 +92,7 @@ func AdminApproveRegistrationHandler(app *pocketbase.PocketBase) func(e *core.Re
 			return e.JSON(http.StatusOK, map[string]any{"status": "already_accepted"})
 		}
 
-		if err := activateEventRegistration(app, record); err != nil {
+		if err := eventinternal.ActivateRegistration(app, record, "events.user.registration_accepted"); err != nil {
 			return apis.NewBadRequestError("failed_update", err)
 		}
 
@@ -101,19 +100,18 @@ func AdminApproveRegistrationHandler(app *pocketbase.PocketBase) func(e *core.Re
 	}
 }
 
-// AdminCancelRegistrationHandler marks a registration as cancelled.
-func AdminCancelRegistrationHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+func CancelRegistrationHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		if _, err := backendinternal.RequireAdmin(e); err != nil {
 			return err
 		}
 
-		regId := e.Request.PathValue("id")
-		if regId == "" {
+		regID := e.Request.PathValue("id")
+		if regID == "" {
 			return apis.NewBadRequestError("invalid_registration", nil)
 		}
 
-		var payload adminRegistrationNotePayload
+		var payload registrationNotePayload
 		if err := e.BindBody(&payload); err != nil {
 			return apis.NewBadRequestError("invalid_payload", err)
 		}
@@ -122,7 +120,7 @@ func AdminCancelRegistrationHandler(app *pocketbase.PocketBase) func(e *core.Req
 			return apis.NewBadRequestError("invalid_cancelled_note", nil)
 		}
 
-		record, err := app.FindRecordById("event_registrations", regId)
+		record, err := app.FindRecordById("event_registrations", regID)
 		if err != nil || record == nil {
 			return apis.NewNotFoundError("invalid_registration", err)
 		}
@@ -143,19 +141,18 @@ func AdminCancelRegistrationHandler(app *pocketbase.PocketBase) func(e *core.Req
 	}
 }
 
-// AdminRejectRegistrationHandler marks a registration as rejected and stores the reason in data.rejected.
-func AdminRejectRegistrationHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+func RejectRegistrationHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		if _, err := backendinternal.RequireAdmin(e); err != nil {
 			return err
 		}
 
-		regId := e.Request.PathValue("id")
-		if regId == "" {
+		regID := e.Request.PathValue("id")
+		if regID == "" {
 			return apis.NewBadRequestError("invalid_registration", nil)
 		}
 
-		var payload adminRegistrationNotePayload
+		var payload registrationNotePayload
 		if err := e.BindBody(&payload); err != nil {
 			return apis.NewBadRequestError("invalid_payload", err)
 		}
@@ -165,7 +162,7 @@ func AdminRejectRegistrationHandler(app *pocketbase.PocketBase) func(e *core.Req
 			return apis.NewBadRequestError("invalid_rejected_note", nil)
 		}
 
-		record, err := app.FindRecordById("event_registrations", regId)
+		record, err := app.FindRecordById("event_registrations", regID)
 		if err != nil || record == nil {
 			return apis.NewNotFoundError("invalid_registration", err)
 		}
@@ -182,21 +179,21 @@ func AdminRejectRegistrationHandler(app *pocketbase.PocketBase) func(e *core.Req
 	}
 }
 
-func mapRegistration(app *pocketbase.PocketBase, record *core.Record) adminRegistrationItem {
+func mapRegistration(app *pocketbase.PocketBase, record *core.Record) registrationItem {
 	data := backendinternal.ParseJSONMap(record.Get("data"))
-	userId := strings.TrimSpace(record.GetString("user"))
-	if userId != "" {
-		if user, err := app.FindRecordById("users", userId); err == nil && user != nil {
+	userID := strings.TrimSpace(record.GetString("user"))
+	if userID != "" {
+		if user, err := app.FindRecordById("users", userID); err == nil && user != nil {
 			data = backendinternal.ParseJSONMap(user.Get("data"))
 		}
 	}
 
-	return adminRegistrationItem{
+	return registrationItem{
 		ID:      record.Id,
 		Email:   record.GetString("email"),
 		Status:  record.GetString("status"),
 		Created: record.GetString("created"),
-		HasUser: userId != "",
+		HasUser: userID != "",
 		Data:    data,
 	}
 }

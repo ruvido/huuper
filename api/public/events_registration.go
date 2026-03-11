@@ -1,9 +1,6 @@
-package api
+package public
 
 import (
-	"bytes"
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html"
@@ -14,7 +11,7 @@ import (
 	"time"
 
 	backendinternal "members/internal"
-	requestinternal "members/internal/requests"
+	eventinternal "members/internal/events"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/pocketbase/pocketbase"
@@ -22,8 +19,6 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/core/validators"
 	"github.com/pocketbase/pocketbase/tools/mailer"
-	"github.com/yuin/goldmark"
-	htmlrender "github.com/yuin/goldmark/renderer/html"
 )
 
 type registrationPayload struct {
@@ -52,11 +47,6 @@ const (
 	templateKindAdminNewRegistration     = "events.admin.new_registration"
 )
 
-const (
-	emailSenderScopeGeneral = "general"
-	emailSenderScopeEvents  = "events"
-)
-
 // RegisterEventHandler creates a registration for an active event by slug.
 func RegisterEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
@@ -65,7 +55,7 @@ func RegisterEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 			return apis.NewBadRequestError(errInvalidEvent, nil)
 		}
 
-		event, err := backendinternal.FindEventBySlug(app, slug)
+		event, err := eventinternal.FindBySlug(app, slug)
 		if err != nil {
 			return apis.NewNotFoundError(errInvalidEvent, err)
 		}
@@ -127,19 +117,19 @@ func RegisterEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 			return apis.NewNotFoundError(errGeneric, err)
 		}
 
-		existing, err := backendinternal.FindEventRegistrationByEmail(app, event.Id, recipient, false)
+		existing, err := eventinternal.FindRegistrationByEmail(app, event.Id, recipient, false)
 		if err == nil && existing != nil {
 			return apis.NewBadRequestError(errAlreadySubmitted, nil)
 		}
 
-		acceptToken, err := generateAcceptToken(app)
+		acceptToken, err := eventinternal.GenerateAcceptToken(app)
 		if err != nil {
 			return apis.NewBadRequestError(errGeneric, err)
 		}
 
 		record := core.NewRecord(registrations)
 		record.Set("accept_token", acceptToken)
-		record.Set("accept_expires_at", acceptTokenExpiryForEvent(event))
+		record.Set("accept_expires_at", eventinternal.AcceptTokenExpiryForEvent(event))
 		record.Set("event", event.Id)
 		if linkedUser != nil {
 			record.Set("user", linkedUser.Id)
@@ -161,7 +151,7 @@ func RegisterEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 			effectiveData = backendinternal.ParseJSONMap(linkedUser.Get("data"))
 		}
 		if linkedUser != nil {
-			if err := activateEventRegistration(app, record); err != nil {
+			if err := eventinternal.ActivateRegistration(app, record, templateKindUserRegistrationAccepted); err != nil {
 				return apis.NewBadRequestError(errGeneric, err)
 			}
 		}
@@ -196,35 +186,7 @@ func sendUserTemplateEmailByKind(
 	recipient string,
 	logMessage string,
 ) bool {
-	recipientAddress, ok := parseAddress(recipient)
-	if !ok {
-		return false
-	}
-
-	template, found, err := loadTemplateDataByKind(app, eventID, kind)
-	if err != nil {
-		app.Logger().Warn("Failed to load template", "kind", kind, "error", err)
-		return false
-	}
-	if !found || !templateHasContent(template) {
-		return false
-	}
-
-	var replyToAddr *mail.Address
-	if replyTo := strings.TrimSpace(template.ReplyTo); replyTo != "" {
-		if parsed, ok := parseAddress(replyTo); ok {
-			replyToAddr = &parsed
-		}
-	}
-
-	return renderAndSendEmail(
-		app,
-		[]mail.Address{recipientAddress},
-		template.Subject,
-		template.Body,
-		replyToAddr,
-		logMessage,
-	)
+	return eventinternal.SendUserTemplateEmailByKind(app, eventID, kind, recipient, logMessage)
 }
 
 func sendAdminNotification(app *pocketbase.PocketBase, event *core.Record, registrantEmail string, acceptToken string, data map[string]any) {
@@ -362,7 +324,7 @@ func renderAcceptButtonText(app *pocketbase.PocketBase, token string) string {
 }
 
 func renderAcceptButton(app *pocketbase.PocketBase, token string, formatter func(string) string) string {
-	acceptURL := buildAcceptURL(app, token)
+	acceptURL := eventinternal.BuildAcceptURL(app, token)
 	if acceptURL == "" {
 		return ""
 	}
@@ -374,47 +336,11 @@ func normalizeEmail(raw string) (string, error) {
 }
 
 func parseAddress(raw string) (mail.Address, bool) {
-	parsed, _, ok := parseNormalizedEmail(raw)
-	return parsed, ok
-}
-
-func senderFromGeneral(app *pocketbase.PocketBase) (mail.Address, bool) {
-	return senderFromScope(app, emailSenderScopeGeneral)
+	return eventinternal.ParseAddress(raw)
 }
 
 func senderFromEvents(app *pocketbase.PocketBase) (mail.Address, bool) {
-	return senderFromScope(app, emailSenderScopeEvents)
-}
-
-func senderFromScope(app *pocketbase.PocketBase, scope string) (mail.Address, bool) {
-	raw := ""
-	if settingsData, err := requestinternal.FindSettingData(app, "email"); err == nil {
-		if scope == emailSenderScopeEvents {
-			if eventsFrom, ok := settingsData[emailSenderScopeEvents].(string); ok {
-				raw = strings.TrimSpace(eventsFrom)
-			}
-		}
-		if raw == "" {
-			if general, ok := settingsData[emailSenderScopeGeneral].(string); ok {
-				raw = strings.TrimSpace(general)
-			}
-		}
-	}
-	if raw == "" {
-		raw = strings.TrimSpace(app.Settings().Meta.SenderAddress)
-	}
-	if raw == "" {
-		return mail.Address{}, false
-	}
-
-	parsed, ok := parseAddress(raw)
-	if !ok {
-		return mail.Address{}, false
-	}
-	if strings.TrimSpace(parsed.Name) == "" {
-		parsed.Name = app.Settings().Meta.SenderName
-	}
-	return parsed, true
+	return eventinternal.SenderFromEvents(app)
 }
 
 func buildMessage(from mail.Address, to []mail.Address, subject string, text string, html string, replyTo *mail.Address) *mailer.Message {
@@ -500,72 +426,9 @@ func stringify(value any) string {
 	}
 }
 
-func buildAcceptURL(app *pocketbase.PocketBase, token string) string {
-	base := strings.TrimRight(app.Settings().Meta.AppURL, "/")
-	if base == "" {
-		return ""
-	}
-	if token == "" {
-		return ""
-	}
-	return base + "/#/event-accept?token=" + token
-}
-
-func randomToken() string {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		return ""
-	}
-	return hex.EncodeToString(b)
-}
-
-func generateAcceptToken(app *pocketbase.PocketBase) (string, error) {
-	const attempts = 5
-	for i := 0; i < attempts; i++ {
-		token := randomToken()
-		if token == "" {
-			continue
-		}
-		unique, err := isTokenUnique(app, token)
-		if err != nil {
-			return "", err
-		}
-		if unique {
-			return token, nil
-		}
-	}
-
-	return "", fmt.Errorf("unable to generate unique accept token")
-}
-
-func isTokenUnique(app *pocketbase.PocketBase, token string) (bool, error) {
-	records, err := app.FindRecordsByFilter(
-		"event_registrations",
-		"accept_token = {:token}",
-		"",
-		1,
-		0,
-		map[string]any{"token": token},
-	)
-	if err != nil {
-		return false, err
-	}
-	return len(records) == 0, nil
-}
 
 func renderEmailBody(body string) (string, string) {
-	clean := strings.TrimSpace(body)
-	if strings.HasPrefix(clean, "md:") {
-		clean = strings.TrimSpace(strings.TrimPrefix(clean, "md:"))
-	}
-	if clean == "" {
-		return "", ""
-	}
-	htmlBody, ok := markdownToHTML(clean)
-	if !ok {
-		htmlBody = `<div style="white-space:pre-wrap">` + html.EscapeString(clean) + `</div>`
-	}
-	return clean, htmlBody
+	return eventinternal.RenderEmailBody(body)
 }
 
 func renderAndSendEmail(
@@ -594,23 +457,6 @@ func renderAndSendEmailTemplates(
 	return sendEmailBodies(app, to, subject, textBody, htmlBody, replyTo, logMessage)
 }
 
-func parseNormalizedEmail(raw string) (mail.Address, string, bool) {
-	return backendinternal.ParseNormalizedEmail(raw)
-}
-
-func markdownToHTML(input string) (string, bool) {
-	md := goldmark.New(
-		goldmark.WithRendererOptions(
-			htmlrender.WithUnsafe(),
-		),
-	)
-	var out bytes.Buffer
-	if err := md.Convert([]byte(input), &out); err != nil {
-		return "", false
-	}
-	return out.String(), true
-}
-
 const maxRegistrationDataBytes = 4000
 
 func isDataSizeOk(data map[string]any) bool {
@@ -632,38 +478,20 @@ func templateVars(event *core.Record, registrantEmail string, data map[string]an
 	name := ""
 	if data != nil {
 		if value, ok := data["full_name"].(string); ok {
-			name = normalizePersonName(value)
+			name = backendinternal.NormalizePersonName(value)
 		}
 	}
 	email := strings.TrimSpace(registrantEmail)
 	return eventTitle, name, email
 }
 
-func acceptTokenExpiryForEvent(event *core.Record) time.Time {
-	if event == nil {
-		return time.Now().UTC()
-	}
-	eventDate := event.GetDateTime("event_date")
-	if eventDate.IsZero() {
-		return time.Now().UTC()
-	}
-	localEventDay := eventDate.Time().In(time.Local)
-	endOfDayLocal := time.Date(
-		localEventDay.Year(),
-		localEventDay.Month(),
-		localEventDay.Day(),
-		23, 59, 59, 0,
-		time.Local,
-	)
-	return endOfDayLocal.UTC()
-}
 
 func normalizeRegistrationNames(data map[string]any) {
 	if data == nil {
 		return
 	}
 	if value, ok := data["full_name"].(string); ok {
-		normalized := normalizePersonName(value)
+		normalized := backendinternal.NormalizePersonName(value)
 		if normalized != "" {
 			data["full_name"] = normalized
 		}
@@ -693,7 +521,7 @@ func adminTemplateOrWarn(app *pocketbase.PocketBase, event *core.Record, registr
 		sendAdminTemplateMissing(app, event, registrantEmail, kind)
 		return templateData{}, mail.Address{}, false
 	}
-	if !found || !templateHasContent(template) {
+	if !found || strings.TrimSpace(template.Subject) == "" || strings.TrimSpace(template.Body) == "" {
 		sendAdminTemplateMissing(app, event, registrantEmail, kind)
 		return templateData{}, mail.Address{}, false
 	}
@@ -706,69 +534,8 @@ func adminTemplateOrWarn(app *pocketbase.PocketBase, event *core.Record, registr
 }
 
 func loadTemplateDataByKind(app *pocketbase.PocketBase, eventID string, kind string) (templateData, bool, error) {
-	record, err := findTemplateByKindAndEvent(app, kind, eventID)
-	if err != nil {
-		return templateData{}, false, err
-	}
-	if record != nil {
-		template, err := parseTemplateData(record)
-		if err != nil {
-			return templateData{}, false, err
-		}
-		return template, true, nil
-	}
-
-	if eventID == "" {
-		return templateData{}, false, nil
-	}
-
-	record, err = findTemplateByKindAndEvent(app, kind, "")
-	if err != nil {
-		return templateData{}, false, err
-	}
-	if record == nil {
-		return templateData{}, false, nil
-	}
-
-	template, err := parseTemplateData(record)
-	if err != nil {
-		return templateData{}, false, err
-	}
-	return template, true, nil
-}
-
-func findTemplateByKindAndEvent(app *pocketbase.PocketBase, kind string, eventID string) (*core.Record, error) {
-	if strings.TrimSpace(kind) == "" {
-		return nil, nil
-	}
-
-	filter := "kind = {:kind} && event = ''"
-	params := map[string]any{"kind": kind}
-	if strings.TrimSpace(eventID) != "" {
-		filter = "kind = {:kind} && event = {:event}"
-		params["event"] = strings.TrimSpace(eventID)
-	}
-
-	records, err := app.FindRecordsByFilter("templates", filter, "", 1, 0, params)
-	if err != nil {
-		return nil, err
-	}
-	if len(records) == 0 {
-		return nil, nil
-	}
-	return records[0], nil
-}
-
-func templateHasContent(template templateData) bool {
-	return strings.TrimSpace(template.Subject) != "" && strings.TrimSpace(template.Body) != ""
-}
-
-func parseTemplateData(record *core.Record) (templateData, error) {
-	var template templateData
-	if err := record.UnmarshalJSONField("data", &template); err != nil {
-		return templateData{}, err
-	}
-	return template, nil
+	template, found, err := eventinternal.LoadTemplateDataByKind(app, eventID, kind)
+	return templateData(template), found, err
 }
 
 func isUniqueConstraintError(err error) bool {
@@ -787,23 +554,4 @@ func isUniqueConstraintError(err error) bool {
 	_, hasEvent := fieldErrors["event"]
 	_, hasEmail := fieldErrors["email"]
 	return hasEvent || hasEmail
-}
-
-func activateEventRegistration(app *pocketbase.PocketBase, record *core.Record) error {
-	record.Set("status", "active")
-	if err := app.Save(record); err != nil {
-		return err
-	}
-
-	eventID := strings.TrimSpace(record.GetString("event"))
-	recipient := strings.TrimSpace(record.GetString("email"))
-	_ = sendUserTemplateEmailByKind(
-		app,
-		eventID,
-		templateKindUserRegistrationAccepted,
-		recipient,
-		"Failed to send accepted registration email",
-	)
-
-	return nil
 }

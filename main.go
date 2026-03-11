@@ -9,6 +9,7 @@ import (
 
 	"members/api"
 	"members/bot"
+	"members/internal/hooks"
 	_ "members/migrations"
 )
 
@@ -21,9 +22,9 @@ func init() {
 
 func main() {
 	app := pocketbase.New()
-	api.RegisterSettingsValidationHooks(app)
-	api.RegisterGroupsValidationHooks(app)
-	api.RegisterUsersNormalizationHooks(app)
+	hooks.RegisterSettingsValidation(app)
+	hooks.RegisterGroupsValidation(app)
+	hooks.RegisterUsersNormalization(app)
 
 	app.OnTerminate().BindFunc(func(e *core.TerminateEvent) error {
 		bot.StopTelegramBot()

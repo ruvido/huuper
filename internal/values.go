@@ -2,12 +2,13 @@ package internal
 
 import (
 	"crypto/rand"
-	"encoding/json"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net/mail"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 func AnyToString(value any) string {
@@ -84,4 +85,25 @@ func RandomToken() string {
 		return ""
 	}
 	return hex.EncodeToString(buf)
+}
+
+func NormalizePersonName(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return ""
+	}
+
+	parts := strings.Fields(strings.ToLower(trimmed))
+	for i, part := range parts {
+		runes := []rune(part)
+		if len(runes) == 0 {
+			continue
+		}
+		runes[0] = unicode.ToUpper(runes[0])
+		for j := 1; j < len(runes); j++ {
+			runes[j] = unicode.ToLower(runes[j])
+		}
+		parts[i] = string(runes)
+	}
+	return strings.Join(parts, " ")
 }

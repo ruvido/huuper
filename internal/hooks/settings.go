@@ -1,4 +1,4 @@
-package api
+package hooks
 
 import (
 	"fmt"
@@ -6,22 +6,23 @@ import (
 
 	backendinternal "members/internal"
 	requestinternal "members/internal/requests"
+	settinginternal "members/internal/settings"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 )
 
-// RegisterSettingsValidationHooks enforces cross-setting integrity for
+// RegisterSettingsValidation enforces cross-setting integrity for
 // profile_schema, signup and onboarding.
-func RegisterSettingsValidationHooks(app *pocketbase.PocketBase) {
+func RegisterSettingsValidation(app *pocketbase.PocketBase) {
 	app.OnRecordValidate("settings").BindFunc(func(e *core.RecordEvent) error {
 		name := strings.TrimSpace(e.Record.GetString("name"))
 		if name == "" {
 			return e.Next()
 		}
 
-		data := unwrapSettingData(e.Record.Get("data"))
+		data := settinginternal.Unwrap(e.Record.Get("data"))
 		if len(data) == 0 {
 			return apis.NewBadRequestError("invalid_settings_data", fmt.Errorf("settings.%s data is empty", name))
 		}
@@ -42,8 +43,6 @@ func RegisterSettingsValidationHooks(app *pocketbase.PocketBase) {
 		case "signup", "onboarding":
 			keys, err := loadProfileSchemaKeys(e.App)
 			if err != nil {
-				// During fresh bootstrap migrations, signup/onboarding can be created
-				// before profile_schema exists. Skip cross-validation in that phase.
 				return e.Next()
 			}
 			if err := validateFlowSettingData(name, data, keys); err != nil {
@@ -94,7 +93,7 @@ func loadProfileSchemaKeys(app core.App) (map[string]struct{}, error) {
 		return nil, fmt.Errorf("settings.profile_schema not found")
 	}
 
-	return extractProfileSchemaKeys(unwrapSettingData(record.Get("data")))
+	return extractProfileSchemaKeys(settinginternal.Unwrap(record.Get("data")))
 }
 
 func extractProfileSchemaKeys(data map[string]any) (map[string]struct{}, error) {
@@ -137,7 +136,7 @@ func validateExistingFlowSetting(app core.App, name string, keys map[string]stru
 		return nil
 	}
 
-	data := unwrapSettingData(record.Get("data"))
+	data := settinginternal.Unwrap(record.Get("data"))
 	return validateFlowSettingData(name, data, keys)
 }
 

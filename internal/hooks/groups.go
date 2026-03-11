@@ -1,4 +1,4 @@
-package api
+package hooks
 
 import (
 	"fmt"
@@ -9,8 +9,8 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
-// RegisterGroupsValidationHooks enforces groups-level integrity rules.
-func RegisterGroupsValidationHooks(app *pocketbase.PocketBase) {
+// RegisterGroupsValidation enforces groups-level integrity rules.
+func RegisterGroupsValidation(app *pocketbase.PocketBase) {
 	app.OnRecordValidate("groups").BindFunc(func(e *core.RecordEvent) error {
 		groupType := strings.TrimSpace(e.Record.GetString("type"))
 		if groupType != "default" {

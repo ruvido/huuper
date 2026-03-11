@@ -12,34 +12,34 @@ import (
 
 func RegisterRoutes(app *pocketbase.PocketBase, se *core.ServeEvent) {
 	publicroutes.Register(se, publicroutes.Handlers{
-		Settings:       GetSettingsHandler(app),
-		EventsAccept:   AcceptEventHandler(app),
-		EventsRegister: RegisterEventHandler(app),
+		Settings:       publicroutes.SettingsHandler(app),
+		EventsAccept:   publicroutes.AcceptEventHandler(app),
+		EventsRegister: publicroutes.RegisterEventHandler(app),
 		RequestsCreate: publicroutes.SubmitRequestHandler(app),
 	})
 
 	meroutes.Register(se, meroutes.Handlers{
-		Settings:           GetSettingsHandler(app),
-		EventStatus:        EventStatusHandler(app),
-		EventUnsubscribe:   EventUnsubscribeHandler(app),
-		TelegramToken:      GenerateTelegramTokenHandler(app),
+		Settings:           meroutes.SettingsHandler(app),
+		EventStatus:        meroutes.EventStatusHandler(app),
+		EventUnsubscribe:   meroutes.EventUnsubscribeHandler(app),
+		TelegramToken:      meroutes.GenerateTelegramTokenHandler(app),
 		RequestsList:       meroutes.ListRequestsHandler(app),
 		RequestGet:         meroutes.GetRequestHandler(app),
 		RequestAction:      meroutes.RequestActionHandler(app),
-		GroupMembers:       GroupMembersHandler(app),
-		GroupGuardians:    GroupGuardiansHandler(app),
-		GroupRequestsCount: GroupRequestsCountHandler(app),
-		DefaultInvite:      DefaultGroupInviteHandler(app),
+		GroupMembers:       meroutes.GroupMembersHandler(app),
+		GroupGuardians:     meroutes.GroupGuardiansHandler(app),
+		GroupRequestsCount: meroutes.GroupRequestsCountHandler(app),
+		DefaultInvite:      meroutes.DefaultGroupInviteHandler(app),
 	})
 
 	adminroutes.Register(se, adminroutes.Handlers{
-		Settings:             GetSettingsHandler(app),
+		Settings:             adminroutes.SettingsHandler(app),
 		Summary:              adminroutes.SummaryHandler(app),
-		EventDetails:         AdminEventDetailsHandler(app),
-		EventEmail:           AdminEventEmailHandler(app),
-		RegistrationApprove:  AdminApproveRegistrationHandler(app),
-		RegistrationReject:   AdminRejectRegistrationHandler(app),
-		RegistrationCancel:   AdminCancelRegistrationHandler(app),
+		EventDetails:         adminroutes.EventDetailsHandler(app),
+		EventEmail:           adminroutes.EventEmailHandler(app),
+		RegistrationApprove:  adminroutes.ApproveRegistrationHandler(app),
+		RegistrationReject:   adminroutes.RejectRegistrationHandler(app),
+		RegistrationCancel:   adminroutes.CancelRegistrationHandler(app),
 		GroupSyncMemberships: adminroutes.SyncGroupMembershipsHandler(app),
 		UserDelete:           adminroutes.DeleteUserHandler(app),
 	})
