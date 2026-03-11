@@ -13,10 +13,6 @@ import (
 
 func DeleteUserHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		if _, err := backendinternal.RequireAdmin(e); err != nil {
-			return err
-		}
-
 		userID := strings.TrimSpace(e.Request.PathValue("id"))
 		if userID == "" {
 			return apis.NewBadRequestError("invalid_user", nil)

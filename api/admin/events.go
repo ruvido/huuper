@@ -27,10 +27,6 @@ type registrationNotePayload struct {
 
 func EventDetailsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		if _, err := backendinternal.RequireAdmin(e); err != nil {
-			return err
-		}
-
 		eventID := e.Request.PathValue("id")
 		if eventID == "" {
 			return apis.NewBadRequestError("invalid_event", nil)
@@ -74,10 +70,6 @@ func EventDetailsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) 
 
 func ApproveRegistrationHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		if _, err := backendinternal.RequireAdmin(e); err != nil {
-			return err
-		}
-
 		regID := e.Request.PathValue("id")
 		if regID == "" {
 			return apis.NewBadRequestError("invalid_registration", nil)
@@ -102,10 +94,6 @@ func ApproveRegistrationHandler(app *pocketbase.PocketBase) func(e *core.Request
 
 func CancelRegistrationHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		if _, err := backendinternal.RequireAdmin(e); err != nil {
-			return err
-		}
-
 		regID := e.Request.PathValue("id")
 		if regID == "" {
 			return apis.NewBadRequestError("invalid_registration", nil)
@@ -143,10 +131,6 @@ func CancelRegistrationHandler(app *pocketbase.PocketBase) func(e *core.RequestE
 
 func RejectRegistrationHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		if _, err := backendinternal.RequireAdmin(e); err != nil {
-			return err
-		}
-
 		regID := e.Request.PathValue("id")
 		if regID == "" {
 			return apis.NewBadRequestError("invalid_registration", nil)

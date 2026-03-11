@@ -9,7 +9,7 @@ import (
 
 func SettingsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		record, data, err := settinginternal.GetVisible(app, e.Request.PathValue("name"))
+		record, data, err := settinginternal.GetVisibleForScope(app, e.Request.PathValue("name"), settinginternal.ScopeAdmin)
 		if err != nil {
 			return err
 		}

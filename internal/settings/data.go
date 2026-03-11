@@ -11,6 +11,14 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
+type Scope string
+
+const (
+	ScopePublic Scope = "public"
+	ScopeMember Scope = "member"
+	ScopeAdmin  Scope = "admin"
+)
+
 var PublicNames = map[string]bool{
 	"title":          true,
 	"password_reset": true,
@@ -46,6 +54,14 @@ func GetVisible(app *pocketbase.PocketBase, name string) (*core.Record, map[stri
 	return record, sanitize(rawName, Unwrap(record.Get("data"))), nil
 }
 
+func GetVisibleForScope(app *pocketbase.PocketBase, name string, scope Scope) (*core.Record, map[string]any, error) {
+	rawName := strings.TrimSpace(name)
+	if !isVisibleInScope(rawName, scope) {
+		return nil, nil, apis.NewNotFoundError("Setting not found", nil)
+	}
+	return GetVisible(app, rawName)
+}
+
 func WriteJSON(e *core.RequestEvent, name string, data map[string]any) error {
 	return e.JSON(http.StatusOK, map[string]any{
 		"name": name,
@@ -62,4 +78,17 @@ func sanitize(name string, data map[string]any) map[string]any {
 		safe["name"] = value
 	}
 	return safe
+}
+
+func isVisibleInScope(name string, scope Scope) bool {
+	switch scope {
+	case ScopePublic:
+		return PublicNames[name]
+	case ScopeMember:
+		return MemberNames[name]
+	case ScopeAdmin:
+		return true
+	default:
+		return false
+	}
 }

@@ -2,7 +2,6 @@ package me
 
 import (
 	"net/http"
-	"strings"
 
 	backendinternal "members/internal"
 	groupinternal "members/internal/groups"
@@ -61,47 +60,11 @@ func GroupMembersHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) 
 			return err
 		}
 
-		relations, err := app.FindRecordsByFilter(
-			"user_groups",
-			"group = {:group}",
-			"created",
-			500,
-			0,
-			map[string]any{"group": group.Id},
-		)
-		if err != nil {
-			return apis.NewBadRequestError("failed_members", err)
-		}
-		guardianCounts, err := groupinternal.GuardianCounts(app, group.Id)
+		response, err := groupinternal.MembersResponseForGroup(app, group.Id)
 		if err != nil {
 			return apis.NewBadRequestError("failed_guardians", err)
 		}
-
-		items := make([]groupinternal.MemberItem, 0, len(relations))
-		for _, rel := range relations {
-			userID := strings.TrimSpace(rel.GetString("user"))
-			if userID == "" {
-				continue
-			}
-			user, err := app.FindRecordById("users", userID)
-			if err != nil || user == nil {
-				continue
-			}
-			role := strings.TrimSpace(rel.GetString("role"))
-			_, isGuardian := guardianCounts[userID]
-			items = append(items, groupinternal.MemberItem{
-				ID:         user.Id,
-				Email:      user.GetString("email"),
-				FullName:   groupinternal.UserDisplayName(user),
-				Role:       role,
-				IsGuardian: isGuardian,
-			})
-		}
-
-		return e.JSON(http.StatusOK, map[string]any{
-			"group_id": group.Id,
-			"items":    items,
-		})
+		return e.JSON(http.StatusOK, response)
 	}
 }
 
@@ -120,29 +83,10 @@ func GroupGuardiansHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent
 			return err
 		}
 
-		guardianCounts, err := groupinternal.GuardianCounts(app, group.Id)
+		response, err := groupinternal.GuardiansResponseForGroup(app, group.Id)
 		if err != nil {
 			return apis.NewBadRequestError("failed_guardians", err)
 		}
-
-		items := make([]groupinternal.GuardianItem, 0, len(guardianCounts))
-		for userID, protegesCount := range guardianCounts {
-			user, err := app.FindRecordById("users", userID)
-			if err != nil || user == nil {
-				continue
-			}
-
-			items = append(items, groupinternal.GuardianItem{
-				ID:            user.Id,
-				Email:         user.GetString("email"),
-				FullName:      groupinternal.UserDisplayName(user),
-				ProtegesCount: protegesCount,
-			})
-		}
-
-		return e.JSON(http.StatusOK, map[string]any{
-			"group_id": group.Id,
-			"items":    items,
-		})
+		return e.JSON(http.StatusOK, response)
 	}
 }

@@ -5,7 +5,6 @@ import (
 	"net/mail"
 	"strings"
 
-	backendinternal "members/internal"
 	eventinternal "members/internal/events"
 
 	"github.com/pocketbase/pocketbase"
@@ -22,10 +21,6 @@ type eventEmailPayload struct {
 
 func EventEmailHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		if _, err := backendinternal.RequireAdmin(e); err != nil {
-			return err
-		}
-
 		eventID := strings.TrimSpace(e.Request.PathValue("id"))
 		if eventID == "" {
 			return apis.NewBadRequestError("invalid_event", nil)

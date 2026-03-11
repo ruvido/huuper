@@ -27,6 +27,15 @@ func RequireAdmin(e *core.RequestEvent) (*core.Record, error) {
 	return authRecord, nil
 }
 
+func AdminOnly(next func(e *core.RequestEvent) error) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		if _, err := RequireAdmin(e); err != nil {
+			return err
+		}
+		return next(e)
+	}
+}
+
 func HasRoleForRequest(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, role string, requestRoleAdmin string, requestRoleGuardian string, requestRoleAssistant string) (bool, error) {
 	if actor != nil && actor.GetBool("admin") {
 		return true, nil

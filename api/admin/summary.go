@@ -8,8 +8,6 @@ import (
 	"strings"
 	"time"
 
-	backendinternal "members/internal"
-
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
@@ -26,10 +24,6 @@ type eventNext struct {
 
 func SummaryHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		if _, err := backendinternal.RequireAdmin(e); err != nil {
-			return err
-		}
-
 		users, err := app.FindRecordsByFilter("users", "", "", 0, 0)
 		if err != nil {
 			return apis.NewBadRequestError("failed_users", err)
