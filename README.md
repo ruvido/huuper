@@ -13,7 +13,7 @@ Self-hosted webapp to manage private Telegram/Discord groups.
 ## Tech Stack
 
 - **Backend**: PocketBase (Go framework)
-- **Frontend**: Svelte with hash routing
+- **Frontend**: skeleton-first static frontend served from `frontend/site`
 - **Database**: SQLite (via PocketBase)
 - **Deploy**: Docker (release-based)
 
@@ -22,8 +22,6 @@ Self-hosted webapp to manage private Telegram/Discord groups.
 ### Prerequisites
 
 - Go 1.21+
-- bun
-
 ### Installation
 
 1. Clone the repository:
@@ -38,21 +36,9 @@ cp .env.example .env
 # Edit .env with your admin credentials
 ```
 
-3. Install frontend dependencies:
+3. Run the server:
 ```bash
-cd frontend
-bun install
-```
-
-4. Build the frontend:
-```bash
-bun run build
-```
-
-5. Run the server:
-```bash
-cd ..
-go run . serve --http=127.0.0.1:8000
+go run ./backend serve --http=127.0.0.1:8000 --dir=./data
 ```
 
 The app will be available at `http://127.0.0.1:8000`
@@ -60,17 +46,12 @@ The app will be available at `http://127.0.0.1:8000`
 ### Building for Production
 
 ```bash
-# Build frontend
-cd frontend
-bun run build
-
 # Build Go binary
-cd ..
-mkdir -p bin
-go build -o bin/huuper main.go
+mkdir -p extra/bin
+go build -o extra/bin/huuper ./backend
 
 # Run
-./bin/huuper serve
+./extra/bin/huuper serve --dir=./data
 ```
 
 ### Deploy
@@ -79,21 +60,22 @@ go build -o bin/huuper main.go
 ./deploy/rsync.sh
 ```
 
-Per dettagli e override VPS vedi `DEPLOY.md`.
+Per dettagli e override VPS vedi [`docs/DEPLOY.md`](/Users/ruvido/notes/1_projects/15-realmen-bot-webapp/huuper/docs/DEPLOY.md).
 
 ## Project Structure
 
 ```
 .
-├── frontend/           # Svelte frontend
-│   ├── src/
-│   │   ├── components/ # Reusable components
-│   │   ├── lib/        # Utilities and stores
-│   │   └── pages/      # Page components
-│   └── package.json
-├── migrations/         # Database migrations
-├── main.go            # Go entry point
-└── pb_public/         # Static files (generated)
+├── backend/            # Go backend
+│   ├── api/
+│   ├── bot/
+│   ├── internal/
+│   ├── migrations/
+│   └── main.go
+├── frontend/           # Active frontend v2
+│   ├── skeleton/
+│   └── site/
+└── data/               # PocketBase data dir
 ```
 
 ## Development
@@ -106,7 +88,7 @@ The project follows these principles:
 
 ## Avatar upload test
 
-You can quickly verify that the `users` collection accepts JPEG, PNG, WebP, and GIF avatars thanks to the fixtures in `test/images/`. Each format has a 1:1 sample file that mirrors what the onboarding flow produces.
+You can quickly verify that the `users` collection accepts JPEG, PNG, WebP, and GIF avatars thanks to the fixtures in `extra/test/images/`. Each format has a 1:1 sample file that mirrors what the onboarding flow produces.
 
 1. Start PocketBase locally (e.g. `./launch.sh`).
 2. From the repo root run:

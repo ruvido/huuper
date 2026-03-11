@@ -12,11 +12,11 @@ if [[ -f "${ENV_FILE}" ]]; then
   set +a
 fi
 
-BASE="${BASE:-}"
+BASE_URL="${BASE_URL:-${BASE:-http://127.0.0.1:9090}}"
 ADMIN_EMAIL="${ADMIN_EMAIL:-}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-}"
 
-: "${BASE:?Missing base url (.env: BASE)}"
+: "${BASE_URL:?Missing base url (.env: BASE_URL or BASE)}"
 : "${ADMIN_EMAIL:?Missing admin email (.env: ADMIN_EMAIL)}"
 : "${ADMIN_PASSWORD:?Missing admin password (.env: ADMIN_PASSWORD)}"
 
@@ -25,7 +25,7 @@ command -v jq >/dev/null 2>&1 || { echo "jq non installato" >&2; exit 1; }
 payload="$(jq -n --arg identity "$ADMIN_EMAIL" --arg password "$ADMIN_PASSWORD" \
   '{identity:$identity, password:$password}')"
 
-response="$(curl -sS -X POST "$BASE/api/collections/users/auth-with-password" \
+response="$(curl -sS -X POST "$BASE_URL/api/collections/users/auth-with-password" \
   -H "Content-Type: application/json" \
   -d "$payload")"
 

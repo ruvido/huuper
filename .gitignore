@@ -1,8 +1,8 @@
 # PocketBase
 .cache
-pb_data*
+data/
 pocketbase
-bin
+extra/bin/
 
 # Environment variables
 .env
@@ -69,19 +69,18 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Frontend (Svelte)
-frontend/node_modules/
-frontend/dist/
-frontend/.svelte-kit/
-frontend/build/
-frontend/.npm-cache/
-frontend/.env
-frontend/.env.local
-frontend/.env.*.local
+# Frontend legacy archive
+archive/frontend-svelte/node_modules/
+archive/frontend-svelte/dist/
+archive/frontend-svelte/.svelte-kit/
+archive/frontend-svelte/build/
+archive/frontend-svelte/.npm-cache/
+archive/frontend-svelte/.env
+archive/frontend-svelte/.env.local
+archive/frontend-svelte/.env.*.local
 
-# Build outputs
-pb_public/assets/
-pb_public/index.html
+# Frontend output
+frontend/site/assets/
 
 # Dependencies
 node_modules/

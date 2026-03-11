@@ -11,15 +11,15 @@ services:
       [
         "sh",
         "-lc",
-        "exec /app/huuper serve --http=0.0.0.0:${APP_HTTP_PORT:-8090} --dir=/app/pb_data",
+        "exec /app/huuper serve --http=0.0.0.0:${APP_HTTP_PORT:-8090} --dir=/app/data",
       ]
     ports:
       - "${APP_HOST_PORT:-8090}:${APP_HTTP_PORT:-8090}"
     volumes:
       - ../current/bin/huuper:/app/huuper:ro
-      - ../current/migrations:/app/migrations:ro
-      - ../current/pb_public:/app/pb_public:ro
-      - ../shared/pb_data:/app/pb_data
+      - ../current/backend/migrations:/app/migrations:ro
+      - ../current/frontend:/app/frontend:ro
+      - ../shared/data:/app/data
       - ../shared/.env:/app/.env:ro
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:${APP_HTTP_PORT:-8090}/api/health"]

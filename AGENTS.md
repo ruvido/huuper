@@ -18,8 +18,8 @@ Linee guida minime per contribuire al progetto in modo coerente, semplice e mant
 - Non aggiungere dipendenze nuove se non strettamente necessario.
 
 ## Scope attuale
-- In questa fase il focus e' backend.
-- Frontend e mobile sono fuori scope, salvo richiesta esplicita.
+- Backend e frontend web sono in scope.
+- Mobile e' fuori scope, salvo richiesta esplicita.
 
 ## Architettura dati
 - Source of truth dei dati applicativi: PocketBase per metadata, relazioni, auth e permessi.
@@ -34,6 +34,16 @@ Linee guida minime per contribuire al progetto in modo coerente, semplice e mant
 - Centralizzare autorizzazione, validazione e access rules; evitare duplicazione negli handler.
 - Mantenere il tree strutturato e sensato, senza refactor strutturali non discussi.
 
+## Frontend
+- Il frontend attivo usa l'approccio `frontend/skeleton` -> `frontend/site`.
+- `frontend/skeleton` e' la source of truth editabile.
+- `frontend/site` e' output generato e servito da PocketBase.
+- Non modificare manualmente `frontend/site`.
+- L'archivio del vecchio frontend Svelte vive in `archive/frontend-svelte/` e non fa parte del path attivo.
+- Usare CSS semantico e componenti/template chiari.
+- Il primo obiettivo frontend v2 e' wireframing funzionale, non design finale.
+- Il dev mode deve restare semplice e trasparente, con watcher/build standard e senza automazioni opache.
+
 ## API Design
 - Le API devono essere chiare, robuste, prevedibili e adatte a interfacce web, CLI, mobile o desktop.
 - Il namespacing deve essere esplicito e stabile.
@@ -47,6 +57,7 @@ Linee guida minime per contribuire al progetto in modo coerente, semplice e mant
 - Duplicazione di logica tra handler.
 - Fallback impliciti o comportamento automatico non richiesto.
 - Drift rispetto alle convenzioni ufficiali di Go e PocketBase.
+- Reintrodurre il frontend legacy nel path attivo.
 
 ## Collaboration Constraint
 - Se una modifica e' ambigua, fermarsi e chiarire.

@@ -16,7 +16,7 @@ TMP_RELEASE_DIR="/tmp/huuper-release-$RELEASE_ID"
 
 echo "release: $RELEASE_ID"
 echo "remote: prepare release layout"
-ssh "$VPS_HOST" "mkdir -p '$VPS_PATH/releases/$RELEASE_ID' '$VPS_PATH/deploy' '$VPS_PATH/shared/pb_data'"
+ssh "$VPS_HOST" "mkdir -p '$VPS_PATH/releases/$RELEASE_ID' '$VPS_PATH/deploy' '$VPS_PATH/shared/data'"
 
 if [ ! -f "$ROOT_DIR/.env" ]; then
   echo "missing .env in project root" >&2
@@ -26,23 +26,19 @@ fi
 echo "remote: check docker permissions"
 ssh "$VPS_HOST" "docker info >/dev/null 2>&1 || (echo 'Docker non accessibile senza sudo.' >&2; exit 1)"
 
-echo "frontend: build"
-cd "$ROOT_DIR/frontend"
-if ! command -v bun >/dev/null 2>&1; then
-  echo "bun not found. Please install bun before deploy."
+if [[ ! -d "$ROOT_DIR/frontend/site" ]]; then
+  echo "missing frontend/site in project root" >&2
   exit 1
 fi
-bun install --frozen-lockfile
-bun run build
 
 echo "backend: build linux binary"
-mkdir -p "$TMP_RELEASE_DIR/bin" "$TMP_RELEASE_DIR/migrations" "$TMP_RELEASE_DIR/pb_public"
+mkdir -p "$TMP_RELEASE_DIR/bin" "$TMP_RELEASE_DIR/backend/migrations" "$TMP_RELEASE_DIR/frontend/site"
 cd "$ROOT_DIR"
-CGO_ENABLED=0 GOOS="$TARGET_GOOS" GOARCH="$TARGET_GOARCH" go build -a -installsuffix cgo -o "$TMP_RELEASE_DIR/bin/$BIN_NAME" main.go
+CGO_ENABLED=0 GOOS="$TARGET_GOOS" GOARCH="$TARGET_GOARCH" go build -a -installsuffix cgo -o "$TMP_RELEASE_DIR/bin/$BIN_NAME" ./backend
 
 echo "prepare: copy runtime artifacts"
-rsync -a --delete "$ROOT_DIR/migrations/" "$TMP_RELEASE_DIR/migrations/"
-rsync -a --delete "$ROOT_DIR/pb_public/" "$TMP_RELEASE_DIR/pb_public/"
+rsync -a --delete "$ROOT_DIR/backend/migrations/" "$TMP_RELEASE_DIR/backend/migrations/"
+rsync -a --delete "$ROOT_DIR/frontend/site/" "$TMP_RELEASE_DIR/frontend/site/"
 
 echo "rsync: release -> $VPS_HOST:$VPS_PATH/releases/$RELEASE_ID/"
 rsync -avz --progress --delete \

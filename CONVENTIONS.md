@@ -1,7 +1,7 @@
 # CONVENTIONS
 
 ## Scopo
-Convenzioni operative e di design per il backend del repository.
+Convenzioni operative e di design per il repository.
 
 ## Priorita'
 1. Chiarezza.
@@ -34,6 +34,15 @@ Convenzioni operative e di design per il backend del repository.
 - Evitare package o helper "misc" senza semantica precisa.
 - Prima di spostare file o cambiare struttura, proporre il target tree.
 
+## Tree frontend
+- Il frontend attivo vive in `frontend/`.
+- `frontend/skeleton/` e' la source of truth.
+- `frontend/site/` e' output buildato e servito dal backend.
+- `frontend/site/` non si modifica a mano.
+- Il frontend legacy Svelte vive solo in `archive/frontend-svelte/`.
+- Privilegiare componenti/template, layout chiari e CSS semantico.
+- La prima fase frontend v2 e' wireframing funzionale.
+
 ## Handler
 - Un handler deve fare poche cose:
   - validare input
@@ -62,6 +71,7 @@ Convenzioni operative e di design per il backend del repository.
 - Usare PocketBase come base standard per auth, metadata, relazioni e persistence.
 - Preferire feature ufficiali del framework rispetto a logica custom evitabile.
 - Le settings JSON sono ammesse, ma parsing e validazione devono stare in punti unici e tipizzati quanto basta.
+- PocketBase serve il frontend buildato da `frontend/site`.
 
 ## Refactoring
 - Refactor piccoli e incrementali.

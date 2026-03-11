@@ -1,7 +1,7 @@
 # PLAN
 
 ## Obiettivo
-Refactoring iterativo del backend per renderlo piu' DRY, robusto, sicuro, discoverable e coerente nel namespacing, senza introdurre scope creep o astrazioni inutili.
+Refactoring iterativo del repository per renderlo piu' DRY, robusto, sicuro, discoverable e coerente nel namespacing, senza introdurre scope creep o astrazioni inutili.
 
 ## Vincoli
 - Seguire `AGENTS.md`.
@@ -13,11 +13,13 @@ Refactoring iterativo del backend per renderlo piu' DRY, robusto, sicuro, discov
 ## Target architetturale
 - Backend pronto per web, CLI, mobile o desktop.
 - API chiare e stabili.
+- Frontend web v2 basato su `frontend/skeleton` come sorgente e `frontend/site` come output servito dal backend.
 - Due entrypoint di accesso principali:
   - `admin=true`: controllo completo sulle risorse applicative.
   - `admin!=true`: accesso limitato al proprio profilo e alle proprie relazioni autorizzate.
 - Policy di accesso centralizzata, non dispersa negli handler.
 - Tree backend organizzato per domini e responsabilita' chiare.
+- Tree frontend organizzato per componenti/template e CSS semantico.
 
 ## Workflow multiagent
 
@@ -31,7 +33,7 @@ Output:
 
 ### 2. Repo Mapper
 Scopo:
-- mappare route, handler, helper condivisi, collection PocketBase, policy esistenti e duplicazioni.
+- mappare route, handler, helper condivisi, collection PocketBase, policy esistenti, build chain frontend e duplicazioni.
 
 Output:
 - inventory del backend
@@ -78,8 +80,9 @@ Output:
 3. Definire il namespacing target.
 4. Consolidare helper di authz e validazione.
 5. Riorganizzare route e handler per dominio.
-6. Allineare naming, payload ed errori.
-7. Verificare build e regressioni.
+6. Allineare frontend attivo, static serving e build pipeline al modello approvato.
+7. Allineare naming, payload ed errori.
+8. Verificare build e regressioni.
 
 ## Iterazioni consigliate
 
@@ -111,6 +114,8 @@ Output:
 - Le policy `admin` vs `me` sono esplicite e centralizzate.
 - Il namespacing delle API e' coerente e discoverable.
 - Il tree backend e' organizzato per domini comprensibili.
+- Il frontend attivo e' `frontend/skeleton` -> `frontend/site`.
+- Il vecchio frontend Svelte e' archiviato fuori dal path attivo.
 - Gli handler delegano policy e validazione a helper condivisi.
 - Le API restano robuste e adatte a piu' client.
 - Ogni step e' stato verificato con build e review.
