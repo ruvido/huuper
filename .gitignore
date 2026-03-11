@@ -3,6 +3,7 @@
 data/
 pocketbase
 extra/bin/
+extra/
 
 # Environment variables
 .env
