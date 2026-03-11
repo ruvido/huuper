@@ -1,20 +1,19 @@
-package api
+package admin
 
 import (
 	"net/http"
 
 	"members/bot"
+	backendinternal "members/internal"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 )
 
-// AdminSyncGroupMembershipsHandler triggers a full Telegram membership sync for all connected users.
-func AdminSyncGroupMembershipsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+func SyncGroupMembershipsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		_, err := requireAdmin(e)
-		if err != nil {
+		if _, err := backendinternal.RequireAdmin(e); err != nil {
 			return err
 		}
 

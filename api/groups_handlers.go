@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strings"
 
+	backendinternal "members/internal"
+
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
@@ -26,16 +28,16 @@ type groupGuardianItem struct {
 
 func GroupRequestsCountHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		actor := e.Auth
-		if actor == nil {
-			return apis.NewUnauthorizedError("Unauthorized", nil)
+		actor, err := backendinternal.RequireAuthenticatedActor(e)
+		if err != nil {
+			return err
 		}
 
 		group, err := findGroupByPathID(app, e)
 		if err != nil {
 			return err
 		}
-		if err := requireGroupVisibility(app, actor, group); err != nil {
+		if err := backendinternal.RequireGroupVisibility(app, actor, group); err != nil {
 			return err
 		}
 
@@ -60,16 +62,16 @@ func GroupRequestsCountHandler(app *pocketbase.PocketBase) func(e *core.RequestE
 
 func GroupMembersHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		actor := e.Auth
-		if actor == nil {
-			return apis.NewUnauthorizedError("Unauthorized", nil)
+		actor, err := backendinternal.RequireAuthenticatedActor(e)
+		if err != nil {
+			return err
 		}
 
 		group, err := findGroupByPathID(app, e)
 		if err != nil {
 			return err
 		}
-		if err := requireGroupVisibility(app, actor, group); err != nil {
+		if err := backendinternal.RequireGroupVisibility(app, actor, group); err != nil {
 			return err
 		}
 
@@ -119,16 +121,16 @@ func GroupMembersHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) 
 
 func GroupGuardiansHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		actor := e.Auth
-		if actor == nil {
-			return apis.NewUnauthorizedError("Unauthorized", nil)
+		actor, err := backendinternal.RequireAuthenticatedActor(e)
+		if err != nil {
+			return err
 		}
 
 		group, err := findGroupByPathID(app, e)
 		if err != nil {
 			return err
 		}
-		if err := requireGroupVisibility(app, actor, group); err != nil {
+		if err := backendinternal.RequireGroupVisibility(app, actor, group); err != nil {
 			return err
 		}
 
@@ -171,59 +173,11 @@ func findGroupByPathID(app *pocketbase.PocketBase, e *core.RequestEvent) (*core.
 	return group, nil
 }
 
-func requireGroupVisibility(app *pocketbase.PocketBase, actor *core.Record, group *core.Record) error {
-	if actor == nil {
-		return apis.NewUnauthorizedError("Unauthorized", nil)
-	}
-	if group == nil {
-		return apis.NewBadRequestError("invalid_group", nil)
-	}
-	if actor.GetBool("admin") {
-		return nil
-	}
-	if isAssistantForGroup(actor, group) {
-		return nil
-	}
-	ok, err := isMemberOfGroup(app, actor.Id, group.Id)
-	if err != nil {
-		return apis.NewBadRequestError("failed_group_access_check", err)
-	}
-	if !ok {
-		return apis.NewForbiddenError("forbidden_group", nil)
-	}
-	return nil
-}
-
-func isAssistantForGroup(actor *core.Record, group *core.Record) bool {
-	if actor == nil || group == nil {
-		return false
-	}
-	return strings.TrimSpace(group.GetString("assistant")) == actor.Id
-}
-
-func isMemberOfGroup(app *pocketbase.PocketBase, userID string, groupID string) (bool, error) {
-	records, err := app.FindRecordsByFilter(
-		"user_groups",
-		"user = {:user} && group = {:group}",
-		"",
-		1,
-		0,
-		map[string]any{
-			"user":  userID,
-			"group": groupID,
-		},
-	)
-	if err != nil {
-		return false, err
-	}
-	return len(records) > 0, nil
-}
-
 func userDisplayName(user *core.Record) string {
 	if user == nil {
 		return ""
 	}
-	data := parseJSONMap(user.Get("data"))
+	data := backendinternal.ParseJSONMap(user.Get("data"))
 	if fullName, ok := data["full_name"].(string); ok && strings.TrimSpace(fullName) != "" {
 		return strings.TrimSpace(fullName)
 	}

@@ -1,21 +1,23 @@
-package api
+package me
 
 import (
 	"net/http"
 	"strconv"
 	"strings"
 
+	backendinternal "members/internal"
+	backendrequests "members/internal/requests"
+
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 )
 
-// ListRequestsHandler returns requests visible to the authenticated user.
 func ListRequestsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		actor := e.Auth
-		if actor == nil {
-			return apis.NewUnauthorizedError("Unauthorized", nil)
+		actor, err := backendinternal.RequireAuthenticatedActor(e)
+		if err != nil {
+			return err
 		}
 
 		query := e.Request.URL.Query()
@@ -51,7 +53,6 @@ func ListRequestsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) 
 
 		params := map[string]any{}
 		filters := []string{}
-
 		if groupID != "" {
 			filters = append(filters, "group = {:group}")
 			params["group"] = groupID
@@ -64,8 +65,6 @@ func ListRequestsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) 
 			filters = append(filters, "email ~ {:q}")
 			params["q"] = search
 		}
-
-		// Rejected requests are never listed.
 		filters = append(filters, "rejected = false")
 
 		filter := strings.Join(filters, " && ")
@@ -74,21 +73,21 @@ func ListRequestsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) 
 			return apis.NewBadRequestError("failed_requests", err)
 		}
 
-		assistantGroups, err := assistantGroupIDsForUser(app, actor)
+		assistantGroups, err := backendinternal.AssistantGroupIDsForUser(app, actor)
 		if err != nil {
 			return apis.NewBadRequestError("failed_groups_lookup", err)
 		}
-		flow, err := loadRequestsFlowSettings(app)
+		flow, err := backendrequests.LoadFlowSettings(app)
 		if err != nil {
 			return apis.NewBadRequestError("invalid_requests_flow_settings", err)
 		}
 
-		items := make([]requestListItem, 0, len(records))
+		items := make([]backendrequests.ListItem, 0, len(records))
 		for _, record := range records {
-			if !canViewRequest(actor, record, assistantGroups) {
+			if !backendinternal.CanViewRequest(actor, record, assistantGroups) {
 				continue
 			}
-			item, err := mapRequestItemWithWorkflow(app, actor, record, flow)
+			item, err := backendrequests.MapItemWithWorkflow(app, actor, record, flow)
 			if err != nil {
 				return apis.NewBadRequestError("failed_requests_workflow", err)
 			}
@@ -105,51 +104,32 @@ func ListRequestsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) 
 	}
 }
 
-// GetRequestHandler returns one request if visible to the authenticated user.
 func GetRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		actor := e.Auth
-		if actor == nil {
-			return apis.NewUnauthorizedError("Unauthorized", nil)
-		}
-
-		id := strings.TrimSpace(e.Request.PathValue("id"))
-		if id == "" {
-			return apis.NewBadRequestError("invalid_request", nil)
-		}
-
-		record, err := app.FindRecordById("requests", id)
-		if err != nil || record == nil {
-			return apis.NewNotFoundError("request_not_found", err)
-		}
-
-		if record.GetBool("rejected") && !actor.GetBool("admin") {
-			return apis.NewForbiddenError("forbidden_request", nil)
-		}
-
-		assistantGroups, err := assistantGroupIDsForUser(app, actor)
+		actor, err := backendinternal.RequireAuthenticatedActor(e)
 		if err != nil {
-			return apis.NewBadRequestError("failed_groups_lookup", err)
+			return err
 		}
-		if !canViewRequest(actor, record, assistantGroups) {
-			return apis.NewForbiddenError("forbidden_request", nil)
+		record, err := backendinternal.VisibleRequestForActor(app, actor, e.Request.PathValue("id"))
+		if err != nil {
+			return err
 		}
 
-		item := mapRequestItem(record)
-		flow, err := loadRequestsFlowSettings(app)
+		item := backendrequests.MapItem(record)
+		flow, err := backendrequests.LoadFlowSettings(app)
 		if err != nil {
 			return apis.NewBadRequestError("invalid_requests_flow_settings", err)
 		}
-		flowVersion, _ := requestProgressFromData(item.Data)
-		stepIndex := effectiveRequestStepIndex(record, item.Data, flow)
-		computedStatus := requestStatusForItem(item.Rejected, stepIndex, flow.Steps)
+		flowVersion, _ := backendrequests.ProgressFromData(item.Data)
+		stepIndex := backendrequests.EffectiveStepIndex(record, item.Data, flow)
+		computedStatus := backendrequests.StatusForItem(item.Rejected, stepIndex, flow.Steps)
 
-		nextStep, hasNext := flowStepAt(flow, stepIndex)
+		nextStep, hasNext := backendrequests.FlowStepAt(flow, stepIndex)
 		canAdvance := false
 		requiredField := ""
 		if hasNext && !item.Rejected {
-			requiredField = requiredFieldForAction(nextStep.Action)
-			canAdvance, err = hasRoleForRequest(app, actor, record, nextStep.Role)
+			requiredField = backendrequests.RequiredFieldForAction(nextStep.Action)
+			canAdvance, err = backendinternal.HasRoleForRequest(app, actor, record, nextStep.Role, backendrequests.RoleAdmin, backendrequests.RoleGuardian, backendrequests.RoleAssistant)
 			if err != nil {
 				return apis.NewBadRequestError("role_resolution_failed", err)
 			}
@@ -182,67 +162,11 @@ func GetRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) er
 	}
 }
 
-// SubmitRequestHandler creates a request from public signup config.
-func SubmitRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
-	return func(e *core.RequestEvent) error {
-		signup, err := loadSignupSettings(app)
-		if err != nil {
-			return apis.NewBadRequestError("invalid_signup_settings", err)
-		}
-		profileSchema, err := loadProfileSchemaSettings(app)
-		if err != nil {
-			return apis.NewBadRequestError("invalid_profile_schema", err)
-		}
-		flow, err := loadRequestsFlowSettings(app)
-		if err != nil {
-			return apis.NewBadRequestError("invalid_requests_flow_settings", err)
-		}
-
-		var raw map[string]any
-		if err := e.BindBody(&raw); err != nil {
-			return apis.NewBadRequestError("invalid_payload", err)
-		}
-
-		input := normalizeSubmitInput(raw)
-		data, email, err := validateAndBuildRequestData(input, signup, profileSchema)
-		if err != nil {
-			return apis.NewBadRequestError("invalid_request_data", err)
-		}
-		if err := ensureSubmitEmailAvailable(app, email); err != nil {
-			return err
-		}
-
-		requests, err := app.FindCollectionByNameOrId("requests")
-		if err != nil {
-			return apis.NewNotFoundError("requests_collection_not_found", err)
-		}
-
-		record := core.NewRecord(requests)
-		record.Set("email", email)
-		data[requestFlowVersionDataKey] = flow.Version
-		data[requestStepIndexDataKey] = 0
-		record.Set("data", data)
-		record.Set("rejected", false)
-		if err := app.Save(record); err != nil {
-			return apis.NewBadRequestError("failed_to_create_request", err)
-		}
-
-		return e.JSON(http.StatusCreated, map[string]any{
-			"id":       record.Id,
-			"email":    record.GetString("email"),
-			"status":   requestStatusSubmitted,
-			"step":     0,
-			"rejected": false,
-			"data":     data,
-		})
-	}
-}
-
-// RequestActionHandler executes request actions (transition/reject).
 func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		if e.Auth == nil {
-			return apis.NewUnauthorizedError("Unauthorized", nil)
+		actor, err := backendinternal.RequireAuthenticatedActor(e)
+		if err != nil {
+			return err
 		}
 
 		id := e.Request.PathValue("id")
@@ -255,7 +179,7 @@ func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 			return apis.NewNotFoundError("request_not_found", err)
 		}
 
-		var payload requestActionPayload
+		var payload backendrequests.ActionPayload
 		if err := e.BindBody(&payload); err != nil {
 			return apis.NewBadRequestError("invalid_payload", err)
 		}
@@ -265,25 +189,25 @@ func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 			return apis.NewBadRequestError("missing_action", nil)
 		}
 
-		data := parseJSONMap(record.Get("data"))
+		data := backendinternal.ParseJSONMap(record.Get("data"))
 
 		deleteRequest := false
 		promotedUserID := ""
 		switch action {
-		case requestActionAdvance, "transition":
-			if err := applyAdvanceAction(app, e.Auth, record, data, payload); err != nil {
+		case backendrequests.ActionAdvance, "transition":
+			if err := backendrequests.ApplyAdvanceAction(app, actor, record, data, payload); err != nil {
 				return err
 			}
-		case requestActionSetGuardian:
-			if err := applySetGuardianAction(app, e.Auth, record, data, strings.TrimSpace(payload.GuardianID)); err != nil {
+		case backendrequests.ActionSetGuardian:
+			if err := backendrequests.ApplySetGuardianAction(app, actor, record, data, strings.TrimSpace(payload.GuardianID)); err != nil {
 				return err
 			}
-		case requestActionReject:
-			if err := applyRejectAction(app, e.Auth, record, data, strings.TrimSpace(payload.Reason)); err != nil {
+		case backendrequests.ActionReject:
+			if err := backendrequests.ApplyRejectAction(actor, record, data, strings.TrimSpace(payload.Reason)); err != nil {
 				return err
 			}
-		case requestActionPromote:
-			userID, err := applyPromoteAction(app, e.Auth, record, data)
+		case backendrequests.ActionPromote:
+			userID, err := backendrequests.ApplyPromoteAction(app, actor, record, data)
 			if err != nil {
 				return err
 			}
@@ -308,12 +232,12 @@ func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 			return apis.NewBadRequestError("failed_to_update_request", err)
 		}
 
-		flow, err := loadRequestsFlowSettings(app)
+		flow, err := backendrequests.LoadFlowSettings(app)
 		if err != nil {
 			return apis.NewBadRequestError("invalid_requests_flow_settings", err)
 		}
-		step := parseFlowVersion(data[requestStepIndexDataKey])
-		status := requestStatusForItem(record.GetBool("rejected"), step, flow.Steps)
+		step := backendrequests.ParseVersion(data[backendrequests.StepIndexDataKey])
+		status := backendrequests.StatusForItem(record.GetBool("rejected"), step, flow.Steps)
 
 		return e.JSON(http.StatusOK, map[string]any{
 			"id":       record.Id,

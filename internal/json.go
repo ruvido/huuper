@@ -1,4 +1,4 @@
-package api
+package internal
 
 import (
 	"encoding/json"
@@ -6,7 +6,7 @@ import (
 	"github.com/pocketbase/pocketbase/tools/types"
 )
 
-func parseJSONMap(raw any) map[string]any {
+func ParseJSONMap(raw any) map[string]any {
 	data := map[string]any{}
 	if raw == nil {
 		return data
@@ -27,5 +27,13 @@ func parseJSONMap(raw any) map[string]any {
 		}
 	}
 
+	return data
+}
+
+func UnwrapSettingData(raw any) map[string]any {
+	data := ParseJSONMap(raw)
+	if nested, ok := data["data"].(map[string]any); ok && nested != nil {
+		return nested
+	}
 	return data
 }

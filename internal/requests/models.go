@@ -1,22 +1,22 @@
-package api
+package requests
 
-type signupFieldConfig struct {
+type SignupFieldConfig struct {
 	Field string `json:"field"`
 }
 
-type signupSettingsConfig struct {
-	Steps []signupFieldConfig `json:"steps"`
+type SignupSettingsConfig struct {
+	Steps []SignupFieldConfig `json:"steps"`
 }
 
-type profileFieldConfig struct {
+type ProfileFieldConfig struct {
 	Key string `json:"key"`
 }
 
-type profileSchemaConfig struct {
-	Fields []profileFieldConfig `json:"fields"`
+type ProfileSchemaConfig struct {
+	Fields []ProfileFieldConfig `json:"fields"`
 }
 
-type requestActionPayload struct {
+type ActionPayload struct {
 	Action         string `json:"action"`
 	Reason         string `json:"reason"`
 	GroupID        string `json:"group"`
@@ -24,7 +24,7 @@ type requestActionPayload struct {
 	MentoringNotes string `json:"mentoring_notes"`
 }
 
-type requestListItem struct {
+type ListItem struct {
 	ID          string         `json:"id"`
 	Email       string         `json:"email"`
 	Status      string         `json:"status"`
@@ -40,8 +40,8 @@ type requestListItem struct {
 }
 
 const (
-	requestActionAdvance     = "advance"
-	requestActionReject      = "reject"
-	requestActionPromote     = "promote"
-	requestActionSetGuardian = "set_guardian"
+	ActionAdvance     = "advance"
+	ActionReject      = "reject"
+	ActionPromote     = "promote"
+	ActionSetGuardian = "set_guardian"
 )

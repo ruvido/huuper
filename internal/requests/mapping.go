@@ -1,14 +1,16 @@
-package api
+package requests
 
 import (
 	"strings"
+
+	backendinternal "members/internal"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
 )
 
-func mapRequestItem(record *core.Record) requestListItem {
-	return requestListItem{
+func MapItem(record *core.Record) ListItem {
+	return ListItem{
 		ID:       record.Id,
 		Email:    record.GetString("email"),
 		Status:   "",
@@ -17,31 +19,31 @@ func mapRequestItem(record *core.Record) requestListItem {
 		Guardian: record.GetString("guardian"),
 		Created:  record.GetString("created"),
 		Updated:  record.GetString("updated"),
-		Data:     parseJSONMap(record.Get("data")),
+		Data:     backendinternal.ParseJSONMap(record.Get("data")),
 	}
 }
 
-func mapRequestItemWithWorkflow(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, flow requestsFlowConfig) (requestListItem, error) {
-	item := mapRequestItem(record)
-	flowVersion, _ := requestProgressFromData(item.Data)
-	stepIndex := effectiveRequestStepIndex(record, item.Data, flow)
+func MapItemWithWorkflow(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, flow FlowConfig) (ListItem, error) {
+	item := MapItem(record)
+	flowVersion, _ := ProgressFromData(item.Data)
+	stepIndex := EffectiveStepIndex(record, item.Data, flow)
 
-	nextStep, hasNext := flowStepAt(flow, stepIndex)
+	nextStep, hasNext := FlowStepAt(flow, stepIndex)
 	canAdvance := false
 	requiredField := ""
 	if hasNext && !item.Rejected {
-		requiredField = requiredFieldForAction(nextStep.Action)
-		ok, err := hasRoleForRequest(app, actor, record, nextStep.Role)
+		requiredField = RequiredFieldForAction(nextStep.Action)
+		ok, err := backendinternal.HasRoleForRequest(app, actor, record, nextStep.Role, RoleAdmin, RoleGuardian, RoleAssistant)
 		if err != nil {
-			return requestListItem{}, err
+			return ListItem{}, err
 		}
 		canAdvance = ok
 	}
 
 	item.FlowVersion = flowVersion
 	item.StepIndex = stepIndex
-	item.Status = requestStatusForItem(item.Rejected, stepIndex, flow.Steps)
-	currentStep, hasCurrent := flowStepAt(flow, stepIndex-1)
+	item.Status = StatusForItem(item.Rejected, stepIndex, flow.Steps)
+	currentStep, hasCurrent := FlowStepAt(flow, stepIndex-1)
 	currentAction := ""
 	currentActionLabel := ""
 	if hasCurrent {
@@ -49,8 +51,7 @@ func mapRequestItemWithWorkflow(app *pocketbase.PocketBase, actor *core.Record, 
 		currentActionLabel = currentStep.Label
 	}
 	if currentActionLabel == "" {
-		normalized := normalizeStatusValue(item.Status)
-		currentActionLabel = strings.ReplaceAll(normalized, "_", " ")
+		currentActionLabel = strings.ReplaceAll(NormalizeStatus(item.Status), "_", " ")
 	}
 	item.Workflow = map[string]any{
 		"total_steps":          len(flow.Steps),
@@ -68,14 +69,14 @@ func mapRequestItemWithWorkflow(app *pocketbase.PocketBase, actor *core.Record, 
 	return item, nil
 }
 
-func effectiveRequestStepIndex(record *core.Record, data map[string]any, flow requestsFlowConfig) int {
-	_, stepIndex := requestProgressFromData(data)
+func EffectiveStepIndex(record *core.Record, data map[string]any, flow FlowConfig) int {
+	_, stepIndex := ProgressFromData(data)
 	if record == nil {
 		return stepIndex
 	}
 
 	for stepIndex < len(flow.Steps) {
-		required := requiredFieldForAction(flow.Steps[stepIndex].Action)
+		required := RequiredFieldForAction(flow.Steps[stepIndex].Action)
 		if required == "group" && strings.TrimSpace(record.GetString("group")) != "" {
 			stepIndex++
 			continue

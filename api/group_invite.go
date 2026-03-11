@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"members/bot"
+	backendinternal "members/internal"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/pocketbase/pocketbase"
@@ -20,10 +21,11 @@ import (
 // DefaultGroupInviteHandler generates a fresh invite link for the default group.
 func DefaultGroupInviteHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		if e.Auth == nil {
-			return apis.NewUnauthorizedError("Unauthorized", nil)
+		actor, err := backendinternal.RequireAuthenticatedActor(e)
+		if err != nil {
+			return err
 		}
-		log.Printf("[default-invite] user=%s request started", strings.TrimSpace(e.Auth.Id))
+		log.Printf("[default-invite] user=%s request started", strings.TrimSpace(actor.Id))
 
 		group, err := app.FindFirstRecordByFilter(
 			"groups",
@@ -34,8 +36,8 @@ func DefaultGroupInviteHandler(app *pocketbase.PocketBase) func(e *core.RequestE
 			return apis.NewNotFoundError("default_group_not_found", err)
 		}
 
-		telegramData := parseJSONMap(group.Get("telegram"))
-		chatIDRaw := strings.TrimSpace(anyToString(telegramData["chat_id"]))
+		telegramData := backendinternal.ParseJSONMap(group.Get("telegram"))
+		chatIDRaw := strings.TrimSpace(backendinternal.AnyToString(telegramData["chat_id"]))
 		if chatIDRaw == "" {
 			return apis.NewBadRequestError("invalid_default_group", fmt.Errorf("missing telegram.chat_id"))
 		}
@@ -51,8 +53,8 @@ func DefaultGroupInviteHandler(app *pocketbase.PocketBase) func(e *core.RequestE
 		}
 
 		// Diagnostic only: if the authenticated user has a Telegram id, log current membership state.
-		authTelegram := parseJSONMap(e.Auth.Get("telegram"))
-		authTelegramID, authTelegramIDOK := anyToInt64(authTelegram["id"])
+		authTelegram := backendinternal.ParseJSONMap(actor.Get("telegram"))
+		authTelegramID, authTelegramIDOK := backendinternal.AnyToInt64(authTelegram["id"])
 		if authTelegramIDOK {
 			member, memberErr := tg.GetChatMember(tgbotapi.GetChatMemberConfig{
 				ChatConfigWithUser: tgbotapi.ChatConfigWithUser{
@@ -61,14 +63,14 @@ func DefaultGroupInviteHandler(app *pocketbase.PocketBase) func(e *core.RequestE
 				},
 			})
 			if memberErr != nil {
-				log.Printf("[default-invite] user=%s tg_user=%d getChatMember error: %v", strings.TrimSpace(e.Auth.Id), authTelegramID, memberErr)
+				log.Printf("[default-invite] user=%s tg_user=%d getChatMember error: %v", strings.TrimSpace(actor.Id), authTelegramID, memberErr)
 			} else if member.User != nil {
-				log.Printf("[default-invite] user=%s tg_user=%d member_status=%s is_member=%v", strings.TrimSpace(e.Auth.Id), authTelegramID, member.Status, member.Status == "member" || member.Status == "administrator" || member.Status == "creator")
+				log.Printf("[default-invite] user=%s tg_user=%d member_status=%s is_member=%v", strings.TrimSpace(actor.Id), authTelegramID, member.Status, member.Status == "member" || member.Status == "administrator" || member.Status == "creator")
 			} else {
-				log.Printf("[default-invite] user=%s tg_user=%d member_status=%s", strings.TrimSpace(e.Auth.Id), authTelegramID, member.Status)
+				log.Printf("[default-invite] user=%s tg_user=%d member_status=%s", strings.TrimSpace(actor.Id), authTelegramID, member.Status)
 			}
 		} else if authTelegram["id"] != nil {
-			log.Printf("[default-invite] user=%s telegram.id not parseable: %v", strings.TrimSpace(e.Auth.Id), authTelegram["id"])
+			log.Printf("[default-invite] user=%s telegram.id not parseable: %v", strings.TrimSpace(actor.Id), authTelegram["id"])
 		}
 
 		resp, err := tg.Request(tgbotapi.CreateChatInviteLinkConfig{
@@ -78,32 +80,32 @@ func DefaultGroupInviteHandler(app *pocketbase.PocketBase) func(e *core.RequestE
 			CreatesJoinRequest: false,
 		})
 		if err != nil {
-			log.Printf("[default-invite] user=%s chat_id=%d createChatInviteLink error: %v", strings.TrimSpace(e.Auth.Id), chatID, err)
+			log.Printf("[default-invite] user=%s chat_id=%d createChatInviteLink error: %v", strings.TrimSpace(actor.Id), chatID, err)
 			return apis.NewBadRequestError("invite_link_generation_failed", err)
 		}
 
 		var invite tgbotapi.ChatInviteLink
 		if err := json.Unmarshal(resp.Result, &invite); err != nil {
-			log.Printf("[default-invite] user=%s chat_id=%d createChatInviteLink unmarshal error: %v", strings.TrimSpace(e.Auth.Id), chatID, err)
+			log.Printf("[default-invite] user=%s chat_id=%d createChatInviteLink unmarshal error: %v", strings.TrimSpace(actor.Id), chatID, err)
 			return apis.NewBadRequestError("invite_link_generation_failed", err)
 		}
 
 		link := strings.TrimSpace(invite.InviteLink)
 		if link == "" {
-			log.Printf("[default-invite] user=%s chat_id=%d empty link from createChatInviteLink", strings.TrimSpace(e.Auth.Id), chatID)
+			log.Printf("[default-invite] user=%s chat_id=%d empty link from createChatInviteLink", strings.TrimSpace(actor.Id), chatID)
 			return apis.NewBadRequestError("invite_link_generation_failed", fmt.Errorf("empty invite link"))
 		}
 		nowUnix := time.Now().Unix()
 		if invite.IsRevoked {
-			log.Printf("[default-invite] user=%s chat_id=%d created link is already revoked", strings.TrimSpace(e.Auth.Id), chatID)
+			log.Printf("[default-invite] user=%s chat_id=%d created link is already revoked", strings.TrimSpace(actor.Id), chatID)
 			return apis.NewBadRequestError("invite_link_generation_failed", fmt.Errorf("created invite link is revoked"))
 		}
 		if invite.ExpireDate > 0 && int64(invite.ExpireDate) <= nowUnix {
-			log.Printf("[default-invite] user=%s chat_id=%d created link is already expired expire_date=%d now=%d", strings.TrimSpace(e.Auth.Id), chatID, invite.ExpireDate, nowUnix)
+			log.Printf("[default-invite] user=%s chat_id=%d created link is already expired expire_date=%d now=%d", strings.TrimSpace(actor.Id), chatID, invite.ExpireDate, nowUnix)
 			return apis.NewBadRequestError("invite_link_generation_failed", fmt.Errorf("created invite link is expired"))
 		}
 		log.Printf("[default-invite] user=%s chat_id=%d created invite link=%s is_primary=%v is_revoked=%v expire_date=%d member_limit=%d creates_join_request=%v",
-			strings.TrimSpace(e.Auth.Id), chatID, link, invite.IsPrimary, invite.IsRevoked, invite.ExpireDate, invite.MemberLimit, invite.CreatesJoinRequest)
+			strings.TrimSpace(actor.Id), chatID, link, invite.IsPrimary, invite.IsRevoked, invite.ExpireDate, invite.MemberLimit, invite.CreatesJoinRequest)
 
 		return e.JSON(http.StatusOK, map[string]any{
 			"group_id":    group.Id,

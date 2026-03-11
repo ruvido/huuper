@@ -13,6 +13,9 @@ import (
 	"strings"
 	"time"
 
+	backendinternal "members/internal"
+	requestinternal "members/internal/requests"
+
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
@@ -62,7 +65,7 @@ func RegisterEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 			return apis.NewBadRequestError(errInvalidEvent, nil)
 		}
 
-		event, err := findEventBySlug(app, slug)
+		event, err := backendinternal.FindEventBySlug(app, slug)
 		if err != nil {
 			return apis.NewNotFoundError(errInvalidEvent, err)
 		}
@@ -124,7 +127,7 @@ func RegisterEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 			return apis.NewNotFoundError(errGeneric, err)
 		}
 
-		existing, err := findEventRegistrationByEmail(app, event.Id, recipient, false)
+		existing, err := backendinternal.FindEventRegistrationByEmail(app, event.Id, recipient, false)
 		if err == nil && existing != nil {
 			return apis.NewBadRequestError(errAlreadySubmitted, nil)
 		}
@@ -155,7 +158,7 @@ func RegisterEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		emailSent := false
 		effectiveData := registrationData
 		if linkedUser != nil {
-			effectiveData = parseJSONMap(linkedUser.Get("data"))
+			effectiveData = backendinternal.ParseJSONMap(linkedUser.Get("data"))
 		}
 		if linkedUser != nil {
 			if err := activateEventRegistration(app, record); err != nil {
@@ -367,11 +370,7 @@ func renderAcceptButton(app *pocketbase.PocketBase, token string, formatter func
 }
 
 func normalizeEmail(raw string) (string, error) {
-	_, normalized, ok := parseNormalizedEmail(raw)
-	if !ok {
-		return "", fmt.Errorf("missing email")
-	}
-	return normalized, nil
+	return backendinternal.NormalizeEmail(raw)
 }
 
 func parseAddress(raw string) (mail.Address, bool) {
@@ -389,7 +388,7 @@ func senderFromEvents(app *pocketbase.PocketBase) (mail.Address, bool) {
 
 func senderFromScope(app *pocketbase.PocketBase, scope string) (mail.Address, bool) {
 	raw := ""
-	if settingsData, err := findSettingData(app, "email"); err == nil {
+	if settingsData, err := requestinternal.FindSettingData(app, "email"); err == nil {
 		if scope == emailSenderScopeEvents {
 			if eventsFrom, ok := settingsData[emailSenderScopeEvents].(string); ok {
 				raw = strings.TrimSpace(eventsFrom)
@@ -596,19 +595,7 @@ func renderAndSendEmailTemplates(
 }
 
 func parseNormalizedEmail(raw string) (mail.Address, string, bool) {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return mail.Address{}, "", false
-	}
-	parsed, err := mail.ParseAddress(trimmed)
-	if err != nil {
-		return mail.Address{}, "", false
-	}
-	normalized := strings.ToLower(strings.TrimSpace(parsed.Address))
-	if normalized == "" {
-		return mail.Address{}, "", false
-	}
-	return mail.Address{Name: parsed.Name, Address: normalized}, normalized, true
+	return backendinternal.ParseNormalizedEmail(raw)
 }
 
 func markdownToHTML(input string) (string, bool) {

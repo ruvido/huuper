@@ -1,17 +1,19 @@
-package api
+package admin
 
 import (
 	"net/http"
 	"strings"
+
+	backendinternal "members/internal"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 )
 
-func AdminDeleteUserHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+func DeleteUserHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		if _, err := requireAdmin(e); err != nil {
+		if _, err := backendinternal.RequireAdmin(e); err != nil {
 			return err
 		}
 
@@ -55,14 +57,7 @@ func AdminDeleteUserHandler(app *pocketbase.PocketBase) func(e *core.RequestEven
 }
 
 func deleteUserGroupMemberships(app *pocketbase.PocketBase, userID string) (int, error) {
-	relations, err := app.FindRecordsByFilter(
-		"user_groups",
-		"user = {:user}",
-		"",
-		0,
-		0,
-		map[string]any{"user": userID},
-	)
+	relations, err := app.FindRecordsByFilter("user_groups", "user = {:user}", "", 0, 0, map[string]any{"user": userID})
 	if err != nil {
 		return 0, err
 	}
@@ -81,14 +76,7 @@ func deleteUserGroupMemberships(app *pocketbase.PocketBase, userID string) (int,
 }
 
 func clearUserAsGroupAssistant(app *pocketbase.PocketBase, userID string) (int, error) {
-	groups, err := app.FindRecordsByFilter(
-		"groups",
-		"assistant = {:user}",
-		"",
-		0,
-		0,
-		map[string]any{"user": userID},
-	)
+	groups, err := app.FindRecordsByFilter("groups", "assistant = {:user}", "", 0, 0, map[string]any{"user": userID})
 	if err != nil {
 		return 0, err
 	}
@@ -108,14 +96,7 @@ func clearUserAsGroupAssistant(app *pocketbase.PocketBase, userID string) (int, 
 }
 
 func clearUserAsRequestGuardian(app *pocketbase.PocketBase, userID string) (int, error) {
-	requests, err := app.FindRecordsByFilter(
-		"requests",
-		"guardian = {:guardian}",
-		"",
-		0,
-		0,
-		map[string]any{"guardian": userID},
-	)
+	requests, err := app.FindRecordsByFilter("requests", "guardian = {:guardian}", "", 0, 0, map[string]any{"guardian": userID})
 	if err != nil {
 		return 0, err
 	}
@@ -126,7 +107,7 @@ func clearUserAsRequestGuardian(app *pocketbase.PocketBase, userID string) (int,
 			continue
 		}
 		record.Set("guardian", "")
-		data := parseJSONMap(record.Get("data"))
+		data := backendinternal.ParseJSONMap(record.Get("data"))
 		delete(data, "guardian")
 		record.Set("data", data)
 		if err := app.Save(record); err != nil {

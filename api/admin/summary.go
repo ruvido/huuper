@@ -1,4 +1,4 @@
-package api
+package admin
 
 import (
 	"bytes"
@@ -8,13 +8,15 @@ import (
 	"strings"
 	"time"
 
+	backendinternal "members/internal"
+
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tools/types"
 )
 
-type adminEventNext struct {
+type eventNext struct {
 	ID            string `json:"id"`
 	Title         string `json:"title"`
 	EventDate     string `json:"event_date"`
@@ -22,10 +24,9 @@ type adminEventNext struct {
 	Pending       int    `json:"pending"`
 }
 
-// AdminSummaryHandler returns compact stats for the admin dashboard.
-func AdminSummaryHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+func SummaryHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		if _, err := requireAdmin(e); err != nil {
+		if _, err := backendinternal.RequireAdmin(e); err != nil {
 			return err
 		}
 
@@ -39,11 +40,11 @@ func AdminSummaryHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) 
 			if user.GetString("status") != "active" {
 				notActive++
 			}
-			rawTelegram := user.Get("telegram")
-			if isTelegramMissing(rawTelegram) {
+			if isTelegramMissing(user.Get("telegram")) {
 				telegramMissing++
 			}
 		}
+
 		groups, err := app.FindRecordsByFilter("groups", "", "", 0, 0)
 		if err != nil {
 			return apis.NewBadRequestError("failed_groups", err)
@@ -60,33 +61,21 @@ func AdminSummaryHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) 
 			return apis.NewBadRequestError("failed_events", err)
 		}
 
-		var next *adminEventNext
+		var next *eventNext
 		if len(events) > 0 {
 			event := events[0]
 			eventID := event.Id
-			registrations, err := app.FindRecordsByFilter(
-				"event_registrations",
-				fmt.Sprintf("event = '%s'", eventID),
-				"",
-				0,
-				0,
-			)
+			registrations, err := app.FindRecordsByFilter("event_registrations", fmt.Sprintf("event = '%s'", eventID), "", 0, 0)
 			if err != nil {
 				return apis.NewBadRequestError("failed_registrations", err)
 			}
 
-			pending, err := app.FindRecordsByFilter(
-				"event_registrations",
-				fmt.Sprintf("event = '%s' && status = 'pending'", eventID),
-				"",
-				0,
-				0,
-			)
+			pending, err := app.FindRecordsByFilter("event_registrations", fmt.Sprintf("event = '%s' && status = 'pending'", eventID), "", 0, 0)
 			if err != nil {
 				return apis.NewBadRequestError("failed_pending", err)
 			}
 
-			next = &adminEventNext{
+			next = &eventNext{
 				ID:            eventID,
 				Title:         event.GetString("title"),
 				EventDate:     event.GetString("event_date"),

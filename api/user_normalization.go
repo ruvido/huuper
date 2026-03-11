@@ -4,6 +4,8 @@ import (
 	"strings"
 	"unicode"
 
+	backendinternal "members/internal"
+
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
@@ -57,7 +59,7 @@ func normalizeUserProfileData(record *core.Record) {
 		return
 	}
 
-	data := parseJSONMap(record.Get("data"))
+	data := backendinternal.ParseJSONMap(record.Get("data"))
 	value, ok := data["full_name"].(string)
 	if !ok {
 		return

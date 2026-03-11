@@ -3,6 +3,8 @@ package api
 import (
 	"net/http"
 
+	backendinternal "members/internal"
+
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
@@ -14,12 +16,36 @@ var publicSettingsNames = map[string]bool{
 	"signup":         true,
 }
 
+var memberSettingsNames = map[string]bool{
+	"onboarding":       true,
+	"profile_schema":   true,
+	"telegram":         true,
+	"telegram_connect": true,
+}
+
 func unwrapSettingData(raw any) map[string]any {
-	data := parseJSONMap(raw)
-	if nested, ok := data["data"].(map[string]any); ok && nested != nil {
-		return nested
+	return backendinternal.UnwrapSettingData(raw)
+}
+
+func requireSettingsVisibility(e *core.RequestEvent, name string) error {
+	if publicSettingsNames[name] {
+		return nil
 	}
-	return data
+
+	actor, err := backendinternal.RequireAuthenticatedActor(e)
+	if err != nil {
+		return err
+	}
+
+	if memberSettingsNames[name] {
+		return nil
+	}
+
+	if !actor.GetBool("admin") {
+		return apis.NewForbiddenError("Forbidden", nil)
+	}
+
+	return nil
 }
 
 // GetSettingsHandler returns settings by name
@@ -30,8 +56,8 @@ func GetSettingsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) e
 			return apis.NewNotFoundError("Setting not found", nil)
 		}
 
-		if !publicSettingsNames[name] && e.Auth == nil {
-			return apis.NewUnauthorizedError("Unauthorized", nil)
+		if err := requireSettingsVisibility(e, name); err != nil {
+			return err
 		}
 
 		record, err := app.FindFirstRecordByFilter(

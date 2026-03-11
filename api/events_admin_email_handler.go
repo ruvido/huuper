@@ -5,6 +5,8 @@ import (
 	"net/mail"
 	"strings"
 
+	backendinternal "members/internal"
+
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
@@ -22,7 +24,7 @@ type adminEventEmailPayload struct {
 // When dry_run=true it sends the same email only to the authenticated admin.
 func AdminEventEmailHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		if _, err := requireAdmin(e); err != nil {
+		if _, err := backendinternal.RequireAdmin(e); err != nil {
 			return err
 		}
 
