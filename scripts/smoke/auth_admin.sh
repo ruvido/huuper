@@ -2,7 +2,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENV_FILE="${SCRIPT_DIR}/.env"
+SCRIPTS_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+ENV_FILE="${SCRIPTS_DIR}/.env"
 
 if [[ -f "${ENV_FILE}" ]]; then
   set -a
@@ -19,15 +20,17 @@ ADMIN_PASSWORD="${ADMIN_PASSWORD:-}"
 : "${ADMIN_EMAIL:?Missing admin email (.env: ADMIN_EMAIL)}"
 : "${ADMIN_PASSWORD:?Missing admin password (.env: ADMIN_PASSWORD)}"
 
+command -v jq >/dev/null 2>&1 || { echo "jq non installato" >&2; exit 1; }
+
 payload="$(jq -n --arg identity "$ADMIN_EMAIL" --arg password "$ADMIN_PASSWORD" \
-    '{identity:$identity, password:$password}')"
+  '{identity:$identity, password:$password}')"
 
 response="$(curl -sS -X POST "$BASE/api/collections/users/auth-with-password" \
-    -H "Content-Type: application/json" \
-    -d "$payload")"
+  -H "Content-Type: application/json" \
+  -d "$payload")"
 
-token="$(printf '%s' "$response" | jq -r '.token')"
+token="$(printf '%s' "$response" | jq -r '.token // empty')"
 
-[ -n "$token" ] && [ "$token" != "null" ] || { echo "Token non trovato"; exit 1; }
+[ -n "$token" ] || { echo "Token admin non trovato"; exit 1; }
 
 echo "$token"

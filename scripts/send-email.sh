@@ -47,7 +47,7 @@ BODY="$(yq -er '.body' "$EMAIL_FILE")" || { echo "Campo 'body' mancante" >&2; ex
 [[ -n "$SUBJECT" ]] || { echo "Campo 'subject' vuoto" >&2; exit 1; }
 [[ -n "$BODY" ]] || { echo "Campo 'body' vuoto" >&2; exit 1; }
 
-TOKEN="$($SCRIPT_DIR/get_admin_token.sh)"
+TOKEN="$($SCRIPT_DIR/smoke/auth_admin.sh)"
 
 PAYLOAD="$(jq -n \
   --arg subject "$SUBJECT" \
