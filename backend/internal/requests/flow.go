@@ -154,6 +154,8 @@ func RequiredFieldForAction(action string) string {
 		return "group"
 	case FlowActionAssignGuardian:
 		return "guardian"
+	case FlowActionMentoring:
+		return "mentoring_notes"
 	default:
 		return ""
 	}
@@ -200,7 +202,7 @@ func StepIndexFromStatus(status string, steps []FlowStep) int {
 		return 0
 	}
 	for i := range steps {
-		target := NormalizeStatus(StatusForStepIndex(i + 1, steps))
+		target := NormalizeStatus(StatusForStepIndex(i+1, steps))
 		if target == normalized {
 			return i + 1
 		}

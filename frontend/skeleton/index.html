@@ -1,0 +1,17 @@
+{{ define "content" }}
+<section class="panel">
+  <form id="login-form">
+    <div class="stack">
+      {{ template "field" (dict "Label" "Email" "ID" "login-email" "Name" "email" "Type" "email" "Placeholder" "nome@dominio.it" "Required" true "Autocomplete" "username") }}
+      {{ template "field" (dict "Label" "Password" "ID" "login-password" "Name" "password" "Type" "password" "Placeholder" "password" "Required" true "Autocomplete" "current-password") }}
+    </div>
+    <p id="login-error" class="status" hidden></p>
+    <div class="actions">
+      <button class="primary" type="submit">Login</button>
+      <a href="/signup/">Signup</a>
+      <a href="/password-reset/">Password reset</a>
+    </div>
+  </form>
+</section>
+{{ end }}
+{{ define "page" }}{{ template "layout-public" (dict "Title" "Huuper" "TopbarTitle" "" "BackHref" "" "Scripts" (list "/assets/js/auth.js" "/assets/js/login.js")) }}{{ end }}

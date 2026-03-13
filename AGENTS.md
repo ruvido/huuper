@@ -16,6 +16,7 @@ Linee guida minime per contribuire al progetto in modo coerente, semplice e mant
 - Tenere i cambi piccoli, iterativi e verificabili.
 - Non introdurre automazioni opache difficili da mantenere.
 - Non aggiungere dipendenze nuove se non strettamente necessario.
+- Non introdurre fallback impliciti, percorsi alternativi automatici o comportamento inferito non richiesto esplicitamente.
 
 ## Scope attuale
 - Backend e frontend web sono in scope.
@@ -33,6 +34,9 @@ Linee guida minime per contribuire al progetto in modo coerente, semplice e mant
 - Preferire refactor iterativi piccoli con build verde a ogni step.
 - Centralizzare autorizzazione, validazione e access rules; evitare duplicazione negli handler.
 - Mantenere il tree strutturato e sensato, senza refactor strutturali non discussi.
+- I file backend devono seguire naming di dominio chiaro, non naming tecnico rumoroso.
+- Evitare file come `_get`, `_list`, `_create`, `_handler` quando il dominio puo' vivere in `groups.go`, `users.go`, `events.go`, `requests.go`, `settings.go`.
+- Se una capability appartiene chiaramente a un dominio esistente, va nello stesso file o package del dominio, non in un file-frammento aggiunto per comodita'.
 
 ## Frontend
 - Il frontend attivo usa l'approccio `frontend/skeleton` -> `frontend/site`.
@@ -43,6 +47,9 @@ Linee guida minime per contribuire al progetto in modo coerente, semplice e mant
 - Usare CSS semantico e componenti/template chiari.
 - Il primo obiettivo frontend v2 e' wireframing funzionale, non design finale.
 - Il dev mode deve restare semplice e trasparente, con watcher/build standard e senza automazioni opache.
+- Per il frontend v2 valgono anche `agents/frontend-agent.md` e `agents/review-agent.md`.
+- Evitare fan-out di chiamate dal frontend quando il backend puo' aggregare i dati in un endpoint chiaro.
+- Per le pagine dettaglio preferire un solo endpoint backend per pagina, soprattutto se il frontend altrimenti farebbe 2 o piu' richieste correlate.
 
 ## API Design
 - Le API devono essere chiare, robuste, prevedibili e adatte a interfacce web, CLI, mobile o desktop.
@@ -55,6 +62,8 @@ Linee guida minime per contribuire al progetto in modo coerente, semplice e mant
 - Feature creep.
 - Astrazioni furbe o premature.
 - Duplicazione di logica tra handler.
+- Duplicazione di fetch lato frontend per comporre una singola vista quando il backend puo' esporre un endpoint di dettaglio aggregato.
+- Reintrodurre naming sporco o frammentato nel backend, soprattutto file suffix-based come `_get`, `_list`, `_handler`.
 - Fallback impliciti o comportamento automatico non richiesto.
 - Drift rispetto alle convenzioni ufficiali di Go e PocketBase.
 - Reintrodurre il frontend legacy nel path attivo.
@@ -62,6 +71,7 @@ Linee guida minime per contribuire al progetto in modo coerente, semplice e mant
 ## Collaboration Constraint
 - Se una modifica e' ambigua, fermarsi e chiarire.
 - Se una modifica tocca struttura, policy o naming cross-cutting, proporre prima le opzioni.
+- Se un flusso ha piu' interpretazioni possibili, non implementare scorciatoie o fallback: fermarsi e chiedere conferma.
 
 ## Decision policy
 - In caso di dubbio scegliere l'opzione piu' semplice, piu' chiara, con meno moving parts.

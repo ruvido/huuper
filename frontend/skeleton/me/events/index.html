@@ -1,0 +1,5 @@
+{{ define "content" }}
+<p id="events-status" class="status"></p>
+<section id="events-list" class="list" hidden></section>
+{{ end }}
+{{ define "page" }}{{ template "layout-me" (dict "Title" "Huuper / Me / Events" "TopbarTitle" "Events" "BackHref" "" "ProfileHref" "/me/profile/" "ActiveNav" "events" "Scripts" (list "/assets/js/auth.js" "/assets/js/guard-me.js" "/assets/js/list-page.js" "/assets/js/me-events.js")) }}{{ end }}

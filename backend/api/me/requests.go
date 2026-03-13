@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	backendinternal "members/backend/internal"
+	groupinternal "members/backend/internal/groups"
 	backendrequests "members/backend/internal/requests"
 
 	"github.com/pocketbase/pocketbase"
@@ -123,6 +124,16 @@ func GetRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) er
 		flowVersion, _ := backendrequests.ProgressFromData(item.Data)
 		stepIndex := backendrequests.EffectiveStepIndex(record, item.Data, flow)
 		computedStatus := backendrequests.StatusForItem(item.Rejected, stepIndex, flow.Steps)
+		statusLabel := requestStatusLabel(computedStatus, stepIndex, flow)
+		fullName := requestDisplayName(item.Data, item.Email, item.ID)
+		groupName, err := requestGroupName(app, item.GroupID)
+		if err != nil {
+			return apis.NewBadRequestError("failed_group_lookup", err)
+		}
+		guardianName, err := requestGuardianName(app, item.Guardian)
+		if err != nil {
+			return apis.NewBadRequestError("failed_guardian_lookup", err)
+		}
 
 		nextStep, hasNext := backendrequests.FlowStepAt(flow, stepIndex)
 		canAdvance := false
@@ -134,32 +145,167 @@ func GetRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) er
 				return apis.NewBadRequestError("role_resolution_failed", err)
 			}
 		}
+		options, err := requestWorkflowOptions(app, actor, record, requiredField, canAdvance)
+		if err != nil {
+			return apis.NewBadRequestError("workflow_options_failed", err)
+		}
 
 		return e.JSON(http.StatusOK, map[string]any{
-			"id":           item.ID,
-			"email":        item.Email,
-			"status":       computedStatus,
-			"rejected":     item.Rejected,
-			"group":        item.GroupID,
-			"guardian":     item.Guardian,
-			"flow_version": flowVersion,
-			"step_index":   stepIndex,
-			"created":      item.Created,
-			"updated":      item.Updated,
-			"data":         item.Data,
+			"id":                   item.ID,
+			"full_name":            fullName,
+			"email":                item.Email,
+			"status":               computedStatus,
+			"status_label":         statusLabel,
+			"rejected":             item.Rejected,
+			"group":                item.GroupID,
+			"group_name":           groupName,
+			"guardian":             item.Guardian,
+			"guardian_name":        guardianName,
+			"assigned_at":          requestAssignedAt(item.Data),
+			"mentoring_notes":      requestMentoringNotes(item.Data),
+			"mentoring_notes_html": requestMentoringNotesHTML(item.Data),
+			"flow_version":         flowVersion,
+			"step_index":           stepIndex,
+			"created":              item.Created,
+			"updated":              item.Updated,
+			"data":                 item.Data,
 			"workflow": map[string]any{
-				"total_steps":       len(flow.Steps),
-				"has_next_step":     hasNext,
-				"next_role":         nextStep.Role,
-				"next_action":       nextStep.Action,
-				"next_action_label": nextStep.Label,
-				"next_action_notes": nextStep.Notes,
-				"required_field":    requiredField,
-				"can_advance":       canAdvance,
-				"current_version":   flow.Version,
+				"total_steps":            len(flow.Steps),
+				"has_next_step":          hasNext,
+				"next_role":              nextStep.Role,
+				"next_action":            nextStep.Action,
+				"next_action_label":      nextStep.Label,
+				"next_action_notes":      nextStep.Notes,
+				"next_action_notes_html": requestNotesHTML(nextStep.Notes),
+				"required_field":         requiredField,
+				"can_advance":            canAdvance,
+				"options":                options,
+				"current_version":        flow.Version,
 			},
 		})
 	}
+}
+
+func requestStatusLabel(status string, stepIndex int, flow backendrequests.FlowConfig) string {
+	nextStep, hasNext := backendrequests.FlowStepAt(flow, stepIndex)
+	if hasNext && strings.TrimSpace(nextStep.Label) != "" {
+		return strings.TrimSpace(nextStep.Label)
+	}
+	return strings.ReplaceAll(backendrequests.NormalizeStatus(status), "_", " ")
+}
+
+func requestGroupName(app *pocketbase.PocketBase, groupID string) (string, error) {
+	groupID = strings.TrimSpace(groupID)
+	if groupID == "" {
+		return "", nil
+	}
+	group, err := app.FindRecordById("groups", groupID)
+	if err != nil || group == nil {
+		return "", err
+	}
+	return strings.TrimSpace(group.GetString("name")), nil
+}
+
+func requestGuardianName(app *pocketbase.PocketBase, userID string) (string, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return "", nil
+	}
+	user, err := app.FindRecordById("users", userID)
+	if err != nil || user == nil {
+		return "", err
+	}
+	return groupinternal.UserDisplayName(user), nil
+}
+
+func requestDisplayName(data map[string]any, email string, fallbackID string) string {
+	if fullName, ok := data["full_name"].(string); ok && strings.TrimSpace(fullName) != "" {
+		return strings.TrimSpace(fullName)
+	}
+	if name, ok := data["name"].(string); ok && strings.TrimSpace(name) != "" {
+		return strings.TrimSpace(name)
+	}
+	if strings.TrimSpace(email) != "" {
+		return strings.TrimSpace(email)
+	}
+	return fallbackID
+}
+
+func requestAssignedAt(data map[string]any) string {
+	guardian, ok := data["guardian"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	assignedAt, _ := guardian["assigned_at"].(string)
+	return strings.TrimSpace(assignedAt)
+}
+
+func requestMentoringNotes(data map[string]any) string {
+	value, _ := data["mentoring_notes"].(string)
+	return strings.TrimSpace(value)
+}
+
+func requestMentoringNotesHTML(data map[string]any) string {
+	html, ok := backendinternal.RenderMarkdownHTML(requestMentoringNotes(data))
+	if !ok {
+		return ""
+	}
+	return html
+}
+
+func requestNotesHTML(raw string) string {
+	html, ok := backendinternal.RenderMarkdownHTML(raw)
+	if !ok {
+		return ""
+	}
+	return html
+}
+
+func requestWorkflowOptions(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, requiredField string, canAdvance bool) (map[string]any, error) {
+	options := map[string]any{}
+	if !canAdvance {
+		return options, nil
+	}
+
+	switch requiredField {
+	case "group":
+		groups, err := app.FindRecordsByFilter("groups", "", "name", 500, 0, nil)
+		if err != nil {
+			return nil, err
+		}
+		items := make([]map[string]any, 0, len(groups))
+		for _, group := range groups {
+			if group == nil {
+				continue
+			}
+			items = append(items, map[string]any{
+				"id":   group.Id,
+				"name": strings.TrimSpace(group.GetString("name")),
+				"type": strings.TrimSpace(group.GetString("type")),
+			})
+		}
+		options["groups"] = items
+	case "guardian":
+		groupID := strings.TrimSpace(record.GetString("group"))
+		if groupID == "" {
+			return options, nil
+		}
+		response, err := groupinternal.MembersResponseForGroup(app, groupID)
+		if err != nil {
+			return nil, err
+		}
+		items := make([]map[string]any, 0, len(response.Items))
+		for _, member := range response.Items {
+			items = append(items, map[string]any{
+				"id":        member.ID,
+				"full_name": member.FullName,
+				"email":     member.Email,
+			})
+		}
+		options["guardians"] = items
+	}
+
+	return options, nil
 }
 
 func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {

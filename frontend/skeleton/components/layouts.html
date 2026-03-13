@@ -1,0 +1,61 @@
+{{ define "head" }}
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ .Title }}</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/assets/css/app.css" />
+  {{- range .Scripts }}
+  <script src="{{ . }}" defer></script>
+  {{- end }}
+</head>
+{{ end }}
+
+{{ define "layout-public" }}
+<!doctype html>
+<html lang="it">
+  {{ template "head" . }}
+  <body>
+    <main class="app">
+      <section class="shell">
+        {{ if or .BackHref .BackHistory .TopbarTitle }}
+          {{ template "topbar" (dict "BackHref" .BackHref "BackHistory" .BackHistory "Title" .TopbarTitle "ProfileHref" "") }}
+        {{ end }}
+        {{ template "content" . }}
+      </section>
+    </main>
+  </body>
+</html>
+{{ end }}
+
+{{ define "layout-me" }}
+<!doctype html>
+<html lang="it">
+  {{ template "head" . }}
+  <body>
+    <main class="app">
+      <section class="shell">
+        {{ template "topbar" (dict "BackHref" .BackHref "BackHistory" .BackHistory "Title" .TopbarTitle "ProfileHref" .ProfileHref) }}
+        {{ template "content" . }}
+      </section>
+    </main>
+    {{ template "bottomnav-me" . }}
+  </body>
+</html>
+{{ end }}
+
+{{ define "layout-admin" }}
+<!doctype html>
+<html lang="it">
+  {{ template "head" . }}
+  <body class="admin">
+    <main class="app">
+      <section class="shell">
+        {{ template "topbar" (dict "BackHref" .BackHref "BackHistory" .BackHistory "Title" .TopbarTitle "ProfileHref" .ProfileHref) }}
+        {{ template "content" . }}
+      </section>
+    </main>
+    {{ template "bottomnav-admin" . }}
+  </body>
+</html>
+{{ end }}

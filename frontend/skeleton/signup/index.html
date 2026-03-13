@@ -1,0 +1,17 @@
+{{ define "content" }}
+<section class="panel">
+  <form id="signup-form">
+    <div class="stack">
+      {{ template "field" (dict "Label" "Email" "ID" "signup-email" "Name" "email" "Type" "email" "Placeholder" "nome@dominio.it" "Required" true "Autocomplete" "email") }}
+      {{ template "field" (dict "Label" "Password" "ID" "signup-password" "Name" "password" "Type" "password" "Placeholder" "password" "Required" true "Autocomplete" "new-password") }}
+      {{ template "field" (dict "Label" "Password confirm" "ID" "signup-password-confirm" "Name" "passwordConfirm" "Type" "password" "Placeholder" "password" "Required" true "Autocomplete" "new-password") }}
+    </div>
+    <p id="signup-status" class="status" hidden></p>
+    <div class="actions">
+      <button class="primary" type="submit">Signup</button>
+      <a href="/">Login</a>
+    </div>
+  </form>
+</section>
+{{ end }}
+{{ define "page" }}{{ template "layout-public" (dict "Title" "Huuper / Signup" "TopbarTitle" "Signup" "BackHref" "/" "Scripts" (list "/assets/js/signup.js")) }}{{ end }}

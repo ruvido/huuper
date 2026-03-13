@@ -3,6 +3,7 @@ package admin
 import (
 	"net/http"
 
+	meapi "members/backend/api/me"
 	"members/backend/bot"
 
 	"github.com/pocketbase/pocketbase"
@@ -22,4 +23,8 @@ func SyncGroupMembershipsHandler(app *pocketbase.PocketBase) func(e *core.Reques
 			"ok": true,
 		})
 	}
+}
+
+func GroupGetHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return meapi.GroupGetHandler(app)
 }

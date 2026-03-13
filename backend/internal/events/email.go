@@ -1,17 +1,15 @@
 package events
 
 import (
-	"bytes"
 	"html"
 	"net/mail"
 	"strings"
 
+	backendinternal "members/backend/internal"
 	requestinternal "members/backend/internal/requests"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/tools/mailer"
-	"github.com/yuin/goldmark"
-	htmlrender "github.com/yuin/goldmark/renderer/html"
 )
 
 const (
@@ -36,7 +34,7 @@ func RenderEmailBody(body string) (string, string) {
 	if clean == "" {
 		return "", ""
 	}
-	htmlBody, ok := markdownToHTML(clean)
+	htmlBody, ok := backendinternal.RenderMarkdownHTML(clean)
 	if !ok {
 		htmlBody = `<div style="white-space:pre-wrap">` + html.EscapeString(clean) + `</div>`
 	}
@@ -115,17 +113,4 @@ func parseNormalizedEmail(raw string) (mail.Address, string, bool) {
 		return mail.Address{}, "", false
 	}
 	return mail.Address{Name: parsed.Name, Address: normalized}, normalized, true
-}
-
-func markdownToHTML(input string) (string, bool) {
-	md := goldmark.New(
-		goldmark.WithRendererOptions(
-			htmlrender.WithUnsafe(),
-		),
-	)
-	var out bytes.Buffer
-	if err := md.Convert([]byte(input), &out); err != nil {
-		return "", false
-	}
-	return out.String(), true
 }

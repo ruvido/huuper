@@ -1,0 +1,6 @@
+{{ define "content" }}
+<p id="event-status" class="status"></p>
+<section id="event-summary" class="list" hidden></section>
+<section id="event-registrations" class="list" hidden></section>
+{{ end }}
+{{ define "page" }}{{ template "layout-admin" (dict "Title" "Huuper / Admin / Event" "TopbarTitle" "Event" "BackHref" "" "BackHistory" true "ProfileHref" "/admin/profile/" "ActiveNav" "events" "Scripts" (list "/assets/js/auth.js" "/assets/js/guard-admin.js" "/assets/js/back.js" "/assets/js/list-page.js" "/assets/js/admin-event-detail.js")) }}{{ end }}

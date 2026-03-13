@@ -1,0 +1,5 @@
+{{ define "content" }}
+<p id="requests-status" class="status"></p>
+<section id="requests-list" class="list" hidden></section>
+{{ end }}
+{{ define "page" }}{{ template "layout-me" (dict "Title" "Huuper / Me / Requests" "TopbarTitle" "Requests" "BackHref" "" "ProfileHref" "/me/profile/" "ActiveNav" "requests" "Scripts" (list "/assets/js/auth.js" "/assets/js/guard-me.js" "/assets/js/list-page.js" "/assets/js/request-card.js" "/assets/js/me-requests.js")) }}{{ end }}

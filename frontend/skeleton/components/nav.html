@@ -1,0 +1,55 @@
+{{ define "topbar" }}
+<header class="topbar">
+  {{ if .BackHistory }}
+    <button class="icon-link" type="button" data-back aria-label="Back">{{ template "icon-back" . }}</button>
+  {{ else if .BackHref }}
+    <a class="icon-link" href="{{ .BackHref }}" aria-label="Back">{{ template "icon-back" . }}</a>
+  {{ else }}
+    <span></span>
+  {{ end }}
+  <div class="topbar-title">{{ .Title }}</div>
+  {{ if .ProfileHref }}
+    <a class="icon-link" href="{{ .ProfileHref }}" aria-label="Profile">{{ template "icon-profile" . }}</a>
+  {{ else }}
+    <span></span>
+  {{ end }}
+</header>
+{{ end }}
+
+{{ define "bottomnav-me" }}
+<nav class="bottomnav" aria-label="Member primary">
+  <a class="nav-link{{ if eq .ActiveNav "groups" }} nav-link-current{{ end }}" href="/me/">
+    {{ template "icon-groups" . }}
+    <span>Groups</span>
+  </a>
+  <a class="nav-link{{ if eq .ActiveNav "events" }} nav-link-current{{ end }}" href="/me/events/">
+    {{ template "icon-events" . }}
+    <span>Events</span>
+  </a>
+  <a class="nav-link{{ if eq .ActiveNav "requests" }} nav-link-current{{ end }}" href="/me/requests/">
+    {{ template "icon-requests" . }}
+    <span>Requests</span>
+  </a>
+</nav>
+{{ end }}
+
+{{ define "bottomnav-admin" }}
+<nav class="bottomnav" aria-label="Admin primary">
+  <a class="nav-link{{ if eq .ActiveNav "dashboard" }} nav-link-current{{ end }}" href="/admin/">
+    {{ template "icon-dashboard" . }}
+    <span>Dashboard</span>
+  </a>
+  <a class="nav-link{{ if eq .ActiveNav "groups" }} nav-link-current{{ end }}" href="/admin/groups/">
+    {{ template "icon-groups" . }}
+    <span>Groups</span>
+  </a>
+  <a class="nav-link{{ if eq .ActiveNav "events" }} nav-link-current{{ end }}" href="/admin/events/">
+    {{ template "icon-events" . }}
+    <span>Events</span>
+  </a>
+  <a class="nav-link{{ if eq .ActiveNav "requests" }} nav-link-current{{ end }}" href="/admin/requests/">
+    {{ template "icon-requests" . }}
+    <span>Requests</span>
+  </a>
+</nav>
+{{ end }}

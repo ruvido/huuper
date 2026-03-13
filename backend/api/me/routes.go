@@ -7,6 +7,9 @@ import (
 
 type Handlers struct {
 	Settings           func(e *core.RequestEvent) error
+	GroupsList         func(e *core.RequestEvent) error
+	GroupGet           func(e *core.RequestEvent) error
+	UserGet            func(e *core.RequestEvent) error
 	EventStatus        func(e *core.RequestEvent) error
 	EventUnsubscribe   func(e *core.RequestEvent) error
 	TelegramToken      func(e *core.RequestEvent) error
@@ -21,6 +24,9 @@ type Handlers struct {
 
 func Register(se *core.ServeEvent, h Handlers) {
 	se.Router.GET("/api/me/settings/{name}", h.Settings).Bind(apis.RequireAuth())
+	se.Router.GET("/api/me/groups", h.GroupsList).Bind(apis.RequireAuth())
+	se.Router.GET("/api/me/groups/{id}", h.GroupGet).Bind(apis.RequireAuth())
+	se.Router.GET("/api/me/users/{id}", h.UserGet).Bind(apis.RequireAuth())
 	se.Router.GET("/api/me/events/{slug}/status", h.EventStatus).Bind(apis.RequireAuth())
 	se.Router.POST("/api/me/events/{slug}/unsubscribe", h.EventUnsubscribe).Bind(apis.RequireAuth())
 	se.Router.POST("/api/me/telegram/token", h.TelegramToken).Bind(apis.RequireAuth())

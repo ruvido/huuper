@@ -1,0 +1,12 @@
+{{ define "content" }}
+<section class="panel">
+  <div class="stack">
+    <p id="profile-email">email:</p>
+    <p id="profile-telegram">telegram:</p>
+  </div>
+  <div class="actions">
+    <button class="primary" type="button" data-logout>Logout</button>
+  </div>
+</section>
+{{ end }}
+{{ define "page" }}{{ template "layout-me" (dict "Title" "Huuper / Me / Profile" "TopbarTitle" "Profile" "BackHref" "" "BackHistory" true "ProfileHref" "" "ActiveNav" "" "Scripts" (list "/assets/js/auth.js" "/assets/js/guard-me.js" "/assets/js/back.js" "/assets/js/profile.js" "/assets/js/logout.js")) }}{{ end }}

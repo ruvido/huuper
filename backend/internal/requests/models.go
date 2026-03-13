@@ -39,6 +39,17 @@ type ListItem struct {
 	Workflow    map[string]any `json:"workflow"`
 }
 
+type GuardianRequestItem struct {
+	ID         string `json:"id"`
+	FullName   string `json:"full_name"`
+	Email      string `json:"email"`
+	Status     string `json:"status"`
+	GroupID    string `json:"group"`
+	GroupName  string `json:"group_name"`
+	Created    string `json:"created"`
+	AssignedAt string `json:"assigned_at"`
+}
+
 const (
 	ActionAdvance     = "advance"
 	ActionReject      = "reject"

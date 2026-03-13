@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	backendinternal "members/backend/internal"
+	groupinternal "members/backend/internal/groups"
+	requestinternal "members/backend/internal/requests"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
@@ -48,6 +50,66 @@ func DeleteUserHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) er
 			"removed_memberships": removedMemberships,
 			"cleared_groups":      clearedGroups,
 			"cleared_guardians":   clearedGuardians,
+		})
+	}
+}
+
+func UserGetHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		userID := strings.TrimSpace(e.Request.PathValue("id"))
+		if userID == "" {
+			return apis.NewBadRequestError("invalid_user", nil)
+		}
+
+		user, err := app.FindRecordById("users", userID)
+		if err != nil || user == nil {
+			return apis.NewNotFoundError("user_not_found", err)
+		}
+
+		memberships, err := app.FindRecordsByFilter("user_groups", "user = {:user}", "", 500, 0, map[string]any{"user": userID})
+		if err != nil {
+			return apis.NewBadRequestError("failed_user_groups", err)
+		}
+
+		groupIDs := make([]string, 0, len(memberships))
+		for _, rel := range memberships {
+			groupID := strings.TrimSpace(rel.GetString("group"))
+			if groupID != "" {
+				groupIDs = append(groupIDs, groupID)
+			}
+		}
+
+		groups, err := app.FindRecordsByIds("groups", groupIDs)
+		if err != nil {
+			return apis.NewBadRequestError("failed_groups", err)
+		}
+
+		groupItems := make([]map[string]any, 0, len(groups))
+		for _, group := range groups {
+			if group == nil {
+				continue
+			}
+			groupItems = append(groupItems, map[string]any{
+				"id":   group.Id,
+				"name": group.GetString("name"),
+				"type": group.GetString("type"),
+			})
+		}
+
+		telegram := backendinternal.ParseJSONMap(user.Get("telegram"))
+		guardianRequests, err := requestinternal.GuardianRequestsForUser(app, userID, nil)
+		if err != nil {
+			return apis.NewBadRequestError("failed_guardian_requests", err)
+		}
+		return e.JSON(http.StatusOK, map[string]any{
+			"id":                user.Id,
+			"email":             user.GetString("email"),
+			"full_name":         groupinternal.UserDisplayName(user),
+			"status":            user.GetString("status"),
+			"admin":             user.GetBool("admin"),
+			"telegram":          telegram,
+			"groups":            groupItems,
+			"guardian_requests": guardianRequests,
 		})
 	}
 }

@@ -1,0 +1,13 @@
+{{ define "field" }}
+<label class="field">
+  <span>{{ .Label }}</span>
+  <input
+    id="{{ .ID }}"
+    type="{{ .Type }}"
+    name="{{ .Name }}"
+    {{- if .Placeholder }} placeholder="{{ .Placeholder }}"{{ end }}
+    {{- if .Required }} required{{ end }}
+    {{- if .Autocomplete }} autocomplete="{{ .Autocomplete }}"{{ end }}
+  />
+</label>
+{{ end }}

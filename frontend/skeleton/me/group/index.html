@@ -1,0 +1,6 @@
+{{ define "content" }}
+<p id="group-status" class="status"></p>
+<section id="group-summary" class="list" hidden></section>
+<section id="group-members" class="list" hidden></section>
+{{ end }}
+{{ define "page" }}{{ template "layout-me" (dict "Title" "Huuper / Me / Group" "TopbarTitle" "Group" "BackHref" "" "BackHistory" true "ProfileHref" "/me/profile/" "ActiveNav" "groups" "Scripts" (list "/assets/js/auth.js" "/assets/js/guard-me.js" "/assets/js/back.js" "/assets/js/list-page.js" "/assets/js/me-group-detail.js")) }}{{ end }}

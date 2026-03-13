@@ -3,60 +3,8 @@ package groups
 import (
 	"strings"
 
-	backendinternal "members/backend/internal"
-
 	"github.com/pocketbase/pocketbase"
-	"github.com/pocketbase/pocketbase/apis"
-	"github.com/pocketbase/pocketbase/core"
 )
-
-type MemberItem struct {
-	ID         string `json:"id"`
-	Email      string `json:"email"`
-	FullName   string `json:"full_name"`
-	Role       string `json:"role"`
-	IsGuardian bool   `json:"is_guardian"`
-}
-
-type GuardianItem struct {
-	ID            string `json:"id"`
-	Email         string `json:"email"`
-	FullName      string `json:"full_name"`
-	ProtegesCount int    `json:"proteges_count"`
-}
-
-type MembersResponse struct {
-	GroupID string       `json:"group_id"`
-	Items   []MemberItem `json:"items"`
-}
-
-type GuardiansResponse struct {
-	GroupID string         `json:"group_id"`
-	Items   []GuardianItem `json:"items"`
-}
-
-func FindByPathID(app *pocketbase.PocketBase, e *core.RequestEvent) (*core.Record, error) {
-	id := strings.TrimSpace(e.Request.PathValue("id"))
-	if id == "" {
-		return nil, apis.NewBadRequestError("invalid_group", nil)
-	}
-	group, err := app.FindRecordById("groups", id)
-	if err != nil || group == nil {
-		return nil, apis.NewNotFoundError("group_not_found", err)
-	}
-	return group, nil
-}
-
-func UserDisplayName(user *core.Record) string {
-	if user == nil {
-		return ""
-	}
-	data := backendinternal.ParseJSONMap(user.Get("data"))
-	if fullName, ok := data["full_name"].(string); ok && strings.TrimSpace(fullName) != "" {
-		return strings.TrimSpace(fullName)
-	}
-	return strings.TrimSpace(user.GetString("email"))
-}
 
 func GuardianCounts(app *pocketbase.PocketBase, groupID string) (map[string]int, error) {
 	records, err := app.FindRecordsByFilter(
@@ -101,14 +49,12 @@ func MembersResponseForGroup(app *pocketbase.PocketBase, groupID string) (*Membe
 	}
 
 	userIDs := make([]string, 0, len(relations))
-	rolesByUserID := make(map[string]string, len(relations))
 	for _, rel := range relations {
 		userID := strings.TrimSpace(rel.GetString("user"))
 		if userID == "" {
 			continue
 		}
 		userIDs = append(userIDs, userID)
-		rolesByUserID[userID] = strings.TrimSpace(rel.GetString("role"))
 	}
 
 	usersByID, err := usersByID(app, userIDs)
@@ -124,11 +70,11 @@ func MembersResponseForGroup(app *pocketbase.PocketBase, groupID string) (*Membe
 		}
 		_, isGuardian := guardianCounts[userID]
 		items = append(items, MemberItem{
-			ID:         user.Id,
-			Email:      user.GetString("email"),
-			FullName:   UserDisplayName(user),
-			Role:       rolesByUserID[userID],
-			IsGuardian: isGuardian,
+			ID:            user.Id,
+			Email:         user.GetString("email"),
+			FullName:      UserDisplayName(user),
+			IsGuardian:    isGuardian,
+			ProtegesCount: guardianCounts[userID],
 		})
 	}
 
@@ -174,37 +120,49 @@ func GuardiansResponseForGroup(app *pocketbase.PocketBase, groupID string) (*Gua
 	}, nil
 }
 
-func usersByID(app *pocketbase.PocketBase, userIDs []string) (map[string]*core.Record, error) {
-	if len(userIDs) == 0 {
-		return map[string]*core.Record{}, nil
-	}
-
-	seen := make(map[string]struct{}, len(userIDs))
-	deduped := make([]string, 0, len(userIDs))
-	for _, userID := range userIDs {
-		trimmed := strings.TrimSpace(userID)
-		if trimmed == "" {
-			continue
-		}
-		if _, ok := seen[trimmed]; ok {
-			continue
-		}
-		seen[trimmed] = struct{}{}
-		deduped = append(deduped, trimmed)
-	}
-
-	records, err := app.FindRecordsByIds("users", deduped)
+func GuardianGroupsForUser(app *pocketbase.PocketBase, userID string) ([]GuardianGroupItem, error) {
+	records, err := app.FindRecordsByFilter(
+		"requests",
+		"guardian = {:guardian} && rejected = false",
+		"",
+		500,
+		0,
+		map[string]any{"guardian": strings.TrimSpace(userID)},
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	out := make(map[string]*core.Record, len(records))
+	countsByGroup := map[string]int{}
+	groupIDs := make([]string, 0)
 	for _, record := range records {
-		if record == nil {
+		groupID := strings.TrimSpace(record.GetString("group"))
+		if groupID == "" {
 			continue
 		}
-		out[record.Id] = record
+		if _, ok := countsByGroup[groupID]; !ok {
+			groupIDs = append(groupIDs, groupID)
+		}
+		countsByGroup[groupID]++
 	}
 
-	return out, nil
+	groups, err := groupsByID(app, groupIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]GuardianGroupItem, 0, len(groupIDs))
+	for _, groupID := range groupIDs {
+		group := groups[groupID]
+		if group == nil {
+			continue
+		}
+		items = append(items, GuardianGroupItem{
+			ID:            group.Id,
+			Name:          strings.TrimSpace(group.GetString("name")),
+			ProtegesCount: countsByGroup[groupID],
+		})
+	}
+
+	return items, nil
 }

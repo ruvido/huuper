@@ -1,105 +1,58 @@
+
 <!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Huuper</title>
-    <style>
-      :root {
-        color-scheme: dark;
-        --bg: #101114;
-        --panel: #17191e;
-        --line: #2a2e37;
-        --text: #f2f4f8;
-        --muted: #9aa3b2;
-        --accent: #d7ff64;
-        --space: 16px;
-      }
+<html lang="it">
+  
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Huuper</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/assets/css/app.css" />
+  <script src="/assets/js/auth.js" defer></script>
+  <script src="/assets/js/login.js" defer></script>
+</head>
 
-      * { box-sizing: border-box; }
-      body {
-        margin: 0;
-        font-family: Georgia, "Times New Roman", serif;
-        background: radial-gradient(circle at top, #1a1d24 0%, var(--bg) 60%);
-        color: var(--text);
-      }
-
-      main {
-        width: min(960px, calc(100vw - 32px));
-        margin: 0 auto;
-        padding: 48px 0 96px;
-      }
-
-      .hero,
-      .panel {
-        background: color-mix(in srgb, var(--panel) 92%, black);
-        border: 1px solid var(--line);
-        border-radius: 18px;
-      }
-
-      .hero {
-        padding: 32px;
-        margin-bottom: 24px;
-      }
-
-      .eyebrow {
-        color: var(--accent);
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        font-size: 12px;
-        margin: 0 0 12px;
-      }
-
-      h1, h2, p { margin: 0; }
-      h1 { font-size: clamp(36px, 6vw, 68px); line-height: 0.95; margin-bottom: 16px; }
-      p { color: var(--muted); line-height: 1.5; }
-
-      .grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: var(--space);
-      }
-
-      .panel {
-        padding: 20px;
-        min-height: 160px;
-      }
-
-      .label {
-        display: inline-block;
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: var(--muted);
-        margin-bottom: 10px;
-      }
-    </style>
-  </head>
   <body>
-    <main>
-      <section class="hero">
-        <p class="eyebrow">Frontend v2</p>
-        <h1>Wireframe mode.</h1>
-        <p>Skeleton-first frontend active. This placeholder is served from <code>frontend/site</code> while the new interface is rebuilt from <code>frontend/skeleton</code>.</p>
-      </section>
+    <main class="app">
+      <section class="shell">
+        
+        
+<section class="panel">
+  <form id="login-form">
+    <div class="stack">
+      
+<label class="field">
+  <span>Email</span>
+  <input
+    id="login-email"
+    type="email"
+    name="email" placeholder="nome@dominio.it" required autocomplete="username"
+  />
+</label>
 
-      <section class="grid">
-        <article class="panel">
-          <span class="label">Public</span>
-          <h2>Entry flows</h2>
-          <p>Signup, onboarding bootstrap, event access, public request submission.</p>
-        </article>
-        <article class="panel">
-          <span class="label">Me</span>
-          <h2>Member area</h2>
-          <p>Profile, groups, requests, events, Telegram token and invite access.</p>
-        </article>
-        <article class="panel">
-          <span class="label">Admin</span>
-          <h2>Operations</h2>
-          <p>Global resource management with backend v2 namespaces and policy boundaries.</p>
-        </article>
+      
+<label class="field">
+  <span>Password</span>
+  <input
+    id="login-password"
+    type="password"
+    name="password" placeholder="password" required autocomplete="current-password"
+  />
+</label>
+
+    </div>
+    <p id="login-error" class="status" hidden></p>
+    <div class="actions">
+      <button class="primary" type="submit">Login</button>
+      <a href="/signup/">Signup</a>
+      <a href="/password-reset/">Password reset</a>
+    </div>
+  </form>
+</section>
+
       </section>
     </main>
-  </body>
+  
+  <script src="/assets/js/hot-reload.js" defer></script>
+</body>
 </html>

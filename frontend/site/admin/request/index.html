@@ -1,0 +1,64 @@
+
+<!doctype html>
+<html lang="it">
+  
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Huuper / Admin / Request</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/assets/css/app.css" />
+  <script src="/assets/js/auth.js" defer></script>
+  <script src="/assets/js/guard-admin.js" defer></script>
+  <script src="/assets/js/back.js" defer></script>
+  <script src="/assets/js/list-page.js" defer></script>
+  <script src="/assets/js/request-card.js" defer></script>
+  <script src="/assets/js/request-detail.js" defer></script>
+  <script src="/assets/js/admin-request-detail.js" defer></script>
+</head>
+
+  <body class="admin">
+    <main class="app">
+      <section class="shell">
+        
+<header class="topbar">
+  
+    <button class="icon-link" type="button" data-back aria-label="Back"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0"/></svg></button>
+  
+  <div class="topbar-title">Request</div>
+  
+    <a class="icon-link" href="/admin/profile/" aria-label="Profile"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.468 12.37C12.758 11.226 11.195 10 8 10s-4.757 1.225-5.468 2.37A6.99 6.99 0 0 0 8 15a6.99 6.99 0 0 0 5.468-2.63"/><path fill-rule="evenodd" d="M8 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6m0 1A4 4 0 1 0 8 2a4 4 0 0 0 0 8"/><path fill-rule="evenodd" d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1"/></svg></a>
+  
+</header>
+
+        
+<p id="request-status" class="status"></p>
+<section id="request-summary" class="list" hidden></section>
+<section id="request-workflow" class="list" hidden></section>
+
+      </section>
+    </main>
+    
+<nav class="bottomnav" aria-label="Admin primary">
+  <a class="nav-link" href="/admin/">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0 1 4v8l7 4 7-4V4zm5.5 4.866L8 8 2.5 4.866 8 1.723zM2 5.732l5.5 3.134v5.411L2 11.134zm6.5 8.545V8.866L14 5.732v5.402z"/></svg>
+    <span>Dashboard</span>
+  </a>
+  <a class="nav-link" href="/admin/groups/">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path d="M13 7c0 1-1 2-3 2s-3-1-3-2 1-2 3-2 3 1 3 2"/><path d="M8 7c0 1-1 2-3 2S2 8 2 7s1-2 3-2 3 1 3 2"/><path fill-rule="evenodd" d="M0 7c0-1.657 1.79-3 4-3 1.082 0 2.064.322 2.784.846C7.487 4.322 8.469 4 9.55 4 11.761 4 13.55 5.343 13.55 7c0 .42-.116.819-.325 1.183C14.301 8.647 15 9.517 15 10.5 15 12.433 12.985 14 10.5 14c-1.42 0-2.687-.511-3.5-1.308C6.187 13.489 4.92 14 3.5 14 1.015 14 0 12.433 0 10.5c0-.983.699-1.853 1.775-2.317A2.37 2.37 0 0 1 1.45 7M4 5C2.57 5 1.5 5.862 1.5 7S2.57 9 4 9s2.5-.862 2.5-2S5.43 5 4 5m6 0c-1.43 0-2.5.862-2.5 2S8.57 9 10 9s2.5-.862 2.5-2S11.43 5 10 5"/></svg>
+    <span>Groups</span>
+  </a>
+  <a class="nav-link" href="/admin/events/">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 .5a.5.5 0 0 1 .5.5V2h7V1a.5.5 0 0 1 1 0V2h1A1.5 1.5 0 0 1 15 3.5v10A1.5 1.5 0 0 1 13.5 15h-11A1.5 1.5 0 0 1 1 13.5v-10A1.5 1.5 0 0 1 2.5 2h1V1A.5.5 0 0 1 4 .5M2 5v8.5a.5.5 0 0 0 .5.5H4V5zm3 0v9h6V5zm7 0v9h1.5a.5.5 0 0 0 .5-.5V5z"/><path d="M8 7a.5.5 0 0 1 .5.5V9H10a.5.5 0 0 1 0 1H8.5v1.5a.5.5 0 0 1-1 0V10H6a.5.5 0 0 1 0-1h1.5V7.5A.5.5 0 0 1 8 7"/></svg>
+    <span>Events</span>
+  </a>
+  <a class="nav-link nav-link-current" href="/admin/requests/">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path d="M14 4.5V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h7.5zM3 2v12h10V5h-2.5A1.5 1.5 0 0 1 9 3.5V1H3z"/><path d="M10 1.5V3a1 1 0 0 0 1 1h1.5z"/><path d="M5 7.5A.5.5 0 0 1 5.5 7h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5m0 2A.5.5 0 0 1 5.5 9h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5m0 2a.5.5 0 0 1 .5-.5H9a.5.5 0 0 1 0 1H5.5a.5.5 0 0 1-.5-.5"/></svg>
+    <span>Requests</span>
+  </a>
+</nav>
+
+  
+  <script src="/assets/js/hot-reload.js" defer></script>
+</body>
+</html>

@@ -43,12 +43,11 @@ func MapItemWithWorkflow(app *pocketbase.PocketBase, actor *core.Record, record 
 	item.FlowVersion = flowVersion
 	item.StepIndex = stepIndex
 	item.Status = StatusForItem(item.Rejected, stepIndex, flow.Steps)
-	currentStep, hasCurrent := FlowStepAt(flow, stepIndex-1)
 	currentAction := ""
 	currentActionLabel := ""
-	if hasCurrent {
-		currentAction = currentStep.Action
-		currentActionLabel = currentStep.Label
+	if hasNext {
+		currentAction = nextStep.Action
+		currentActionLabel = nextStep.Label
 	}
 	if currentActionLabel == "" {
 		currentActionLabel = strings.ReplaceAll(NormalizeStatus(item.Status), "_", " ")

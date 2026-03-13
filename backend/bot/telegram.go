@@ -14,11 +14,11 @@ var bot *tgbotapi.BotAPI
 var app *pocketbase.PocketBase
 
 type MembershipSyncStats struct {
-	UsersChecked int `json:"users_checked"`
+	UsersChecked  int `json:"users_checked"`
 	GroupsChecked int `json:"groups_checked"`
-	Created int `json:"created"`
-	Updated int `json:"updated"`
-	Errors int `json:"errors"`
+	Created       int `json:"created"`
+	Updated       int `json:"updated"`
+	Errors        int `json:"errors"`
 }
 
 // GetBot returns the bot instance
@@ -313,7 +313,7 @@ func handleChatMemberUpdate(update *tgbotapi.ChatMemberUpdated) {
 		go sendWelcomeMessage(chatID)
 
 		// Sync all connected users with new group
-			go SyncAllUsersMemberships()
+		go SyncAllUsersMemberships()
 	}
 
 	// Bot lost admin or was removed (member -> not admin, or kicked/left)
@@ -441,11 +441,6 @@ func syncUserGroupRecord(user *core.Record, chatID int64, status string) {
 		return
 	}
 
-	role := "member"
-	if status == "administrator" || status == "creator" {
-		role = "admin"
-	}
-
 	existingRecord, _ := app.FindFirstRecordByFilter(
 		"user_groups",
 		"user = {:user} && group = {:group}",
@@ -456,14 +451,6 @@ func syncUserGroupRecord(user *core.Record, chatID int64, status string) {
 	)
 
 	if existingRecord != nil {
-		if existingRecord.GetString("role") != role {
-			existingRecord.Set("role", role)
-			if err := app.Save(existingRecord); err != nil {
-				log.Printf("Failed to update user_groups role: %v", err)
-			} else {
-				log.Printf("✓ Updated user %s role to '%s' in group '%s'", user.GetString("email"), role, group.GetString("name"))
-			}
-		}
 		return
 	}
 
@@ -476,12 +463,11 @@ func syncUserGroupRecord(user *core.Record, chatID int64, status string) {
 	userGroupRecord := core.NewRecord(userGroupsCollection)
 	userGroupRecord.Set("user", user.Id)
 	userGroupRecord.Set("group", group.Id)
-	userGroupRecord.Set("role", role)
 
 	if err := app.Save(userGroupRecord); err != nil {
 		log.Printf("Failed to create user_groups record: %v", err)
 	} else {
-		log.Printf("✓ Added user %s to group '%s' with role '%s'", user.GetString("email"), group.GetString("name"), role)
+		log.Printf("✓ Added user %s to group '%s'", user.GetString("email"), group.GetString("name"))
 	}
 }
 
@@ -617,11 +603,6 @@ func syncUserGroupMemberships(user *core.Record) MembershipSyncStats {
 		}
 
 		if chatMember.Status == "member" || chatMember.Status == "administrator" || chatMember.Status == "creator" {
-			role := "member"
-			if chatMember.Status == "administrator" || chatMember.Status == "creator" {
-				role = "admin"
-			}
-
 			existingRecord, _ := app.FindFirstRecordByFilter(
 				"user_groups",
 				"user = {:user} && group = {:group}",
@@ -637,7 +618,6 @@ func syncUserGroupMemberships(user *core.Record) MembershipSyncStats {
 					userGroupRecord := core.NewRecord(userGroupsCollection)
 					userGroupRecord.Set("user", user.Id)
 					userGroupRecord.Set("group", group.Id)
-					userGroupRecord.Set("role", role)
 					if err := app.Save(userGroupRecord); err != nil {
 						stats.Errors++
 					} else {
@@ -645,13 +625,6 @@ func syncUserGroupMemberships(user *core.Record) MembershipSyncStats {
 					}
 				} else {
 					stats.Errors++
-				}
-			} else if existingRecord.GetString("role") != role {
-				existingRecord.Set("role", role)
-				if err := app.Save(existingRecord); err != nil {
-					stats.Errors++
-				} else {
-					stats.Updated++
 				}
 			}
 		}

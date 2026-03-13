@@ -1,12 +1,14 @@
 # Skeleton
 
-Sorgente editabile del frontend v2.
+Source of truth del frontend v2.
 
-Qui vivranno:
-- layout
-- components
-- pages
-- assets
-- copy
+Struttura iniziale:
+- `components/`: shell e blocchi riusabili
+- `me/`: wireframe area membro
+- `admin/`: wireframe area admin
+- `assets/`: CSS e asset condivisi
 
-Nella fase iniziale il focus e' wireframing semantico.
+Fase attuale:
+- wireframing mobile-first
+- CSS semantico con poche classi
+- shell app-like con top bar e bottom bar

@@ -38,10 +38,11 @@ cp .env.example .env
 
 3. Run the server:
 ```bash
-go run ./backend serve --http=127.0.0.1:8000 --dir=./data
+go run ./backend serve --http=127.0.0.1:8000 --dir=./data --frontend-dev
 ```
 
 The app will be available at `http://127.0.0.1:8000`
+The frontend is rebuilt from `frontend/skeleton` to `frontend/site` and hot-reloaded in dev mode.
 
 ### Building for Production
 

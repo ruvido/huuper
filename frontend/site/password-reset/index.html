@@ -1,0 +1,58 @@
+
+<!doctype html>
+<html lang="it">
+  
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Huuper / Password reset</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/assets/css/app.css" />
+  <script src="/assets/js/password-reset.js" defer></script>
+</head>
+
+  <body>
+    <main class="app">
+      <section class="shell">
+        
+          
+<header class="topbar">
+  
+    <a class="icon-link" href="/" aria-label="Back"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0"/></svg></a>
+  
+  <div class="topbar-title">Password reset</div>
+  
+    <span></span>
+  
+</header>
+
+        
+        
+<section class="panel">
+  <form id="password-reset-form">
+    <div class="stack">
+      
+<label class="field">
+  <span>Email</span>
+  <input
+    id="password-reset-email"
+    type="email"
+    name="email" placeholder="nome@dominio.it" required autocomplete="email"
+  />
+</label>
+
+    </div>
+    <p id="password-reset-status" class="status" hidden></p>
+    <div class="actions">
+      <button class="primary" type="submit">Send</button>
+      <a href="/">Login</a>
+    </div>
+  </form>
+</section>
+
+      </section>
+    </main>
+  
+  <script src="/assets/js/hot-reload.js" defer></script>
+</body>
+</html>
