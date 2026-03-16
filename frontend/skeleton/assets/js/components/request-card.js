@@ -155,14 +155,18 @@ window.huuperRequestCard = (() => {
     const displayTitle = item.full_name || (item.data && (item.data.full_name || item.data.name)) || item.email || item.id;
     const title = window.huuperListPage.escapeHTML(displayTitle);
     const since = item.assigned_at ? `Since: ${dateOnly(item.assigned_at)}` : "";
-    const status = statusText(item.status_label || item.status);
+    const workflow = item && typeof item.workflow === "object" ? item.workflow : {};
+    const status = text(workflow.current_action_label) || statusText(item.status_label || item.status);
     return `
-      <a href="${window.huuperListPage.escapeHTML(href)}" class="request-compact-row">
-        <span class="request-compact-copy">
-          <strong>${title}</strong>
-          ${since ? `<span class="request-compact-since">${window.huuperListPage.escapeHTML(since)}</span>` : ""}
+      <a href="${window.huuperListPage.escapeHTML(href)}" class="user-row request-compact-row">
+        <span class="user-avatar" aria-hidden="true">
+          <span class="user-avatar-text">${window.huuperListPage.escapeHTML(initials(displayTitle))}</span>
         </span>
-        ${status ? `<span class="request-compact-status">${window.huuperListPage.escapeHTML(status)}</span>` : ""}
+        <span class="user-copy request-compact-copy">
+          <strong>${title}</strong>
+          ${since ? `<span class="user-subline request-compact-since">${window.huuperListPage.escapeHTML(since)}</span>` : ""}
+        </span>
+        ${status ? `<span class="user-side"><span class="user-side-title request-compact-status">${window.huuperListPage.escapeHTML(status)}</span></span>` : ""}
       </a>
     `;
   }

@@ -550,15 +550,17 @@ button {
 
 .request-compact-row {
   display: grid !important;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-  gap: var(--space-3) !important;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4) !important;
+  min-height: 72px;
 }
 
 .request-compact-copy {
   display: grid;
-  gap: 6px;
+  gap: 2px;
   min-width: 0;
+  align-self: center;
 }
 
 .request-compact-copy strong {
@@ -571,7 +573,7 @@ button {
   color: var(--text-muted);
   font-size: var(--font-ui-xs);
   font-weight: 700;
-  line-height: 1;
+  line-height: 1.1;
 }
 
 .action-row {
