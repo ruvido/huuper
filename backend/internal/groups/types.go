@@ -4,6 +4,10 @@ type MemberItem struct {
 	ID            string `json:"id"`
 	Email         string `json:"email"`
 	FullName      string `json:"full_name"`
+	Avatar        string `json:"avatar,omitempty"`
+	Age           *int   `json:"age,omitempty"`
+	Region        string `json:"region,omitempty"`
+	IsAssistant   bool   `json:"is_assistant,omitempty"`
 	IsGuardian    bool   `json:"is_guardian"`
 	ProtegesCount int    `json:"proteges_count"`
 }
@@ -12,6 +16,7 @@ type GuardianItem struct {
 	ID            string `json:"id"`
 	Email         string `json:"email"`
 	FullName      string `json:"full_name"`
+	Avatar        string `json:"avatar,omitempty"`
 	ProtegesCount int    `json:"proteges_count"`
 }
 
@@ -28,6 +33,18 @@ type GroupListItem struct {
 	Description   string `json:"description"`
 	MembersCount  int    `json:"members_count"`
 	RequestsCount *int   `json:"requests_count,omitempty"`
+}
+
+type PendingRequestItem struct {
+	ID          string         `json:"id"`
+	FullName    string         `json:"full_name"`
+	Email       string         `json:"email"`
+	Status      string         `json:"status"`
+	StatusLabel string         `json:"status_label"`
+	Created     string         `json:"created"`
+	AssignedAt  string         `json:"assigned_at,omitempty"`
+	Data        map[string]any `json:"data"`
+	Workflow    map[string]any `json:"workflow"`
 }
 
 type MembersResponse struct {

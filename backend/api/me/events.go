@@ -49,6 +49,50 @@ func EventStatusHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) e
 	}
 }
 
+func EventGetHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		authRecord, err := backendinternal.RequireAuthenticatedActor(e)
+		if err != nil {
+			return err
+		}
+
+		eventID := e.Request.PathValue("id")
+		if eventID == "" {
+			return apis.NewBadRequestError("invalid_event", nil)
+		}
+
+		event, err := app.FindRecordById("events", eventID)
+		if err != nil || event == nil {
+			return apis.NewNotFoundError("invalid_event", err)
+		}
+
+		registered := false
+		if authRecord != nil {
+			registration, err := eventinternal.FindRegistrationByUser(app, event.Id, authRecord.Id, true)
+			if err == nil && registration != nil {
+				registered = true
+			} else {
+				email, normalizeErr := backendinternal.NormalizeEmail(authRecord.GetString("email"))
+				if normalizeErr == nil {
+					registration, err = eventinternal.FindRegistrationByEmail(app, event.Id, email, true)
+					registered = err == nil && registration != nil
+				}
+			}
+		}
+
+		return e.JSON(http.StatusOK, map[string]any{
+			"event": map[string]any{
+				"id":         event.Id,
+				"slug":       event.GetString("slug"),
+				"title":      event.GetString("title"),
+				"event_date": event.GetString("event_date"),
+				"data":       backendinternal.ParseJSONMap(event.Get("data")),
+			},
+			"registered": registered,
+		})
+	}
+}
+
 func EventUnsubscribeHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		authRecord, err := backendinternal.RequireAuthenticatedActor(e)

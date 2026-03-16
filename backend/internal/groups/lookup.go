@@ -1,7 +1,9 @@
 package groups
 
 import (
+	"strconv"
 	"strings"
+	"time"
 
 	backendinternal "members/backend/internal"
 
@@ -31,6 +33,55 @@ func UserDisplayName(user *core.Record) string {
 		return strings.TrimSpace(fullName)
 	}
 	return strings.TrimSpace(user.GetString("email"))
+}
+
+func UserRegion(user *core.Record) string {
+	if user == nil {
+		return ""
+	}
+	data := backendinternal.ParseJSONMap(user.Get("data"))
+	if region, ok := data["region"].(string); ok && strings.TrimSpace(region) != "" {
+		return strings.TrimSpace(region)
+	}
+	return ""
+}
+
+func UserAge(user *core.Record) *int {
+	if user == nil {
+		return nil
+	}
+	data := backendinternal.ParseJSONMap(user.Get("data"))
+	raw, ok := data["birth_year"]
+	if !ok {
+		return nil
+	}
+
+	var birthYear int
+	switch value := raw.(type) {
+	case float64:
+		birthYear = int(value)
+	case int:
+		birthYear = value
+	case string:
+		parsed, err := strconv.Atoi(strings.TrimSpace(value))
+		if err != nil {
+			return nil
+		}
+		birthYear = parsed
+	default:
+		return nil
+	}
+
+	currentYear := time.Now().Year()
+	if birthYear <= 1900 || birthYear > currentYear {
+		return nil
+	}
+
+	age := currentYear - birthYear
+	if age < 0 || age > 120 {
+		return nil
+	}
+	return &age
 }
 
 func usersByID(app *pocketbase.PocketBase, userIDs []string) (map[string]*core.Record, error) {

@@ -1,5 +1,2 @@
-{{ define "content" }}
-<p id="events-status" class="status"></p>
-<section id="events-list" class="list" hidden></section>
-{{ end }}
-{{ define "page" }}{{ template "layout-me" (dict "Title" "Huuper / Me / Events" "TopbarTitle" "Events" "BackHref" "" "ProfileHref" "/me/profile/" "ActiveNav" "events" "Scripts" (list "/assets/js/auth.js" "/assets/js/guard-me.js" "/assets/js/list-page.js" "/assets/js/me-events.js")) }}{{ end }}
+{{ define "content" }}{{ template "status-list-content" (dict "StatusID" "events-status" "ListID" "events-list") }}{{ end }}
+{{ define "page" }}{{ template "layout-me" (dict "Title" "Huuper / Me / Events" "TopbarTitle" "Events" "BackHref" "" "ProfileHref" "/me/profile/" "ActiveNav" "events" "Scripts" (list "/assets/js/core/auth.js" "/assets/js/core/guard-me.js" "/assets/js/core/list-page.js" "/assets/js/core/entity-list.js" "/assets/js/me/events.js")) }}{{ end }}

@@ -3,6 +3,22 @@ window.huuperRequestDetail = (() => {
     return window.huuperListPage.text(value);
   }
 
+  function actionText(value) {
+    const raw = text(value);
+    const labels = {
+      assign_group: "Assign group",
+      assign_guardian: "Assign guardian",
+      mentoring: "Complete mentoring",
+      group_approved: "Approve group",
+      admin_approved: "Approve request",
+      reject: "Reject request",
+      promote: "Promote request",
+      advance: "Continue",
+    };
+
+    return labels[raw] || raw.replaceAll("_", " ").replaceAll("-", " ").trim() || "Continue";
+  }
+
   function renderOptions(node, items, placeholder, formatLabel) {
     const options = [`<option value="">${placeholder}</option>`];
     for (const item of items) {
@@ -42,7 +58,7 @@ window.huuperRequestDetail = (() => {
       }
 
       const requiredField = workflow.required_field || "";
-      const actionLabel = workflow.next_action_label || workflow.next_action || "Continue";
+      const actionLabel = actionText(workflow.next_action || workflow.current_action);
       const actionNotesHTML = text(workflow.next_action_notes_html);
 
       const parts = [`<article class="request-card">`];
@@ -50,13 +66,13 @@ window.huuperRequestDetail = (() => {
         parts.push(`<div class="request-notes"><span>Notes:</span><div>${actionNotesHTML}</div></div>`);
       }
       if (requiredField === "group") {
-        parts.push(`<label class="field"><span>Group</span><select id="request-group"></select></label>`);
+        parts.push(`<label class="form-field"><span>Group</span><select id="request-group"></select></label>`);
       } else if (requiredField === "guardian") {
-        parts.push(`<label class="field"><span>Guardian</span><select id="request-guardian"></select></label>`);
+        parts.push(`<label class="form-field"><span>Guardian</span><select id="request-guardian"></select></label>`);
       } else if (requiredField === "mentoring_notes") {
-        parts.push(`<label class="field"><span>Notes</span><textarea id="request-mentoring-notes"></textarea></label>`);
+        parts.push(`<label class="form-field"><span>Mentoring notes</span><textarea id="request-mentoring-notes"></textarea></label>`);
       }
-      parts.push(`<div class="actions"><button id="request-advance" type="button">${window.huuperListPage.escapeHTML(actionLabel)}</button></div>`);
+      parts.push(`<div class="action-row"><button id="request-advance" type="button">${window.huuperListPage.escapeHTML(actionLabel)}</button></div>`);
       parts.push(`</article>`);
       workflowNode.innerHTML = parts.join("");
       workflowNode.hidden = false;

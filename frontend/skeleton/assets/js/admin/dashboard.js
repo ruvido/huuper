@@ -20,7 +20,7 @@
       }
 
       window.huuperListPage.renderList(listNode, rows, ([label, value]) => {
-        return `<article><strong>${label}</strong><p class="status">${value}</p></article>`;
+        return `<article><span class="data-label">${label}</span><strong class="data-value">${value}</strong></article>`;
       });
       listNode.hidden = false;
     } catch (_) {

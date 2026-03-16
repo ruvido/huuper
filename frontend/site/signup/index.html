@@ -1,6 +1,6 @@
 
 <!doctype html>
-<html lang="it">
+<html lang="en">
   
 <head>
   <meta charset="utf-8" />
@@ -8,19 +8,20 @@
   <title>Huuper / Signup</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/assets/css/app.css" />
-  <script src="/assets/js/signup.js" defer></script>
+  <script src="/assets/js/core/topbar.js" defer></script>
+  <script src="/assets/js/public/signup.js" defer></script>
 </head>
 
   <body>
     <main class="app">
-      <section class="shell">
+      <section class="app-shell">
         
           
-<header class="topbar">
+<header class="top-bar">
   
-    <a class="icon-link" href="/" aria-label="Back"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0"/></svg></a>
+    <a class="topbar-back" href="/" aria-label="Back"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0"/></svg></a>
   
-  <div class="topbar-title">Signup</div>
+  <div class="top-bar-title">Signup</div>
   
     <span></span>
   
@@ -30,19 +31,19 @@
         
 <section class="panel">
   <form id="signup-form">
-    <div class="stack">
+    <div class="view-stack">
       
-<label class="field">
+<label class="form-field">
   <span>Email</span>
   <input
     id="signup-email"
     type="email"
-    name="email" placeholder="nome@dominio.it" required autocomplete="email"
+    name="email" placeholder="name@domain.com" required autocomplete="email"
   />
 </label>
 
       
-<label class="field">
+<label class="form-field">
   <span>Password</span>
   <input
     id="signup-password"
@@ -52,7 +53,7 @@
 </label>
 
       
-<label class="field">
+<label class="form-field">
   <span>Password confirm</span>
   <input
     id="signup-password-confirm"
@@ -62,8 +63,8 @@
 </label>
 
     </div>
-    <p id="signup-status" class="status" hidden></p>
-    <div class="actions">
+    <p id="signup-status" class="meta-text" hidden></p>
+    <div class="action-row">
       <button class="primary" type="submit">Signup</button>
       <a href="/">Login</a>
     </div>
@@ -73,6 +74,6 @@
       </section>
     </main>
   
-  <script src="/assets/js/hot-reload.js" defer></script>
+  <script src="/assets/js/core/hot-reload.js" defer></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 
 <!doctype html>
-<html lang="it">
+<html lang="en">
   
 <head>
   <meta charset="utf-8" />
@@ -8,30 +8,43 @@
   <title>Huuper</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/assets/css/app.css" />
-  <script src="/assets/js/auth.js" defer></script>
-  <script src="/assets/js/login.js" defer></script>
+  <script src="/assets/js/core/topbar.js" defer></script>
+  <script src="/assets/js/core/auth.js" defer></script>
+  <script src="/assets/js/public/login.js" defer></script>
 </head>
 
   <body>
     <main class="app">
-      <section class="shell">
+      <section class="app-shell">
+        
+          
+<header class="top-bar">
+  
+    <span></span>
+  
+  <div class="top-bar-title">REALMEN</div>
+  
+    <span></span>
+  
+</header>
+
         
         
 <section class="panel">
   <form id="login-form">
-    <div class="stack">
+    <div class="view-stack">
       
-<label class="field">
+<label class="form-field">
   <span>Email</span>
   <input
     id="login-email"
     type="email"
-    name="email" placeholder="nome@dominio.it" required autocomplete="username"
+    name="email" placeholder="name@domain.com" required autocomplete="username"
   />
 </label>
 
       
-<label class="field">
+<label class="form-field">
   <span>Password</span>
   <input
     id="login-password"
@@ -41,8 +54,8 @@
 </label>
 
     </div>
-    <p id="login-error" class="status" hidden></p>
-    <div class="actions">
+    <p id="login-error" class="meta-text" hidden></p>
+    <div class="action-row">
       <button class="primary" type="submit">Login</button>
       <a href="/signup/">Signup</a>
       <a href="/password-reset/">Password reset</a>
@@ -53,6 +66,6 @@
       </section>
     </main>
   
-  <script src="/assets/js/hot-reload.js" defer></script>
+  <script src="/assets/js/core/hot-reload.js" defer></script>
 </body>
 </html>

@@ -39,6 +39,19 @@ type ListItem struct {
 	Workflow    map[string]any `json:"workflow"`
 }
 
+func DisplayName(data map[string]any, email string, fallbackID string) string {
+	if fullName, ok := data["full_name"].(string); ok && fullName != "" {
+		return fullName
+	}
+	if name, ok := data["name"].(string); ok && name != "" {
+		return name
+	}
+	if email != "" {
+		return email
+	}
+	return fallbackID
+}
+
 type GuardianRequestItem struct {
 	ID         string `json:"id"`
 	FullName   string `json:"full_name"`

@@ -219,16 +219,7 @@ func requestGuardianName(app *pocketbase.PocketBase, userID string) (string, err
 }
 
 func requestDisplayName(data map[string]any, email string, fallbackID string) string {
-	if fullName, ok := data["full_name"].(string); ok && strings.TrimSpace(fullName) != "" {
-		return strings.TrimSpace(fullName)
-	}
-	if name, ok := data["name"].(string); ok && strings.TrimSpace(name) != "" {
-		return strings.TrimSpace(name)
-	}
-	if strings.TrimSpace(email) != "" {
-		return strings.TrimSpace(email)
-	}
-	return fallbackID
+	return strings.TrimSpace(backendrequests.DisplayName(data, strings.TrimSpace(email), fallbackID))
 }
 
 func requestAssignedAt(data map[string]any) string {

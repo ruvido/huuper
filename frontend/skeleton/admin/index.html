@@ -1,5 +1,5 @@
 {{ define "content" }}
-<p id="admin-status" class="status"></p>
-<section id="admin-summary" class="list" hidden></section>
+<p id="admin-status" class="meta-text"></p>
+<section id="admin-summary" class="list-card" hidden></section>
 {{ end }}
-{{ define "page" }}{{ template "layout-admin" (dict "Title" "Huuper / Admin" "TopbarTitle" "Dashboard" "BackHref" "" "ProfileHref" "/admin/profile/" "ActiveNav" "dashboard" "Scripts" (list "/assets/js/auth.js" "/assets/js/guard-admin.js" "/assets/js/list-page.js" "/assets/js/admin-dashboard.js")) }}{{ end }}
+{{ define "page" }}{{ template "layout-admin" (dict "Title" "Huuper / Admin" "TopbarTitle" "Dashboard" "BackHref" "" "ProfileHref" "/admin/profile/" "ActiveNav" "dashboard" "Scripts" (list "/assets/js/core/auth.js" "/assets/js/core/guard-admin.js" "/assets/js/core/list-page.js" "/assets/js/admin/dashboard.js")) }}{{ end }}

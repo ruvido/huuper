@@ -1,6 +1,14 @@
 {{ define "content" }}
-<p id="group-status" class="status"></p>
-<section id="group-summary" class="list" hidden></section>
-<section id="group-members" class="list" hidden></section>
+<p id="group-status" class="meta-text"></p>
+<section id="group-tabs" class="section-tabs" hidden>
+  <button id="group-tab-members" class="section-tab section-tab-current" type="button">Members</button>
+  <button id="group-tab-pending" class="section-tab" type="button">Pending</button>
+</section>
+<section id="group-members-section" hidden>
+  <section id="group-members" class="list-card user-list"></section>
+</section>
+<section id="group-pending-section" hidden>
+  <section id="group-pending" class="list-card user-list"></section>
+</section>
 {{ end }}
-{{ define "page" }}{{ template "layout-admin" (dict "Title" "Huuper / Admin / Group" "TopbarTitle" "Group" "BackHref" "" "BackHistory" true "ProfileHref" "/admin/profile/" "ActiveNav" "groups" "Scripts" (list "/assets/js/auth.js" "/assets/js/guard-admin.js" "/assets/js/back.js" "/assets/js/list-page.js" "/assets/js/admin-group-detail.js")) }}{{ end }}
+{{ define "page" }}{{ template "layout-admin" (dict "Title" "Huuper / Admin / Group" "TopbarTitle" "Group" "BackHref" "" "BackHistory" true "ProfileHref" "/admin/profile/" "ActiveNav" "groups" "Scripts" (list "/assets/js/core/auth.js" "/assets/js/core/guard-admin.js" "/assets/js/core/back.js" "/assets/js/core/list-page.js" "/assets/js/components/request-card.js" "/assets/js/components/group-card.js" "/assets/js/components/user-card.js" "/assets/js/components/group-detail.js" "/assets/js/admin/group.js")) }}{{ end }}

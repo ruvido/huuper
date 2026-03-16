@@ -1,5 +1,5 @@
 {{ define "content" }}
-<p id="user-status" class="status"></p>
-<section id="user-summary" class="stack" hidden></section>
+<p id="user-status" class="meta-text"></p>
+<section id="user-summary" class="view-stack" hidden></section>
 {{ end }}
-{{ define "page" }}{{ template "layout-me" (dict "Title" "Huuper / Me / User" "TopbarTitle" "User" "BackHref" "" "BackHistory" true "ProfileHref" "/me/profile/" "ActiveNav" "" "Scripts" (list "/assets/js/auth.js" "/assets/js/guard-me.js" "/assets/js/back.js" "/assets/js/list-page.js" "/assets/js/request-card.js" "/assets/js/me-user-detail.js")) }}{{ end }}
+{{ define "page" }}{{ template "layout-me" (dict "Title" "Huuper / Me / User" "TopbarTitle" "User" "BackHref" "" "BackHistory" true "ProfileHref" "/me/profile/" "ActiveNav" "" "Scripts" (list "/assets/js/core/auth.js" "/assets/js/core/guard-me.js" "/assets/js/core/back.js" "/assets/js/core/list-page.js" "/assets/js/components/request-card.js" "/assets/js/components/user-detail.js" "/assets/js/me/user.js")) }}{{ end }}

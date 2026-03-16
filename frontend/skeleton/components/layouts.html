@@ -5,6 +5,7 @@
   <title>{{ .Title }}</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/assets/css/app.css" />
+  <script src="/assets/js/core/topbar.js" defer></script>
   {{- range .Scripts }}
   <script src="{{ . }}" defer></script>
   {{- end }}
@@ -13,11 +14,11 @@
 
 {{ define "layout-public" }}
 <!doctype html>
-<html lang="it">
+<html lang="en">
   {{ template "head" . }}
   <body>
     <main class="app">
-      <section class="shell">
+      <section class="app-shell">
         {{ if or .BackHref .BackHistory .TopbarTitle }}
           {{ template "topbar" (dict "BackHref" .BackHref "BackHistory" .BackHistory "Title" .TopbarTitle "ProfileHref" "") }}
         {{ end }}
@@ -30,11 +31,11 @@
 
 {{ define "layout-me" }}
 <!doctype html>
-<html lang="it">
+<html lang="en">
   {{ template "head" . }}
   <body>
     <main class="app">
-      <section class="shell">
+      <section class="app-shell">
         {{ template "topbar" (dict "BackHref" .BackHref "BackHistory" .BackHistory "Title" .TopbarTitle "ProfileHref" .ProfileHref) }}
         {{ template "content" . }}
       </section>
@@ -46,11 +47,11 @@
 
 {{ define "layout-admin" }}
 <!doctype html>
-<html lang="it">
+<html lang="en">
   {{ template "head" . }}
   <body class="admin">
     <main class="app">
-      <section class="shell">
+      <section class="app-shell">
         {{ template "topbar" (dict "BackHref" .BackHref "BackHistory" .BackHistory "Title" .TopbarTitle "ProfileHref" .ProfileHref) }}
         {{ template "content" . }}
       </section>

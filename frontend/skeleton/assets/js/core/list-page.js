@@ -44,6 +44,13 @@ window.huuperListPage = (() => {
     }
   }
 
+  function renderCompactLink(href, title, meta) {
+    const safeHref = escapeHTML(href);
+    const safeTitle = escapeHTML(title);
+    const safeMeta = text(meta);
+    return `<a href="${safeHref}"><strong>${safeTitle}</strong>${safeMeta ? `<p class="meta-text">${escapeHTML(safeMeta)}</p>` : ""}</a>`;
+  }
+
   function setStatus(node, message) {
     node.textContent = message;
     node.hidden = !message;
@@ -55,6 +62,7 @@ window.huuperListPage = (() => {
     escapeHTML,
     queryParam,
     renderList,
+    renderCompactLink,
     setStatus,
   };
 })();

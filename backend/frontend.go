@@ -154,7 +154,7 @@ func renderTemplate(pagePath string, componentFiles []string) ([]byte, error) {
 }
 
 func injectHotReload(data []byte) []byte {
-	snippet := []byte(`  <script src="/assets/js/hot-reload.js" defer></script>` + "\n")
+	snippet := []byte(`  <script src="/assets/js/core/hot-reload.js" defer></script>` + "\n")
 	lower := strings.ToLower(string(data))
 	idx := strings.LastIndex(lower, "</body>")
 	if idx < 0 {

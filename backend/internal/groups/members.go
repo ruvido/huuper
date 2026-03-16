@@ -1,6 +1,7 @@
 package groups
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/pocketbase/pocketbase"
@@ -31,6 +32,12 @@ func GuardianCounts(app *pocketbase.PocketBase, groupID string) (map[string]int,
 }
 
 func MembersResponseForGroup(app *pocketbase.PocketBase, groupID string) (*MembersResponse, error) {
+	group, err := app.FindRecordById("groups", groupID)
+	if err != nil || group == nil {
+		return nil, err
+	}
+	assistantID := strings.TrimSpace(group.GetString("assistant"))
+
 	relations, err := app.FindRecordsByFilter(
 		"user_groups",
 		"group = {:group}",
@@ -73,10 +80,33 @@ func MembersResponseForGroup(app *pocketbase.PocketBase, groupID string) (*Membe
 			ID:            user.Id,
 			Email:         user.GetString("email"),
 			FullName:      UserDisplayName(user),
+			Avatar:        strings.TrimSpace(user.GetString("avatar")),
+			Age:           UserAge(user),
+			Region:        UserRegion(user),
+			IsAssistant:   assistantID != "" && user.Id == assistantID,
 			IsGuardian:    isGuardian,
 			ProtegesCount: guardianCounts[userID],
 		})
 	}
+
+	sort.SliceStable(items, func(i, j int) bool {
+		if items[i].IsAssistant != items[j].IsAssistant {
+			return items[i].IsAssistant
+		}
+		if items[i].IsGuardian != items[j].IsGuardian {
+			return items[i].IsGuardian
+		}
+
+		left := strings.ToLower(strings.TrimSpace(items[i].FullName))
+		right := strings.ToLower(strings.TrimSpace(items[j].FullName))
+		if left == "" {
+			left = strings.ToLower(strings.TrimSpace(items[i].Email))
+		}
+		if right == "" {
+			right = strings.ToLower(strings.TrimSpace(items[j].Email))
+		}
+		return left < right
+	})
 
 	return &MembersResponse{
 		GroupID: groupID,
@@ -110,6 +140,7 @@ func GuardiansResponseForGroup(app *pocketbase.PocketBase, groupID string) (*Gua
 			ID:            user.Id,
 			Email:         user.GetString("email"),
 			FullName:      UserDisplayName(user),
+			Avatar:        strings.TrimSpace(user.GetString("avatar")),
 			ProtegesCount: guardianCounts[userID],
 		})
 	}

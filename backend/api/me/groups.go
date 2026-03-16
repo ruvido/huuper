@@ -2,9 +2,11 @@ package me
 
 import (
 	"net/http"
+	"strings"
 
 	backendinternal "members/backend/internal"
 	groupinternal "members/backend/internal/groups"
+	backendrequests "members/backend/internal/requests"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
@@ -130,13 +132,39 @@ func GroupGetHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) erro
 		}
 
 		requestsVisible := backendinternal.IsAssistantForGroup(actor, group)
+		if actor.GetBool("admin") {
+			requestsVisible = true
+		}
 		requestsCount := 0
+		pendingRequests := []groupinternal.PendingRequestItem{}
 		if requestsVisible {
 			requests, err := app.FindRecordsByFilter("requests", "group = {:group} && rejected = false", "", 500, 0, map[string]any{"group": group.Id})
 			if err != nil {
 				return apis.NewBadRequestError("failed_group_requests", err)
 			}
 			requestsCount = len(requests)
+			flow, err := backendrequests.LoadFlowSettings(app)
+			if err != nil {
+				return apis.NewBadRequestError("invalid_requests_flow_settings", err)
+			}
+			pendingRequests = make([]groupinternal.PendingRequestItem, 0, len(requests))
+			for _, record := range requests {
+				item, err := backendrequests.MapItemWithWorkflow(app, actor, record, flow)
+				if err != nil {
+					return apis.NewBadRequestError("failed_group_request_workflow", err)
+				}
+				pendingRequests = append(pendingRequests, groupinternal.PendingRequestItem{
+					ID:          item.ID,
+					FullName:    strings.TrimSpace(backendrequests.DisplayName(item.Data, strings.TrimSpace(item.Email), item.ID)),
+					Email:       strings.TrimSpace(item.Email),
+					Status:      strings.TrimSpace(item.Status),
+					StatusLabel: requestStatusLabel(item.Status, item.StepIndex, flow),
+					Created:     strings.TrimSpace(item.Created),
+					AssignedAt:  requestAssignedAt(item.Data),
+					Data:        item.Data,
+					Workflow:    item.Workflow,
+				})
+			}
 		}
 
 		membersResponse, err := groupinternal.MembersResponseForGroup(app, group.Id)
@@ -157,6 +185,7 @@ func GroupGetHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) erro
 			"members_count":    len(members),
 			"requests_visible": requestsVisible,
 			"requests_count":   requestsCount,
+			"pending_requests": pendingRequests,
 			"assistant":        group.GetString("assistant"),
 			"members":          membersResponse.Items,
 			"guardians":        guardiansResponse.Items,

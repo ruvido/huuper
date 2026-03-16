@@ -1,15 +1,15 @@
 {{ define "content" }}
 <section class="panel">
   <form id="password-reset-form">
-    <div class="stack">
-      {{ template "field" (dict "Label" "Email" "ID" "password-reset-email" "Name" "email" "Type" "email" "Placeholder" "nome@dominio.it" "Required" true "Autocomplete" "email") }}
+    <div class="view-stack">
+      {{ template "field" (dict "Label" "Email" "ID" "password-reset-email" "Name" "email" "Type" "email" "Placeholder" "name@domain.com" "Required" true "Autocomplete" "email") }}
     </div>
-    <p id="password-reset-status" class="status" hidden></p>
-    <div class="actions">
+    <p id="password-reset-status" class="meta-text" hidden></p>
+    <div class="action-row">
       <button class="primary" type="submit">Send</button>
       <a href="/">Login</a>
     </div>
   </form>
 </section>
 {{ end }}
-{{ define "page" }}{{ template "layout-public" (dict "Title" "Huuper / Password reset" "TopbarTitle" "Password reset" "BackHref" "/" "Scripts" (list "/assets/js/password-reset.js")) }}{{ end }}
+{{ define "page" }}{{ template "layout-public" (dict "Title" "Huuper / Password reset" "TopbarTitle" "Password reset" "BackHref" "/" "Scripts" (list "/assets/js/public/password-reset.js")) }}{{ end }}

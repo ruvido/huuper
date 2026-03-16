@@ -105,6 +105,7 @@ func UserGetHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error
 			"id":                user.Id,
 			"email":             user.GetString("email"),
 			"full_name":         groupinternal.UserDisplayName(user),
+			"avatar":            strings.TrimSpace(user.GetString("avatar")),
 			"status":            user.GetString("status"),
 			"admin":             user.GetBool("admin"),
 			"telegram":          telegram,

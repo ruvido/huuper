@@ -35,17 +35,46 @@ window.huuperRequestCard = (() => {
       return "";
     }
 
-    const normalized = raw.replace(/^\d+-/, "").replaceAll("_", " ").replaceAll("-", " ").trim();
-    if (!normalized) {
+    const normalized = raw.replace(/^\d+-/, "").trim();
+    const labels = {
+      submitted: "Submitted",
+      assign_group: "Group assignment",
+      assign_guardian: "Guardian assignment",
+      guardian_assigned: "Mentoring",
+      mentoring: "Mentoring",
+      group_approved: "Group approval",
+      admin_approved: "Final approval",
+      rejected: "Rejected",
+      promoted: "Promoted",
+    };
+
+    if (labels[normalized]) {
+      return labels[normalized];
+    }
+
+    const humanized = normalized.replaceAll("_", " ").replaceAll("-", " ").trim();
+    if (!humanized) {
       return "";
     }
 
-    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+    return humanized.charAt(0).toUpperCase() + humanized.slice(1);
   }
 
   function title(item) {
     const data = item && typeof item.data === "object" ? item.data : {};
     return escapeHTML(item.full_name || data.full_name || data.name || item.email || item.id || "");
+  }
+
+  function initials(value) {
+    const raw = text(value);
+    if (!raw) {
+      return "?";
+    }
+    const parts = raw.split(/\s+/).filter(Boolean).slice(0, 2);
+    if (parts.length === 0) {
+      return raw.slice(0, 2).toUpperCase();
+    }
+    return parts.map((part) => part[0] || "").join("").toUpperCase();
   }
 
   function row(label, value) {
@@ -61,15 +90,10 @@ window.huuperRequestCard = (() => {
     if (!raw) {
       return "";
     }
-
-    if (raw.startsWith("md:")) {
-      return raw.slice(3).trim();
-    }
-
     return raw;
   }
 
-  function notesHTML(item) {
+  function mentoringNotesHTML(item) {
     const mentoringHTML = text(item.mentoring_notes_html);
     if (mentoringHTML) {
       return mentoringHTML;
@@ -79,7 +103,10 @@ window.huuperRequestCard = (() => {
     if (mentoringText) {
       return `<p>${escapeHTML(mentoringText)}</p>`;
     }
+    return "";
+  }
 
+  function workflowNotesHTML(item) {
     const workflow = item && typeof item.workflow === "object" ? item.workflow : {};
     const rawHTML = text(workflow.next_action_notes_html);
     if (rawHTML) {
@@ -116,24 +143,28 @@ window.huuperRequestCard = (() => {
     if (inlineMentoring) {
       rows.push(row("Mentoring notes", inlineMentoring));
     }
-    const renderedNotes = showNotes ? notesHTML(item) : "";
-    const hasMentoringNotes = text(item.mentoring_notes_html) || text(item.mentoring_notes);
-    const notesLabel = hasMentoringNotes ? "Mentoring notes" : "Notes";
-    const notesBlock = renderedNotes && !inlineMentoring ? `<div class="request-notes"><p class="request-row"><span>${escapeHTML(notesLabel)}:</span></p><div>${renderedNotes}</div></div>` : "";
+    const renderedMentoringNotes = showNotes && !inlineMentoring ? mentoringNotesHTML(item) : "";
+    const renderedWorkflowNotes = showNotes ? workflowNotesHTML(item) : "";
+    const mentoringNotesBlock = renderedMentoringNotes ? `<div class="request-notes"><p class="request-row"><span>Mentoring notes:</span></p><div>${renderedMentoringNotes}</div></div>` : "";
+    const workflowNotesBlock = renderedWorkflowNotes ? `<div class="request-notes"><p class="request-row"><span>Notes:</span></p><div>${renderedWorkflowNotes}</div></div>` : "";
 
-    return `<article class="request-card"><strong>${title(item)}</strong>${rows.join("")}${notesBlock}</article>`;
+    return `<article class="request-card"><strong>${title(item)}</strong>${rows.join("")}${mentoringNotesBlock}${workflowNotesBlock}</article>`;
   }
 
   function renderCompact(item, href) {
-    const rows = [];
-    if (item.assigned_at) {
-      rows.push(row("Since", dateOnly(item.assigned_at)));
-    } else {
-      const workflow = item && typeof item.workflow === "object" ? item.workflow : {};
-      rows.push(row("Status", workflow.current_action_label || item.status_label || statusText(item.status)));
-    }
-
-    return `<a class="request-card request-card-link" href="${escapeHTML(href)}"><strong>${title(item)}</strong>${rows.join("")}</a>`;
+    const displayTitle = item.full_name || (item.data && (item.data.full_name || item.data.name)) || item.email || item.id;
+    const title = window.huuperListPage.escapeHTML(displayTitle);
+    const since = item.assigned_at ? `Since: ${dateOnly(item.assigned_at)}` : "";
+    const status = statusText(item.status_label || item.status);
+    return `
+      <a href="${window.huuperListPage.escapeHTML(href)}" class="request-compact-row">
+        <span class="request-compact-copy">
+          <strong>${title}</strong>
+          ${since ? `<span class="request-compact-since">${window.huuperListPage.escapeHTML(since)}</span>` : ""}
+        </span>
+        ${status ? `<span class="request-compact-status">${window.huuperListPage.escapeHTML(status)}</span>` : ""}
+      </a>
+    `;
   }
 
   return {

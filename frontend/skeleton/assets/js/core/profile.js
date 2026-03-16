@@ -17,6 +17,6 @@
         ? telegram.first_name.trim()
         : "";
 
-  emailNode.textContent = `email: ${email}`;
-  telegramNode.textContent = telegramName ? `telegram: ${telegramName}` : "telegram:";
+  emailNode.textContent = email || "Not available";
+  telegramNode.textContent = telegramName || "";
 })();

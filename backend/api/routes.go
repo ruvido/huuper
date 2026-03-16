@@ -23,6 +23,7 @@ func RegisterRoutes(app *pocketbase.PocketBase, se *core.ServeEvent) {
 		GroupsList:         meroutes.GroupsListHandler(app),
 		GroupGet:           meroutes.GroupGetHandler(app),
 		UserGet:            meroutes.UserGetHandler(app),
+		EventGet:           meroutes.EventGetHandler(app),
 		EventStatus:        meroutes.EventStatusHandler(app),
 		EventUnsubscribe:   meroutes.EventUnsubscribeHandler(app),
 		TelegramToken:      meroutes.GenerateTelegramTokenHandler(app),
