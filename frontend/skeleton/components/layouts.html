@@ -12,6 +12,32 @@
 </head>
 {{ end }}
 
+{{ define "scope-guard" }}
+<script>
+  (() => {
+    const expectedScope = "{{ . }}";
+    const storageKey = "huuper.auth";
+    let auth = null;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      auth = raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      auth = null;
+    }
+
+    if (!auth || !auth.token) {
+      window.location.replace("/");
+      return;
+    }
+
+    const actualScope = auth && auth.model && auth.model.admin === true ? "admin" : "me";
+    if (actualScope !== expectedScope) {
+      window.location.replace(actualScope === "admin" ? "/admin/" : "/me/");
+    }
+  })();
+</script>
+{{ end }}
+
 {{ define "layout-public" }}
 <!doctype html>
 <html lang="en">
@@ -34,6 +60,7 @@
 <html lang="en">
   {{ template "head" . }}
   <body>
+    {{ template "scope-guard" "me" }}
     <main class="app">
       <section class="app-shell">
         {{ template "topbar" (dict "BackHref" .BackHref "BackHistory" .BackHistory "Title" .TopbarTitle "ProfileHref" .ProfileHref) }}
@@ -50,6 +77,7 @@
 <html lang="en">
   {{ template "head" . }}
   <body class="admin">
+    {{ template "scope-guard" "admin" }}
     <main class="app">
       <section class="app-shell">
         {{ template "topbar" (dict "BackHref" .BackHref "BackHistory" .BackHistory "Title" .TopbarTitle "ProfileHref" .ProfileHref) }}
