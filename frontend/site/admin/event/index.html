@@ -6,19 +6,48 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Huuper / Admin / Event</title>
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="/assets/favicon/favicon.ico" sizes="any" />
+  <link rel="apple-touch-icon" href="/assets/favicon/apple-touch-icon.png" />
+  <script src="/copy/brand.js"></script>
   <link rel="stylesheet" href="/assets/css/app.css" />
   <script src="/assets/js/core/topbar.js" defer></script>
   <script src="/assets/js/core/auth.js" defer></script>
   <script src="/assets/js/core/guard-admin.js" defer></script>
   <script src="/assets/js/core/back.js" defer></script>
   <script src="/assets/js/core/list-page.js" defer></script>
+  <script src="/assets/js/components/action-sheet.js" defer></script>
   <script src="/assets/js/components/event-card.js" defer></script>
+  <script src="/assets/js/components/user-card.js" defer></script>
   <script src="/assets/js/components/event-detail.js" defer></script>
   <script src="/assets/js/admin/event.js" defer></script>
 </head>
 
   <body class="admin">
+    
+<script>
+  (() => {
+    const expectedScope = "admin";
+    const storageKey = "huuper.auth";
+    let auth = null;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      auth = raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      auth = null;
+    }
+
+    if (!auth || !auth.token) {
+      window.location.replace("/");
+      return;
+    }
+
+    const actualScope = auth && auth.model && auth.model.admin === true ? "admin" : "me";
+    if (actualScope !== expectedScope) {
+      window.location.replace(actualScope === "admin" ? "/admin/" : "/me/");
+    }
+  })();
+</script>
+
     <main class="app">
       <section class="app-shell">
         
@@ -33,9 +62,27 @@
 </header>
 
         
-<p id="event-status" class="meta-text"></p>
 <section id="event-summary" class="list-card" hidden></section>
-<section id="event-registrations" class="list-card" hidden></section>
+<section id="event-tabs" class="section-tabs" hidden>
+  <button id="event-tab-users" class="section-tab section-tab-current" type="button">Users</button>
+  <button id="event-tab-guests" class="section-tab" type="button">Guests</button>
+  <button id="event-tab-pending" class="section-tab" type="button">Pending</button>
+</section>
+<section id="event-registrations" class="list-card user-list" hidden></section>
+<section id="event-cancelled-block" class="event-secondary-block" hidden>
+  <button id="event-cancelled-toggle" class="event-secondary-toggle" type="button" aria-expanded="false">
+    <span class="event-secondary-copy">
+      <span id="event-cancelled-label" class="section-tab-text">Cancelled</span>
+      <span id="event-cancelled-count" class="section-tab-count">0</span>
+    </span>
+    <span class="event-secondary-chevron" aria-hidden="true">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+        <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708"/>
+      </svg>
+    </span>
+  </button>
+  <section id="event-cancelled-list" class="list-card user-list" hidden></section>
+</section>
 
       </section>
     </main>

@@ -5,6 +5,10 @@
   window.huuperEventDetail.init({
     detailURL: (id) => `/api/me/events/${encodeURIComponent(id)}`,
     includeRegistrationState: true,
-    includeRegistrations: false,
+    includeRegistrations: true,
+    scope: "me",
+    canManageRegistrations: false,
+    showPending: false,
+    showCancelled: false,
   });
 })();

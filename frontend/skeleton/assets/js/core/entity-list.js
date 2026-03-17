@@ -17,7 +17,13 @@ window.huuperEntityList = (() => {
         const payload = await config.load();
         const items = Array.isArray(payload.items) ? payload.items : [];
         if (items.length === 0) {
-          window.huuperListPage.setStatus(statusNode, config.emptyMessage);
+          if (typeof config.renderEmpty === "function") {
+            listNode.innerHTML = config.renderEmpty();
+            listNode.hidden = false;
+            statusNode.hidden = true;
+          } else {
+            window.huuperListPage.setStatus(statusNode, config.emptyMessage);
+          }
           return;
         }
 

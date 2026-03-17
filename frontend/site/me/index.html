@@ -6,7 +6,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Huuper / Me / Groups</title>
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="/assets/favicon/favicon.ico" sizes="any" />
+  <link rel="apple-touch-icon" href="/assets/favicon/apple-touch-icon.png" />
+  <script src="/copy/brand.js"></script>
   <link rel="stylesheet" href="/assets/css/app.css" />
   <script src="/assets/js/core/topbar.js" defer></script>
   <script src="/assets/js/core/auth.js" defer></script>
@@ -17,6 +19,31 @@
 </head>
 
   <body>
+    
+<script>
+  (() => {
+    const expectedScope = "me";
+    const storageKey = "huuper.auth";
+    let auth = null;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      auth = raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      auth = null;
+    }
+
+    if (!auth || !auth.token) {
+      window.location.replace("/");
+      return;
+    }
+
+    const actualScope = auth && auth.model && auth.model.admin === true ? "admin" : "me";
+    if (actualScope !== expectedScope) {
+      window.location.replace(actualScope === "admin" ? "/admin/" : "/me/");
+    }
+  })();
+</script>
+
     <main class="app">
       <section class="app-shell">
         

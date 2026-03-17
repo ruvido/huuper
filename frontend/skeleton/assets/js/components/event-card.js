@@ -1,7 +1,14 @@
 window.huuperEventCard = (() => {
-  function summary(event, meta) {
-    return `<article><strong>${window.huuperListPage.escapeHTML(event.title || event.id || "")}</strong>${meta ? `<p class="meta-text">${window.huuperListPage.escapeHTML(meta)}</p>` : ""}</article>`;
+  function summaryLines(location, duration) {
+    const locationText = window.huuperListPage.escapeHTML(location || "");
+    const durationText = window.huuperListPage.escapeHTML(duration || "");
+    return `
+      <article class="event-summary-card">
+        ${location ? `<strong>${locationText}</strong>` : ""}
+        ${duration ? `<p class="event-summary-duration">${durationText}</p>` : ""}
+      </article>
+    `;
   }
 
-  return { summary };
+  return { summaryLines };
 })();

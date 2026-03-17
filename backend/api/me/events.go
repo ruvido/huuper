@@ -67,6 +67,10 @@ func EventGetHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) erro
 		}
 
 		registered := false
+		attendees, err := eventinternal.ActiveAttendeesForEvent(app, event.Id)
+		if err != nil {
+			return apis.NewBadRequestError("failed_registrations", err)
+		}
 		if authRecord != nil {
 			registration, err := eventinternal.FindRegistrationByUser(app, event.Id, authRecord.Id, true)
 			if err == nil && registration != nil {
@@ -88,7 +92,10 @@ func EventGetHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) erro
 				"event_date": event.GetString("event_date"),
 				"data":       backendinternal.ParseJSONMap(event.Get("data")),
 			},
-			"registered": registered,
+			"registered":              registered,
+			"registrations":           attendees,
+			"pending_registrations":   []any{},
+			"cancelled_registrations": []any{},
 		})
 	}
 }

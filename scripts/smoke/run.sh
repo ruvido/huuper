@@ -6,10 +6,22 @@ SCRIPTS_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 ENV_FILE="${SCRIPTS_DIR}/.env"
 
 if [[ -f "${ENV_FILE}" ]]; then
-  set -a
-  # shellcheck disable=SC1090
-  source "${ENV_FILE}"
-  set +a
+  while IFS='=' read -r key raw; do
+    [[ -z "${key}" ]] && continue
+    [[ "${key}" =~ ^[[:space:]]*# ]] && continue
+
+    key="$(printf '%s' "${key}" | xargs)"
+    [[ -z "${key}" ]] && continue
+
+    if [[ -n "${!key-}" ]]; then
+      continue
+    fi
+
+    value="$(printf '%s' "${raw:-}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+    value="${value%\"}"
+    value="${value#\"}"
+    export "${key}=${value}"
+  done < "${ENV_FILE}"
 fi
 
 BASE_URL="${BASE_URL:-${BASE:-http://127.0.0.1:9090}}"

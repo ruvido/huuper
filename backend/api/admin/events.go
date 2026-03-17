@@ -12,15 +12,6 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
-type registrationItem struct {
-	ID      string         `json:"id"`
-	Email   string         `json:"email"`
-	Status  string         `json:"status"`
-	Created string         `json:"created"`
-	HasUser bool           `json:"hasUser"`
-	Data    map[string]any `json:"data"`
-}
-
 type registrationNotePayload struct {
 	Note string `json:"note"`
 }
@@ -37,21 +28,17 @@ func EventDetailsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) 
 			return apis.NewNotFoundError("invalid_event", err)
 		}
 
-		registrations, err := app.FindRecordsByFilter(
-			"event_registrations",
-			"event = {:event}",
-			"created",
-			0,
-			0,
-			map[string]any{"event": eventID},
-		)
+		attendees, err := eventinternal.ActiveAttendeesForEvent(app, eventID)
 		if err != nil {
 			return apis.NewBadRequestError("failed_registrations", err)
 		}
-
-		items := make([]registrationItem, 0, len(registrations))
-		for _, record := range registrations {
-			items = append(items, mapRegistration(app, record))
+		pendingAttendees, err := eventinternal.PendingAttendeesForEvent(app, eventID)
+		if err != nil {
+			return apis.NewBadRequestError("failed_registrations", err)
+		}
+		cancelledAttendees, err := eventinternal.CancelledAttendeesForEvent(app, eventID)
+		if err != nil {
+			return apis.NewBadRequestError("failed_registrations", err)
 		}
 
 		eventData := backendinternal.ParseJSONMap(event.Get("data"))
@@ -63,7 +50,9 @@ func EventDetailsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) 
 				"event_date": event.GetString("event_date"),
 				"data":       eventData,
 			},
-			"registrations": items,
+			"registrations":           attendees,
+			"pending_registrations":   pendingAttendees,
+			"cancelled_registrations": cancelledAttendees,
 		})
 	}
 }
@@ -160,24 +149,5 @@ func RejectRegistrationHandler(app *pocketbase.PocketBase) func(e *core.RequestE
 		}
 
 		return e.JSON(http.StatusOK, map[string]any{"status": "rejected"})
-	}
-}
-
-func mapRegistration(app *pocketbase.PocketBase, record *core.Record) registrationItem {
-	data := backendinternal.ParseJSONMap(record.Get("data"))
-	userID := strings.TrimSpace(record.GetString("user"))
-	if userID != "" {
-		if user, err := app.FindRecordById("users", userID); err == nil && user != nil {
-			data = backendinternal.ParseJSONMap(user.Get("data"))
-		}
-	}
-
-	return registrationItem{
-		ID:      record.Id,
-		Email:   record.GetString("email"),
-		Status:  record.GetString("status"),
-		Created: record.GetString("created"),
-		HasUser: userID != "",
-		Data:    data,
 	}
 }
