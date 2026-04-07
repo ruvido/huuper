@@ -120,8 +120,11 @@ func BuildUserData(data map[string]any) map[string]any {
 		return map[string]any{}
 	}
 	out := maps.Clone(data)
-	delete(out, FlowVersionDataKey)
-	delete(out, StepIndexDataKey)
+	for key := range out {
+		if strings.HasPrefix(strings.TrimSpace(key), "__") {
+			delete(out, key)
+		}
+	}
 	return out
 }
 

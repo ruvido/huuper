@@ -121,7 +121,7 @@ func GetRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) er
 		if err != nil {
 			return apis.NewBadRequestError("invalid_requests_flow_settings", err)
 		}
-		flowVersion, _ := backendrequests.ProgressFromData(item.Data)
+		flowVersion := backendrequests.FlowVersionFromData(item.Data)
 		stepIndex := backendrequests.EffectiveStepIndex(record, item.Data, flow)
 		computedStatus := backendrequests.StatusForItem(item.Rejected, stepIndex, flow.Steps)
 		statusLabel := requestStatusLabel(computedStatus, stepIndex, flow)
@@ -145,7 +145,7 @@ func GetRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) er
 				return apis.NewBadRequestError("role_resolution_failed", err)
 			}
 		}
-		options, err := requestWorkflowOptions(app, actor, record, requiredField, canAdvance)
+		options, err := requestWorkflowOptions(app, actor, record, nextStep, requiredField, canAdvance)
 		if err != nil {
 			return apis.NewBadRequestError("workflow_options_failed", err)
 		}
@@ -165,7 +165,6 @@ func GetRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) er
 			"mentoring_notes":      requestMentoringNotes(item.Data),
 			"mentoring_notes_html": requestMentoringNotesHTML(item.Data),
 			"flow_version":         flowVersion,
-			"step_index":           stepIndex,
 			"created":              item.Created,
 			"updated":              item.Updated,
 			"data":                 item.Data,
@@ -177,6 +176,7 @@ func GetRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) er
 				"next_action_label":      nextStep.Label,
 				"next_action_notes":      nextStep.Notes,
 				"next_action_notes_html": requestNotesHTML(nextStep.Notes),
+				"filter":                 nextStep.Filter,
 				"required_field":         requiredField,
 				"can_advance":            canAdvance,
 				"options":                options,
@@ -252,7 +252,7 @@ func requestNotesHTML(raw string) string {
 	return html
 }
 
-func requestWorkflowOptions(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, requiredField string, canAdvance bool) (map[string]any, error) {
+func requestWorkflowOptions(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, step backendrequests.FlowStep, requiredField string, canAdvance bool) (map[string]any, error) {
 	options := map[string]any{}
 	if !canAdvance {
 		return options, nil
@@ -260,7 +260,13 @@ func requestWorkflowOptions(app *pocketbase.PocketBase, actor *core.Record, reco
 
 	switch requiredField {
 	case "group":
-		groups, err := app.FindRecordsByFilter("groups", "", "name", 500, 0, nil)
+		filter := ""
+		params := map[string]any{}
+		if step.Filter == backendrequests.FilterLocal {
+			filter = "type = {:type}"
+			params["type"] = backendrequests.FilterLocal
+		}
+		groups, err := app.FindRecordsByFilter("groups", filter, "name", 500, 0, params)
 		if err != nil {
 			return nil, err
 		}
@@ -285,13 +291,10 @@ func requestWorkflowOptions(app *pocketbase.PocketBase, actor *core.Record, reco
 		if err != nil {
 			return nil, err
 		}
-		items := make([]map[string]any, 0, len(response.Items))
-		for _, member := range response.Items {
-			items = append(items, map[string]any{
-				"id":        member.ID,
-				"full_name": member.FullName,
-				"email":     member.Email,
-			})
+		items := response.Items
+		if step.Filter == backendrequests.FilterGroupMembers {
+			options["guardians"] = items
+			return options, nil
 		}
 		options["guardians"] = items
 	}
@@ -373,13 +376,12 @@ func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		if err != nil {
 			return apis.NewBadRequestError("invalid_requests_flow_settings", err)
 		}
-		step := backendrequests.ParseVersion(data[backendrequests.StepIndexDataKey])
-		status := backendrequests.StatusForItem(record.GetBool("rejected"), step, flow.Steps)
+		stepIndex := backendrequests.EffectiveStepIndex(record, data, flow)
+		status := backendrequests.StatusForItem(record.GetBool("rejected"), stepIndex, flow.Steps)
 
 		return e.JSON(http.StatusOK, map[string]any{
 			"id":       record.Id,
 			"status":   status,
-			"step":     step,
 			"rejected": record.GetBool("rejected"),
 			"data":     record.Get("data"),
 		})

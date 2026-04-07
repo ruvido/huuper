@@ -153,12 +153,17 @@ func GroupGetHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) erro
 				if err != nil {
 					return apis.NewBadRequestError("failed_group_request_workflow", err)
 				}
+				statusLabel := strings.TrimSpace(backendinternal.AnyToString(item.Workflow["current_action_label"]))
+				if statusLabel == "" {
+					stepIndex := backendrequests.EffectiveStepIndex(record, item.Data, flow)
+					statusLabel = requestStatusLabel(item.Status, stepIndex, flow)
+				}
 				pendingRequests = append(pendingRequests, groupinternal.PendingRequestItem{
 					ID:          item.ID,
 					FullName:    strings.TrimSpace(backendrequests.DisplayName(item.Data, strings.TrimSpace(item.Email), item.ID)),
 					Email:       strings.TrimSpace(item.Email),
 					Status:      strings.TrimSpace(item.Status),
-					StatusLabel: requestStatusLabel(item.Status, item.StepIndex, flow),
+					StatusLabel: statusLabel,
 					Created:     strings.TrimSpace(item.Created),
 					AssignedAt:  requestAssignedAt(item.Data),
 					Data:        item.Data,

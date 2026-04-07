@@ -25,7 +25,7 @@ func MapItem(record *core.Record) ListItem {
 
 func MapItemWithWorkflow(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, flow FlowConfig) (ListItem, error) {
 	item := MapItem(record)
-	flowVersion, _ := ProgressFromData(item.Data)
+	flowVersion := FlowVersionFromData(item.Data)
 	stepIndex := EffectiveStepIndex(record, item.Data, flow)
 
 	nextStep, hasNext := FlowStepAt(flow, stepIndex)
@@ -41,7 +41,6 @@ func MapItemWithWorkflow(app *pocketbase.PocketBase, actor *core.Record, record 
 	}
 
 	item.FlowVersion = flowVersion
-	item.StepIndex = stepIndex
 	item.Status = StatusForItem(item.Rejected, stepIndex, flow.Steps)
 	currentAction := ""
 	currentActionLabel := ""
@@ -69,22 +68,37 @@ func MapItemWithWorkflow(app *pocketbase.PocketBase, actor *core.Record, record 
 }
 
 func EffectiveStepIndex(record *core.Record, data map[string]any, flow FlowConfig) int {
-	_, stepIndex := ProgressFromData(data)
 	if record == nil {
-		return stepIndex
+		return 0
 	}
 
+	stepIndex := 0
 	for stepIndex < len(flow.Steps) {
-		required := RequiredFieldForAction(flow.Steps[stepIndex].Action)
-		if required == "group" && strings.TrimSpace(record.GetString("group")) != "" {
-			stepIndex++
-			continue
-		}
-		if required == "guardian" && strings.TrimSpace(record.GetString("guardian")) != "" {
+		if stepSatisfied(record, data, flow.Steps[stepIndex].Action) {
 			stepIndex++
 			continue
 		}
 		break
 	}
 	return stepIndex
+}
+
+func stepSatisfied(record *core.Record, data map[string]any, action string) bool {
+	switch action {
+	case FlowActionAssignGroup:
+		return strings.TrimSpace(record.GetString("group")) != ""
+	case FlowActionAssignGuardian:
+		return strings.TrimSpace(record.GetString("guardian")) != ""
+	case FlowActionMentoring:
+		value, _ := data["mentoring_done_at"].(string)
+		return strings.TrimSpace(value) != ""
+	case FlowActionGroupApproved:
+		value, _ := data["group_approved_at"].(string)
+		return strings.TrimSpace(value) != ""
+	case FlowActionAdminApproved:
+		value, _ := data["admin_approved_at"].(string)
+		return strings.TrimSpace(value) != ""
+	default:
+		return false
+	}
 }

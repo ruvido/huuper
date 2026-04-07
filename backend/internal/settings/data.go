@@ -22,6 +22,7 @@ const (
 var PublicNames = map[string]bool{
 	"title":          true,
 	"password_reset": true,
+	"profile_schema": true,
 	"signup":         true,
 }
 

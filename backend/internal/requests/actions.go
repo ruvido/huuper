@@ -36,13 +36,13 @@ func ApplyAdvanceAction(app *pocketbase.PocketBase, actor *core.Record, record *
 	}
 
 	if nextStep.Action == FlowActionAssignGroup {
-		if err := applyGroupAssignment(app, record, strings.TrimSpace(payload.GroupID)); err != nil {
+		if err := applyGroupAssignment(app, record, strings.TrimSpace(payload.GroupID), nextStep.Filter); err != nil {
 			return err
 		}
 	}
 
 	if nextStep.Action == FlowActionAssignGuardian {
-		if err := applyGuardianAssignment(app, record, data, actor, strings.TrimSpace(payload.GuardianID)); err != nil {
+		if err := applyGuardianAssignment(app, record, data, actor, strings.TrimSpace(payload.GuardianID), nextStep.Filter); err != nil {
 			return err
 		}
 	}
@@ -59,9 +59,21 @@ func ApplyAdvanceAction(app *pocketbase.PocketBase, actor *core.Record, record *
 		}
 	}
 
-	nextStepIndex := stepIndex + 1
+	if nextStep.Action == FlowActionGroupApproved {
+		data["group_approved_at"] = time.Now().UTC().Format(time.RFC3339)
+		if actor != nil {
+			data["group_approved_by"] = actorDisplayName(actor)
+		}
+	}
+
+	if nextStep.Action == FlowActionAdminApproved {
+		data["admin_approved_at"] = time.Now().UTC().Format(time.RFC3339)
+		if actor != nil {
+			data["admin_approved_by"] = actorDisplayName(actor)
+		}
+	}
+
 	data[FlowVersionDataKey] = flow.Version
-	data[StepIndexDataKey] = nextStepIndex
 	record.Set("data", data)
 	return nil
 }
@@ -105,7 +117,7 @@ func ApplySetGuardianAction(app *pocketbase.PocketBase, actor *core.Record, reco
 		return nil
 	}
 
-	if err := applyGuardianAssignment(app, record, data, actor, guardianID); err != nil {
+	if err := applyGuardianAssignment(app, record, data, actor, guardianID, FilterGroupMembers); err != nil {
 		return err
 	}
 	record.Set("data", data)
@@ -180,7 +192,7 @@ func ApplyPromoteAction(app *pocketbase.PocketBase, actor *core.Record, record *
 	return user.Id, nil
 }
 
-func applyGroupAssignment(app *pocketbase.PocketBase, record *core.Record, groupID string) error {
+func applyGroupAssignment(app *pocketbase.PocketBase, record *core.Record, groupID string, filter string) error {
 	if groupID == "" {
 		return apis.NewBadRequestError("missing_group", nil)
 	}
@@ -188,11 +200,14 @@ func applyGroupAssignment(app *pocketbase.PocketBase, record *core.Record, group
 	if err != nil || group == nil {
 		return apis.NewBadRequestError("invalid_group", err)
 	}
+	if filter == FilterLocal && strings.TrimSpace(group.GetString("type")) != FilterLocal {
+		return apis.NewBadRequestError("invalid_group_filter", nil)
+	}
 	record.Set("group", groupID)
 	return nil
 }
 
-func applyGuardianAssignment(app *pocketbase.PocketBase, record *core.Record, data map[string]any, actor *core.Record, guardianID string) error {
+func applyGuardianAssignment(app *pocketbase.PocketBase, record *core.Record, data map[string]any, actor *core.Record, guardianID string, filter string) error {
 	groupID := strings.TrimSpace(record.GetString("group"))
 	if groupID == "" {
 		return apis.NewBadRequestError("missing_group_assignment", nil)
@@ -206,22 +221,24 @@ func applyGuardianAssignment(app *pocketbase.PocketBase, record *core.Record, da
 		return apis.NewBadRequestError("invalid_guardian", err)
 	}
 
-	guardianMemberships, err := app.FindRecordsByFilter(
-		"user_groups",
-		"user = {:user} && group = {:group}",
-		"",
-		1,
-		0,
-		map[string]any{
-			"user":  guardianID,
-			"group": groupID,
-		},
-	)
-	if err != nil {
-		return apis.NewBadRequestError("guardian_membership_check_failed", err)
-	}
-	if len(guardianMemberships) == 0 {
-		return apis.NewBadRequestError("guardian_not_in_group", nil)
+	if filter == FilterGroupMembers {
+		guardianMemberships, err := app.FindRecordsByFilter(
+			"user_groups",
+			"user = {:user} && group = {:group}",
+			"",
+			1,
+			0,
+			map[string]any{
+				"user":  guardianID,
+				"group": groupID,
+			},
+		)
+		if err != nil {
+			return apis.NewBadRequestError("guardian_membership_check_failed", err)
+		}
+		if len(guardianMemberships) == 0 {
+			return apis.NewBadRequestError("guardian_not_in_group", nil)
+		}
 	}
 
 	record.Set("guardian", guardianID)

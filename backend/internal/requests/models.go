@@ -35,7 +35,6 @@ type ListItem struct {
 	Updated     string         `json:"updated"`
 	Data        map[string]any `json:"data"`
 	FlowVersion int            `json:"flow_version"`
-	StepIndex   int            `json:"step_index"`
 	Workflow    map[string]any `json:"workflow"`
 }
 

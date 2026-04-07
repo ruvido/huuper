@@ -37,6 +37,7 @@ type FlowStep struct {
 	Action string `json:"action"`
 	Label  string `json:"label"`
 	Notes  string `json:"notes,omitempty"`
+	Filter string `json:"filter,omitempty"`
 }
 
 type FlowConfig struct {
@@ -46,7 +47,6 @@ type FlowConfig struct {
 
 const (
 	FlowVersionDataKey = "__flow_version"
-	StepIndexDataKey   = "__step_index"
 )
 
 var allowedRoles = map[string]struct{}{
@@ -70,6 +70,11 @@ var actionToStatus = map[string]string{
 	FlowActionGroupApproved:  StatusGroupApproved,
 	FlowActionAdminApproved:  StatusAdminApproved,
 }
+
+const (
+	FilterLocal        = "local"
+	FilterGroupMembers = "group_members"
+)
 
 func ParseFlowConfig(data map[string]any) (FlowConfig, error) {
 	version := ParseVersion(data["version"])
@@ -107,10 +112,35 @@ func ParseFlowConfig(data map[string]any) (FlowConfig, error) {
 
 		label := strings.TrimSpace(backendinternal.AnyToString(entry["label"]))
 		notes := strings.TrimSpace(backendinternal.AnyToString(entry["notes"]))
-		steps = append(steps, FlowStep{Role: role, Action: action, Label: label, Notes: notes})
+		filter := strings.TrimSpace(backendinternal.AnyToString(entry["filter"]))
+		if err := validateFilterForAction(action, filter); err != nil {
+			return FlowConfig{}, fmt.Errorf("settings.requests_flow steps[%d] %w", i, err)
+		}
+		steps = append(steps, FlowStep{Role: role, Action: action, Label: label, Notes: notes, Filter: filter})
 	}
 
 	return FlowConfig{Version: version, Steps: steps}, nil
+}
+
+func validateFilterForAction(action, filter string) error {
+	if filter == "" {
+		return nil
+	}
+
+	switch action {
+	case FlowActionAssignGroup:
+		if filter != FilterLocal {
+			return fmt.Errorf("invalid filter for %s: %s", action, filter)
+		}
+		return nil
+	case FlowActionAssignGuardian:
+		if filter != FilterGroupMembers {
+			return fmt.Errorf("invalid filter for %s: %s", action, filter)
+		}
+		return nil
+	default:
+		return fmt.Errorf("filter not allowed for %s", action)
+	}
 }
 
 func ParseVersion(raw any) int {
@@ -136,16 +166,12 @@ func ParseVersion(raw any) int {
 	}
 }
 
-func ProgressFromData(data map[string]any) (flowVersion int, stepIndex int) {
-	flowVersion = ParseVersion(data[FlowVersionDataKey])
-	stepIndex = ParseVersion(data[StepIndexDataKey])
+func FlowVersionFromData(data map[string]any) int {
+	flowVersion := ParseVersion(data[FlowVersionDataKey])
 	if flowVersion < 1 {
-		flowVersion = 1
+		return 1
 	}
-	if stepIndex < 0 {
-		stepIndex = 0
-	}
-	return flowVersion, stepIndex
+	return flowVersion
 }
 
 func RequiredFieldForAction(action string) string {

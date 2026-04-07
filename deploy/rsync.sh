@@ -10,13 +10,14 @@ BIN_NAME="${BIN_NAME:-huuper}"
 APP_HOST_PORT="${APP_HOST_PORT:-8090}"
 TARGET_GOOS="${TARGET_GOOS:-linux}"
 TARGET_GOARCH="${TARGET_GOARCH:-amd64}"
+FRONTEND_ARCHIVE_DIR="${FRONTEND_ARCHIVE_DIR:-$VPS_PATH/shared/frontend-history}"
 
 RELEASE_ID="${RELEASE_ID:-$(date +%Y%m%d-%H%M%S)-$(git -C "$ROOT_DIR" rev-parse --short HEAD)}"
 TMP_RELEASE_DIR="/tmp/huuper-release-$RELEASE_ID"
 
 echo "release: $RELEASE_ID"
 echo "remote: prepare release layout"
-ssh "$VPS_HOST" "mkdir -p '$VPS_PATH/releases/$RELEASE_ID' '$VPS_PATH/deploy' '$VPS_PATH/shared/data'"
+ssh "$VPS_HOST" "mkdir -p '$VPS_PATH/releases/$RELEASE_ID' '$VPS_PATH/deploy' '$VPS_PATH/shared/data' '$FRONTEND_ARCHIVE_DIR'"
 
 if [ ! -f "$ROOT_DIR/.env" ]; then
   echo "missing .env in project root" >&2
@@ -58,6 +59,9 @@ rsync -avz --progress \
 
 echo "remote: validate shared env"
 ssh "$VPS_HOST" "test -f '$VPS_PATH/shared/.env' || (echo 'Missing $VPS_PATH/shared/.env' >&2; exit 1)"
+
+echo "remote: snapshot current frontend"
+ssh "$VPS_HOST" "if [ -d '$VPS_PATH/current/frontend/site' ]; then mkdir -p '$FRONTEND_ARCHIVE_DIR/$RELEASE_ID'; rsync -a --delete '$VPS_PATH/current/frontend/site/' '$FRONTEND_ARCHIVE_DIR/$RELEASE_ID/'; fi"
 
 echo "remote: switch current release"
 ssh "$VPS_HOST" "ln -sfn '$VPS_PATH/releases/$RELEASE_ID' '$VPS_PATH/current'"
