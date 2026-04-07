@@ -14,8 +14,11 @@
   <script src="/assets/js/core/auth.js" defer></script>
   <script src="/assets/js/core/guard-admin.js" defer></script>
   <script src="/assets/js/core/list-page.js" defer></script>
-  <script src="/assets/js/core/entity-list.js" defer></script>
-  <script src="/assets/js/components/request-card.js" defer></script>
+  <script src="/assets/js/core/request-list-page.js" defer></script>
+  <script src="/assets/js/components/action-sheet.js" defer></script>
+  <script src="/assets/js/components/group-meta.js" defer></script>
+  <script src="/assets/js/components/request-item.js" defer></script>
+  <script src="/assets/js/components/request-assignment-sheet.js" defer></script>
   <script src="/assets/js/admin/requests.js" defer></script>
 </head>
 
@@ -60,7 +63,17 @@
 
         
 <p id="admin-requests-status" class="meta-text"></p>
-<section id="admin-requests-list" class="list-card" hidden></section>
+<section id="admin-requests-tabs" class="section-tabs" hidden>
+  <button id="admin-requests-tab-all" class="section-tab section-tab-current" type="button">
+    <span class="section-tab-text">All</span>
+    <span id="admin-requests-count-all" class="section-tab-count">0</span>
+  </button>
+  <button id="admin-requests-tab-urgent" class="section-tab" type="button">
+    <span class="section-tab-text">Urgent</span>
+    <span id="admin-requests-count-urgent" class="section-tab-count">0</span>
+  </button>
+</section>
+<section id="admin-requests-list" class="list-card list-card-default" hidden></section>
 
       </section>
     </main>

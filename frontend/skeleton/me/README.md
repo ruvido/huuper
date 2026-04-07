@@ -5,5 +5,5 @@ Area membro.
 Wireframe iniziale:
 - `Groups`
 - `Events`
-- `Requests` solo come capability contestuale
+- `Requests` come sezione primaria del membro
 - `Profile` sempre dalla top bar

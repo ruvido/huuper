@@ -44,11 +44,11 @@
 <!doctype html>
 <html lang="en">
   {{ template "head" . }}
-  <body>
+  <body{{- if .BodyData }}{{- range $key, $value := .BodyData }} data-{{ $key }}="{{ $value }}"{{- end }}{{- end }}>
     <main class="app">
       <section class="app-shell">
         {{ if or .BackHref .BackHistory .TopbarTitle }}
-          {{ template "topbar" (dict "BackHref" .BackHref "BackHistory" .BackHistory "Title" .TopbarTitle "ProfileHref" "") }}
+        {{ template "topbar" (dict "BackHref" .BackHref "BackHistory" .BackHistory "Title" .TopbarTitle "ProfileHref" "" "MetaID" .TopbarMetaID "VariantClass" .TopbarVariantClass "MetaClass" .TopbarMetaClass) }}
         {{ end }}
         {{ template "content" . }}
       </section>
@@ -65,7 +65,7 @@
     {{ template "scope-guard" "me" }}
     <main class="app">
       <section class="app-shell">
-        {{ template "topbar" (dict "BackHref" .BackHref "BackHistory" .BackHistory "Title" .TopbarTitle "ProfileHref" .ProfileHref) }}
+        {{ template "topbar" (dict "BackHref" .BackHref "BackHistory" .BackHistory "Title" .TopbarTitle "ProfileHref" .ProfileHref "MetaID" .TopbarMetaID "VariantClass" .TopbarVariantClass "MetaClass" .TopbarMetaClass) }}
         {{ template "content" . }}
       </section>
     </main>
@@ -82,7 +82,7 @@
     {{ template "scope-guard" "admin" }}
     <main class="app">
       <section class="app-shell">
-        {{ template "topbar" (dict "BackHref" .BackHref "BackHistory" .BackHistory "Title" .TopbarTitle "ProfileHref" .ProfileHref) }}
+        {{ template "topbar" (dict "BackHref" .BackHref "BackHistory" .BackHistory "Title" .TopbarTitle "ProfileHref" .ProfileHref "MetaID" .TopbarMetaID "VariantClass" .TopbarVariantClass "MetaClass" .TopbarMetaClass) }}
         {{ template "content" . }}
       </section>
     </main>

@@ -1,4 +1,83 @@
 {{ define "status-list-content" }}
 <p id="{{ .StatusID }}" class="meta-text"></p>
-<section id="{{ .ListID }}" class="list-card" hidden></section>
+<section id="{{ .ListID }}" class="list-card list-card-default" hidden></section>
+{{ end }}
+
+{{ define "request-detail-content" }}
+<section class="request-page-layout">
+  <p id="request-status" class="meta-text"></p>
+  <div class="request-page-content">
+    <section id="request-summary" class="request-page-summary" hidden></section>
+    <section id="request-workflow" class="request-page-workflow" hidden></section>
+  </div>
+</section>
+{{ end }}
+
+{{ define "request-assignment-content" }}
+<p id="request-assignment-status" class="meta-text"></p>
+<section id="request-assignment-list" class="list-card" hidden></section>
+{{ end }}
+
+{{ define "profile-content" }}
+<section class="panel">
+  <div class="view-stack">
+    <div class="data-block">
+      <span class="data-label">Email</span>
+      <strong class="data-value" id="profile-email"></strong>
+    </div>
+    <div class="data-block">
+      <span class="data-label">Telegram</span>
+      <strong class="data-value" id="profile-telegram"></strong>
+    </div>
+  </div>
+  <div class="action-row">
+    <button class="primary" type="button" data-logout>Logout</button>
+  </div>
+</section>
+{{ end }}
+
+{{ define "user-detail-content" }}
+<p id="user-status" class="meta-text"></p>
+<section id="user-summary" class="view-stack" hidden></section>
+{{ if .ShowGroups }}
+<section id="user-groups" class="list-card list-card-default" hidden></section>
+{{ end }}
+{{ end }}
+
+{{ define "group-detail-content" }}
+<p id="group-status" class="meta-text"></p>
+<section id="group-tabs" class="section-tabs" hidden>
+  <button id="group-tab-members" class="section-tab section-tab-current" type="button">Members</button>
+  <button id="group-tab-pending" class="section-tab" type="button">Pending</button>
+</section>
+<section id="group-members-section" hidden>
+  <section id="group-members" class="list-card list-card-default"></section>
+</section>
+<section id="group-pending-section" hidden>
+  <section id="group-pending" class="list-card list-card-default"></section>
+</section>
+{{ end }}
+
+{{ define "event-detail-content" }}
+<section id="event-summary" class="list-card" hidden></section>
+<section id="event-tabs" class="section-tabs" hidden>
+  <button id="event-tab-users" class="section-tab section-tab-current" type="button">Users</button>
+  <button id="event-tab-guests" class="section-tab" type="button">Guests</button>
+  <button id="event-tab-pending" class="section-tab" type="button">Pending</button>
+</section>
+<section id="event-registrations" class="list-card list-card-default" hidden></section>
+<section id="event-cancelled-block" class="event-secondary-block" hidden>
+  <button id="event-cancelled-toggle" class="event-secondary-toggle" type="button" aria-expanded="false">
+    <span class="event-secondary-copy">
+      <span id="event-cancelled-label" class="section-tab-text">Cancelled</span>
+      <span id="event-cancelled-count" class="section-tab-count">0</span>
+    </span>
+    <span class="event-secondary-chevron" aria-hidden="true">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+        <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708"/>
+      </svg>
+    </span>
+  </button>
+  <section id="event-cancelled-list" class="list-card list-card-default" hidden></section>
+</section>
 {{ end }}

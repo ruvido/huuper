@@ -1,0 +1,43 @@
+{{ define "public-entry-content" }}
+<section class="public-entry">
+  <div class="section-tabs public-entry-tabs" id="public-entry-tabs" role="tablist" aria-label="Public access">
+    <button class="section-tab public-entry-tab" type="button" data-public-mode="request" role="tab" aria-selected="false">
+      <span class="section-tab-text">Request</span>
+    </button>
+    <button class="section-tab public-entry-tab" type="button" data-public-mode="login" role="tab" aria-selected="false">
+      <span class="section-tab-text">Login</span>
+    </button>
+  </div>
+
+  <section class="public-entry-pane" data-public-pane="request">
+    <form id="public-request-form">
+      <div class="public-request-topbar" id="public-request-topbar" hidden>
+        <button id="public-request-back" type="button" hidden>Back</button>
+        <button class="primary" id="public-request-submit" type="submit">Next</button>
+      </div>
+      <p id="public-request-progress" class="section-label" hidden></p>
+      <div class="public-request-stepper">
+        <div id="public-request-fields" class="public-request-step"></div>
+      </div>
+      <p id="public-request-status" class="meta-text" hidden></p>
+      <div class="action-row" id="public-request-actions">
+        <button class="primary" id="public-request-start" type="button">Next</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="public-entry-pane" data-public-pane="login" hidden>
+    <form id="login-form">
+      <div class="view-stack">
+        {{ template "field" (dict "Label" "Email" "ID" "login-email" "Name" "email" "Type" "email" "Placeholder" "name@domain.com" "Required" true "Autocomplete" "username") }}
+        {{ template "field" (dict "Label" "Password" "ID" "login-password" "Name" "password" "Type" "password" "Placeholder" "password" "Required" true "Autocomplete" "current-password") }}
+      </div>
+      <p id="login-error" class="meta-text" hidden></p>
+      <div class="action-row">
+        <button class="primary" type="submit">Login</button>
+        <a href="/password-reset/">Password reset</a>
+      </div>
+    </form>
+  </section>
+</section>
+{{ end }}

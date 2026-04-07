@@ -1,5 +1,5 @@
 {{ define "topbar" }}
-<header class="top-bar">
+<header class="top-bar{{ if .VariantClass }} {{ .VariantClass }}{{ end }}">
   {{ if .BackHistory }}
     <button class="topbar-back" type="button" data-back aria-label="Back">{{ template "icon-back" . }}</button>
   {{ else if .BackHref }}
@@ -10,6 +10,8 @@
   <div class="top-bar-title">{{ .Title }}</div>
   {{ if .ProfileHref }}
     <a class="topbar-profile" href="{{ .ProfileHref }}" aria-label="Profile" data-topbar-profile>{{ template "icon-profile" . }}</a>
+  {{ else if .MetaID }}
+    <span class="topbar-meta{{ if .MetaClass }} {{ .MetaClass }}{{ end }}" id="{{ .MetaID }}" hidden></span>
   {{ else }}
     <span></span>
   {{ end }}

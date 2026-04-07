@@ -1,0 +1,100 @@
+
+<!doctype html>
+<html lang="en">
+  
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Huuper / Login</title>
+  <link rel="icon" href="/assets/favicon/favicon.ico" sizes="any" />
+  <link rel="apple-touch-icon" href="/assets/favicon/apple-touch-icon.png" />
+  <script src="/copy/brand.js"></script>
+  <link rel="stylesheet" href="/assets/css/app.css" />
+  <script src="/assets/js/core/topbar.js" defer></script>
+  <script src="/assets/js/core/auth.js" defer></script>
+  <script src="/assets/js/public/entry.js" defer></script>
+</head>
+
+  <body data-publicdefaultmode="login">
+    <main class="app">
+      <section class="app-shell">
+        
+        
+<header class="top-bar">
+  
+    <a class="topbar-back" href="/" aria-label="Back"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0"/></svg></a>
+  
+  <div class="top-bar-title"></div>
+  
+    <span></span>
+  
+</header>
+
+        
+        
+<section class="public-entry">
+  <div class="section-tabs public-entry-tabs" id="public-entry-tabs" role="tablist" aria-label="Public access">
+    <button class="section-tab public-entry-tab" type="button" data-public-mode="request" role="tab" aria-selected="false">
+      <span class="section-tab-text">Request</span>
+    </button>
+    <button class="section-tab public-entry-tab" type="button" data-public-mode="login" role="tab" aria-selected="false">
+      <span class="section-tab-text">Login</span>
+    </button>
+  </div>
+
+  <section class="public-entry-pane" data-public-pane="request">
+    <form id="public-request-form">
+      <div class="public-request-topbar" id="public-request-topbar" hidden>
+        <button id="public-request-back" type="button" hidden>Back</button>
+        <button class="primary" id="public-request-submit" type="submit">Next</button>
+      </div>
+      <p id="public-request-progress" class="section-label" hidden></p>
+      <div class="public-request-stepper">
+        <div id="public-request-fields" class="public-request-step"></div>
+      </div>
+      <p id="public-request-status" class="meta-text" hidden></p>
+      <div class="action-row" id="public-request-actions">
+        <button class="primary" id="public-request-start" type="button">Next</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="public-entry-pane" data-public-pane="login" hidden>
+    <form id="login-form">
+      <div class="view-stack">
+        
+<label class="form-field">
+  <span>Email</span>
+  <input
+    id="login-email"
+    type="email"
+    name="email" placeholder="name@domain.com" required autocomplete="username"
+  />
+</label>
+
+        
+<label class="form-field">
+  <span>Password</span>
+  <input
+    id="login-password"
+    type="password"
+    name="password" placeholder="password" required autocomplete="current-password"
+  />
+</label>
+
+      </div>
+      <p id="login-error" class="meta-text" hidden></p>
+      <div class="action-row">
+        <button class="primary" type="submit">Login</button>
+        <a href="/password-reset/">Password reset</a>
+      </div>
+    </form>
+  </section>
+</section>
+
+      </section>
+    </main>
+  
+  <script src="/assets/js/core/hot-reload.js" defer></script>
+</body>
+</html>

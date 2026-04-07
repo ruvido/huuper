@@ -1,4 +1,4 @@
-window.huuperUserCard = (() => {
+window.huuperListItem = (() => {
   function text(value) {
     return window.huuperListPage ? window.huuperListPage.text(value) : String(value || "").trim();
   }
@@ -72,30 +72,30 @@ window.huuperUserCard = (() => {
     return `/api/files/users/${encodeURIComponent(id)}/${encodeURIComponent(filename)}`;
   }
 
-  function renderAvatar(item, name, options = {}) {
+  function renderMedia(item, label, options = {}) {
     const url = avatarURL(item);
-    const classes = ["user-avatar"];
+    const classes = ["list-item-media"];
     if (options.guardian) {
-      classes.push("user-avatar-guardian");
+      classes.push("list-item-media-guardian");
     }
 
-    const fallback = `<span class="user-avatar-text"${url ? ' hidden' : ''}>${escapeHTML(initials(name))}</span>`;
+    const fallback = `<span class="list-item-media-text"${url ? ' hidden' : ""}>${escapeHTML(initials(label))}</span>`;
     if (!url) {
-      return `<span class="${classes.join(" ")}"><span class="user-avatar-face">${fallback}</span>${options.guardian ? '<span class="user-avatar-dot"></span>' : ""}</span>`;
+      return `<span class="${classes.join(" ")}" aria-hidden="true"><span class="list-item-media-face">${fallback}</span>${options.guardian ? '<span class="list-item-media-dot"></span>' : ""}</span>`;
     }
 
     return `
-      <span class="${classes.join(" ")}">
-        <span class="user-avatar-face">
+      <span class="${classes.join(" ")}" aria-hidden="true">
+        <span class="list-item-media-face">
           <img
-            class="user-avatar-image"
+            class="list-item-media-image"
             src="${escapeHTML(url)}"
             alt=""
             onerror="this.hidden=true; if(this.nextElementSibling){ this.nextElementSibling.hidden=false; }"
           />
           ${fallback}
         </span>
-        ${options.guardian ? '<span class="user-avatar-dot"></span>' : ""}
+        ${options.guardian ? '<span class="list-item-media-dot"></span>' : ""}
       </span>
     `;
   }
@@ -141,26 +141,26 @@ window.huuperUserCard = (() => {
     };
   }
 
-  function renderBody(name, subline) {
+  function renderBody(name, meta) {
     return `
-      <span class="user-main">
-        <span class="user-copy">
+      <span class="list-item-main">
+        <span class="list-item-copy">
           <strong>${escapeHTML(name)}</strong>
-          ${subline ? `<span class="user-subline">${escapeHTML(subline)}</span>` : ""}
+          ${meta ? `<span class="list-item-meta">${escapeHTML(meta)}</span>` : ""}
         </span>
       </span>
     `;
   }
 
-  function renderSide(meta) {
-    if (!meta || (!meta.title && !meta.detail)) {
+  function renderSide(side) {
+    if (!side || (!side.title && !side.detail)) {
       return "";
     }
 
     return `
-      <span class="user-side${meta.tone ? ` user-side-${meta.tone}` : ""}">
-        ${meta.title ? `<span class="user-side-title">${escapeHTML(meta.title)}</span>` : ""}
-        ${meta.detail ? `<span class="user-side-detail">${escapeHTML(meta.detail)}</span>` : ""}
+      <span class="list-item-side${side.tone ? ` list-item-side-${side.tone}` : ""}">
+        ${side.title ? `<span class="list-item-side-title">${escapeHTML(side.title)}</span>` : ""}
+        ${side.detail ? `<span class="list-item-side-detail">${escapeHTML(side.detail)}</span>` : ""}
       </span>
     `;
   }
@@ -181,26 +181,28 @@ window.huuperUserCard = (() => {
 
   function renderRow(config) {
     const tag = config.tag || "article";
-    const rowClass = ["user-row"];
+    const classes = ["list-item"];
     if (config.menuData) {
-      rowClass.push("user-row-has-menu");
+      classes.push("list-item-has-menu");
     }
     if (config.linkable) {
-      rowClass.push("user-row-linkable");
+      classes.push("list-item-linkable");
     }
 
     const attrs = [];
     if (tag === "a" && config.href) {
       attrs.push(`href="${escapeHTML(config.href)}"`);
+    } else if (tag === "button") {
+      attrs.push(`type="button"`);
     } else if (config.href) {
       attrs.push(`data-href="${escapeHTML(config.href)}"`);
     }
 
     return `
-      <${tag} class="${rowClass.join(" ")}"${attrs.length > 0 ? ` ${attrs.join(" ")}` : ""}>
-        ${config.avatar}
-        ${renderBody(config.name, config.subline)}
-        ${renderSide(config.meta)}
+      <${tag} class="${classes.join(" ")}"${attrs.length > 0 ? ` ${attrs.join(" ")}` : ""}>
+        ${config.media}
+        ${renderBody(config.name, config.metaText)}
+        ${renderSide(config.side)}
         ${renderMenu(config.menuData)}
       </${tag}>
     `;
@@ -208,24 +210,19 @@ window.huuperUserCard = (() => {
 
   function renderMember(item, href) {
     const name = item.full_name || item.email || item.id || "";
-    const subline = subtitle(item);
-    const meta = trailing(item);
-
     return renderRow({
       tag: "a",
       href,
       name,
-      subline,
-      meta,
+      metaText: subtitle(item),
+      side: trailing(item),
       linkable: false,
-      avatar: renderAvatar(item, name, { guardian: item.is_guardian }),
+      media: renderMedia(item, name, { guardian: item.is_guardian }),
     });
   }
 
   function renderAttendee(item, href, options = {}) {
     const name = item.full_name || item.email || item.id || "";
-    const subline = attendeeSubtitle(item);
-    const meta = attendeeTrailing(item);
     const menuData = options.menu === false ? null : {
       id: item.id || "",
       user_id: item.user_id || "",
@@ -237,16 +234,29 @@ window.huuperUserCard = (() => {
       tag: "article",
       href: href || "",
       name,
-      subline,
-      meta,
+      metaText: attendeeSubtitle(item),
+      side: attendeeTrailing(item),
       linkable: Boolean(href),
       menuData,
-      avatar: renderAvatar(item, name),
+      media: renderMedia(item, name),
+    });
+  }
+
+  function renderSelectableMember(item) {
+    const name = item.full_name || item.email || item.id || "";
+    return renderRow({
+      tag: "button",
+      name,
+      metaText: subtitle(item),
+      side: trailing(item),
+      linkable: false,
+      media: renderMedia(item, name, { guardian: item.is_guardian }),
     });
   }
 
   return {
     renderMember,
     renderAttendee,
+    renderSelectableMember,
   };
 })();

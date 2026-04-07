@@ -1,0 +1,297 @@
+window.huuperRequestItem = (() => {
+  function text(value) {
+    return window.huuperListPage ? window.huuperListPage.text(value) : String(value || "").trim();
+  }
+
+  function escapeHTML(value) {
+    return window.huuperListPage ? window.huuperListPage.escapeHTML(value) : text(value);
+  }
+
+  function dateOnly(value) {
+    const raw = text(value);
+    if (!raw) {
+      return "";
+    }
+
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) {
+      return raw;
+    }
+
+    return new Intl.DateTimeFormat("it-IT", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }).format(parsed);
+  }
+
+  function dateTime(value) {
+    const raw = text(value);
+    if (!raw) {
+      return "";
+    }
+
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) {
+      return raw;
+    }
+
+    return new Intl.DateTimeFormat("it-IT", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(parsed);
+  }
+
+  function statusText(value) {
+    const raw = text(value);
+    if (!raw) {
+      return "";
+    }
+
+    const normalized = raw.replace(/^\d+-/, "").trim();
+    const labels = {
+      submitted: "Submitted",
+      assign_group: "Group assignment",
+      assign_guardian: "Guardian assignment",
+      guardian_assigned: "Mentoring",
+      mentoring: "Mentoring",
+      group_approved: "Group approval",
+      admin_approved: "Final approval",
+      rejected: "Rejected",
+      promoted: "Promoted",
+    };
+
+    if (labels[normalized]) {
+      return labels[normalized];
+    }
+
+    const humanized = normalized.replaceAll("_", " ").replaceAll("-", " ").trim();
+    if (!humanized) {
+      return "";
+    }
+
+    return humanized.charAt(0).toUpperCase() + humanized.slice(1);
+  }
+
+  function title(item) {
+    const data = item && typeof item.data === "object" ? item.data : {};
+    return escapeHTML(item.full_name || data.full_name || data.name || item.email || item.id || "");
+  }
+
+  function initials(value) {
+    const raw = text(value);
+    if (!raw) {
+      return "?";
+    }
+    const parts = raw.split(/\s+/).filter(Boolean).slice(0, 2);
+    if (parts.length === 0) {
+      return raw.slice(0, 2).toUpperCase();
+    }
+    return parts.map((part) => part[0] || "").join("").toUpperCase();
+  }
+
+  function row(label, value) {
+    const rendered = text(value);
+    if (!rendered) {
+      return "";
+    }
+    return `<p class="request-row"><span>${escapeHTML(label)}:</span> <strong>${escapeHTML(rendered)}</strong></p>`;
+  }
+
+  function notesText(value) {
+    const raw = text(value);
+    if (!raw) {
+      return "";
+    }
+    return raw;
+  }
+
+  function mentoringNotesHTML(item) {
+    const mentoringHTML = text(item.mentoring_notes_html);
+    if (mentoringHTML) {
+      return mentoringHTML;
+    }
+
+    const mentoringText = notesText(item.mentoring_notes);
+    if (mentoringText) {
+      return `<p>${escapeHTML(mentoringText)}</p>`;
+    }
+    return "";
+  }
+
+  function workflowNotesHTML(item) {
+    const workflow = item && typeof item.workflow === "object" ? item.workflow : {};
+    const rawHTML = text(workflow.next_action_notes_html);
+    if (rawHTML) {
+      return rawHTML;
+    }
+
+    const rawText = notesText(workflow.next_action_notes);
+    if (!rawText) {
+      return "";
+    }
+    return `<p>${escapeHTML(rawText)}</p>`;
+  }
+
+  function inlineMentoringNotes(item) {
+    const raw = notesText(item.mentoring_notes);
+    if (!raw || raw.includes("\n")) {
+      return "";
+    }
+    return raw;
+  }
+
+  function detailField(label, value) {
+    const rendered = text(value);
+    if (!rendered) {
+      return "";
+    }
+
+    const classes = ["request-detail-field"];
+    return `
+      <article class="${classes.join(" ")}">
+        <span class="request-detail-term">${escapeHTML(label)}</span>
+        <strong class="request-detail-description">${escapeHTML(rendered)}</strong>
+      </article>
+    `;
+  }
+
+  function ageText(birthYear) {
+    const parsed = Number.parseInt(text(birthYear), 10);
+    const currentYear = new Date().getFullYear();
+    if (!Number.isFinite(parsed) || parsed < 1900 || parsed > currentYear) {
+      return "";
+    }
+    return `${currentYear - parsed} anni`;
+  }
+
+  function requestAgeDays(createdAt) {
+    const raw = text(createdAt);
+    if (!raw) {
+      return "";
+    }
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) {
+      return "";
+    }
+    const diffMs = Date.now() - parsed.getTime();
+    const diffDays = Math.floor(diffMs / 86400000);
+    if (diffDays <= 0) {
+      return "";
+    }
+    return `${diffDays}d`;
+  }
+
+  function renderDetail(item, options = {}) {
+    const showNotes = options.showNotes !== false;
+    const data = item && typeof item.data === "object" ? item.data : {};
+    const inlineMentoring = inlineMentoringNotes(item);
+    const renderedMentoringNotes = showNotes && !inlineMentoring ? mentoringNotesHTML(item) : "";
+    const fullName = text(data.full_name || item.full_name || item.email || item.id);
+    const age = ageText(data.birth_year);
+    const location = text(data.region);
+    const meta = age && location
+      ? `${escapeHTML(age)} <span class="request-meta-dot" aria-hidden="true"></span> ${escapeHTML(location)}`
+      : age
+        ? escapeHTML(age)
+        : location
+          ? escapeHTML(location)
+          : "";
+    const details = [
+      detailField("Telefono", data.mobile),
+      detailField("Email", item.email),
+      detailField("Marital status", data.marital_status),
+      detailField("Figli", data.children),
+    ].filter(Boolean).join("");
+    const motivationText = text(data.motivation) || inlineMentoring;
+    const notesBlock = renderedMentoringNotes
+      ? `<div class="request-rich-text"><div>${renderedMentoringNotes}</div></div>`
+      : "";
+
+    return `
+      <article class="request-sheet">
+        <header class="request-sheet-header">
+          <div class="request-identity">
+            <span class="request-eyebrow">Full name</span>
+            <h1 class="request-title">${escapeHTML(fullName)}</h1>
+            ${meta ? `<p class="request-subtitle">${meta}</p>` : ""}
+          </div>
+        </header>
+        <section class="request-info-grid">${details}</section>
+        ${motivationText ? `
+          <section class="request-motivation">
+            <span class="request-detail-term">Motivation</span>
+            <blockquote class="request-motivation-quote">"${escapeHTML(motivationText)}"</blockquote>
+          </section>
+        ` : ""}
+        ${notesBlock}
+      </article>
+    `;
+  }
+
+  function actionHref(item, options = {}) {
+    const workflow = item && typeof item.workflow === "object" ? item.workflow : {};
+    const action = text(workflow.current_action || workflow.next_action);
+    if (workflow.can_advance !== true) {
+      return "";
+    }
+    if (action === "assign_group" && typeof options.assignGroupURL === "function") {
+      return options.assignGroupURL(item.id);
+    }
+    if (action === "assign_guardian" && typeof options.assignGuardianURL === "function") {
+      return options.assignGuardianURL(item.id);
+    }
+    return "";
+  }
+
+  function requestMeta(item) {
+    const parts = [];
+    const data = item && typeof item.data === "object" ? item.data : {};
+    const region = text(item.region || data.region);
+    const rawBirthYear = text(item.birth_year || data.birth_year);
+    const birthYear = Number.parseInt(rawBirthYear, 10);
+    const currentYear = new Date().getFullYear();
+
+    if (region) {
+      parts.push(region);
+    }
+    if (Number.isFinite(birthYear) && birthYear > 1900 && birthYear <= currentYear) {
+      parts.push(`${currentYear - birthYear} years`);
+    }
+
+    return parts.join(" • ");
+  }
+
+  function renderListItem(item, href, options = {}) {
+    const displayTitle = item.full_name || (item.data && (item.data.full_name || item.data.name)) || item.email || item.id;
+    const safeTitle = escapeHTML(displayTitle);
+    const meta = requestMeta(item);
+    const workflow = item && typeof item.workflow === "object" ? item.workflow : {};
+    const status = text(workflow.current_action_label) || statusText(item.status_label || item.status);
+    const nextHref = actionHref(item, options);
+    const side = status
+      ? (nextHref
+          ? `<button type="button" class="list-item-side request-item-action" data-request-id="${escapeHTML(item.id)}" data-action-href="${escapeHTML(nextHref)}"><span class="list-item-side-title request-item-status">${escapeHTML(status)}</span></button>`
+          : `<span class="list-item-side"><span class="list-item-side-title request-item-status">${escapeHTML(status)}</span></span>`)
+      : "";
+
+    return `
+      <article class="list-item request-item">
+        <a href="${escapeHTML(href)}" class="list-item-copy request-item-copy">
+          <strong>${safeTitle}</strong>
+          ${meta ? `<span class="list-item-meta request-item-meta">${escapeHTML(meta)}</span>` : ""}
+        </a>
+        ${side}
+      </article>
+    `;
+  }
+
+  return {
+    renderDetail,
+    renderListItem,
+    statusText,
+  };
+})();

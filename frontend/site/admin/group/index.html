@@ -15,9 +15,9 @@
   <script src="/assets/js/core/guard-admin.js" defer></script>
   <script src="/assets/js/core/back.js" defer></script>
   <script src="/assets/js/core/list-page.js" defer></script>
-  <script src="/assets/js/components/request-card.js" defer></script>
-  <script src="/assets/js/components/group-card.js" defer></script>
-  <script src="/assets/js/components/user-card.js" defer></script>
+  <script src="/assets/js/components/request-item.js" defer></script>
+  <script src="/assets/js/components/group-meta.js" defer></script>
+  <script src="/assets/js/components/list-item.js" defer></script>
   <script src="/assets/js/components/group-detail.js" defer></script>
   <script src="/assets/js/admin/group.js" defer></script>
 </head>
@@ -51,7 +51,7 @@
     <main class="app">
       <section class="app-shell">
         
-<header class="top-bar">
+<header class="top-bar top-bar-detail-page">
   
     <button class="topbar-back" type="button" data-back aria-label="Back"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0"/></svg></button>
   
@@ -68,10 +68,10 @@
   <button id="group-tab-pending" class="section-tab" type="button">Pending</button>
 </section>
 <section id="group-members-section" hidden>
-  <section id="group-members" class="list-card user-list"></section>
+  <section id="group-members" class="list-card list-card-default"></section>
 </section>
 <section id="group-pending-section" hidden>
-  <section id="group-pending" class="list-card user-list"></section>
+  <section id="group-pending" class="list-card list-card-default"></section>
 </section>
 
       </section>

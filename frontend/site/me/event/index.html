@@ -16,8 +16,8 @@
   <script src="/assets/js/core/back.js" defer></script>
   <script src="/assets/js/core/list-page.js" defer></script>
   <script src="/assets/js/components/action-sheet.js" defer></script>
-  <script src="/assets/js/components/event-card.js" defer></script>
-  <script src="/assets/js/components/user-card.js" defer></script>
+  <script src="/assets/js/components/event-summary.js" defer></script>
+  <script src="/assets/js/components/list-item.js" defer></script>
   <script src="/assets/js/components/event-detail.js" defer></script>
   <script src="/assets/js/me/event.js" defer></script>
 </head>
@@ -68,7 +68,7 @@
   <button id="event-tab-guests" class="section-tab" type="button">Guests</button>
   <button id="event-tab-pending" class="section-tab" type="button">Pending</button>
 </section>
-<section id="event-registrations" class="list-card user-list" hidden></section>
+<section id="event-registrations" class="list-card list-card-default" hidden></section>
 <section id="event-cancelled-block" class="event-secondary-block" hidden>
   <button id="event-cancelled-toggle" class="event-secondary-toggle" type="button" aria-expanded="false">
     <span class="event-secondary-copy">
@@ -81,7 +81,7 @@
       </svg>
     </span>
   </button>
-  <section id="event-cancelled-list" class="list-card user-list" hidden></section>
+  <section id="event-cancelled-list" class="list-card list-card-default" hidden></section>
 </section>
 
       </section>

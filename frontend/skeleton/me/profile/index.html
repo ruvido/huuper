@@ -1,18 +1,2 @@
-{{ define "content" }}
-<section class="panel">
-  <div class="view-stack">
-    <div class="data-block">
-      <span class="data-label">Email</span>
-      <strong class="data-value" id="profile-email"></strong>
-    </div>
-    <div class="data-block">
-      <span class="data-label">Telegram</span>
-      <strong class="data-value" id="profile-telegram"></strong>
-    </div>
-  </div>
-  <div class="action-row">
-    <button class="primary" type="button" data-logout>Logout</button>
-  </div>
-</section>
-{{ end }}
+{{ define "content" }}{{ template "profile-content" . }}{{ end }}
 {{ define "page" }}{{ template "layout-me" (dict "Title" "Huuper / Me / Profile" "TopbarTitle" "Profile" "BackHref" "" "BackHistory" true "ProfileHref" "" "ActiveNav" "" "Scripts" (list "/assets/js/core/auth.js" "/assets/js/core/guard-me.js" "/assets/js/core/back.js" "/assets/js/core/profile.js" "/assets/js/core/logout.js")) }}{{ end }}

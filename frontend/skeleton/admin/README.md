@@ -7,3 +7,5 @@ Wireframe iniziale:
 - requests
 - events
 - groups
+
+I blocchi condivisi stanno in `components/`; `admin/` definisce solo le pagine e i flussi specifici dell'area amministrativa.

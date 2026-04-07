@@ -1,0 +1,93 @@
+
+<!doctype html>
+<html lang="en">
+  
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Huuper / Admin / Assign Group</title>
+  <link rel="icon" href="/assets/favicon/favicon.ico" sizes="any" />
+  <link rel="apple-touch-icon" href="/assets/favicon/apple-touch-icon.png" />
+  <script src="/copy/brand.js"></script>
+  <link rel="stylesheet" href="/assets/css/app.css" />
+  <script src="/assets/js/core/topbar.js" defer></script>
+  <script src="/assets/js/core/auth.js" defer></script>
+  <script src="/assets/js/core/guard-admin.js" defer></script>
+  <script src="/assets/js/core/back.js" defer></script>
+  <script src="/assets/js/core/list-page.js" defer></script>
+  <script src="/assets/js/components/action-sheet.js" defer></script>
+  <script src="/assets/js/components/group-meta.js" defer></script>
+  <script src="/assets/js/components/list-item.js" defer></script>
+  <script src="/assets/js/components/request-assignment.js" defer></script>
+  <script src="/assets/js/admin/request-assign-group.js" defer></script>
+</head>
+
+  <body class="admin">
+    
+<script>
+  (() => {
+    const expectedScope = "admin";
+    const storageKey = "huuper.auth";
+    let auth = null;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      auth = raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      auth = null;
+    }
+
+    if (!auth || !auth.token) {
+      window.location.replace("/");
+      return;
+    }
+
+    const actualScope = auth && auth.model && auth.model.admin === true ? "admin" : "me";
+    if (actualScope !== expectedScope) {
+      window.location.replace(actualScope === "admin" ? "/admin/" : "/me/");
+    }
+  })();
+</script>
+
+    <main class="app">
+      <section class="app-shell">
+        
+<header class="top-bar">
+  
+    <button class="topbar-back" type="button" data-back aria-label="Back"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0"/></svg></button>
+  
+  <div class="top-bar-title">Assign group</div>
+  
+    <a class="topbar-profile" href="/admin/profile/" aria-label="Profile" data-topbar-profile><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.468 12.37C12.758 11.226 11.195 10 8 10s-4.757 1.225-5.468 2.37A6.99 6.99 0 0 0 8 15a6.99 6.99 0 0 0 5.468-2.63"/><path fill-rule="evenodd" d="M8 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6m0 1A4 4 0 1 0 8 2a4 4 0 0 0 0 8"/><path fill-rule="evenodd" d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1"/></svg></a>
+  
+</header>
+
+        
+<p id="request-assignment-status" class="meta-text"></p>
+<section id="request-assignment-list" class="list-card" hidden></section>
+
+      </section>
+    </main>
+    
+<nav class="bottom-nav" aria-label="Admin primary">
+  <a class="nav-item" href="/admin/">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0 1 4v8l7 4 7-4V4zm5.5 4.866L8 8 2.5 4.866 8 1.723zM2 5.732l5.5 3.134v5.411L2 11.134zm6.5 8.545V8.866L14 5.732v5.402z"/></svg>
+    <span>Dashboard</span>
+  </a>
+  <a class="nav-item" href="/admin/groups/">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6m-5.784 6A2.24 2.24 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.3 6.3 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1zM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5"/></svg>
+    <span>Groups</span>
+  </a>
+  <a class="nav-item" href="/admin/events/">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 .5a.5.5 0 0 0-1 0V1H2a2 2 0 0 0-2 2v1h16V3a2 2 0 0 0-2-2h-1V.5a.5.5 0 0 0-1 0V1H4zM16 14V5H0v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2m-3.5-7h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5"/></svg>
+    <span>Events</span>
+  </a>
+  <a class="nav-item nav-item-current" href="/admin/requests/">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.98 4a.5.5 0 0 0-.39.188L1.54 8H6a.5.5 0 0 1 .5.5 1.5 1.5 0 1 0 3 0A.5.5 0 0 1 10 8h4.46l-3.05-3.812A.5.5 0 0 0 11.02 4zm-1.17-.437A1.5 1.5 0 0 1 4.98 3h6.04a1.5 1.5 0 0 1 1.17.563l3.7 4.625a.5.5 0 0 1 .106.374l-.39 3.124A1.5 1.5 0 0 1 14.117 13H1.883a1.5 1.5 0 0 1-1.489-1.314l-.39-3.124a.5.5 0 0 1 .106-.374z"/></svg>
+    <span>Requests</span>
+  </a>
+</nav>
+
+  
+  <script src="/assets/js/core/hot-reload.js" defer></script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-window.huuperGroupCard = (() => {
+window.huuperGroupMeta = (() => {
   function text(value) {
     return window.huuperListPage.text(value);
   }
@@ -62,6 +62,7 @@ window.huuperGroupCard = (() => {
   }
 
   return {
+    groupMeta,
     renderSummary,
     memberMeta,
   };
