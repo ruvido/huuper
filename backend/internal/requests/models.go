@@ -24,6 +24,11 @@ type ActionPayload struct {
 	MentoringNotes string `json:"mentoring_notes"`
 }
 
+type RequestFlowSnapshot struct {
+	Version int        `json:"version"`
+	Steps   []FlowStep `json:"steps"`
+}
+
 type ListItem struct {
 	ID          string         `json:"id"`
 	Email       string         `json:"email"`
@@ -64,9 +69,11 @@ type GuardianRequestItem struct {
 }
 
 const (
-	ActionAdvance     = "advance"
-	ActionReject      = "reject"
-	ActionPromote     = "promote"
-	ActionSetGroup    = "set_group"
-	ActionSetGuardian = "set_guardian"
+	ActionReject          = "reject"
+	ActionPromote         = "promote"
+	ActionSetGroup        = "set_group"
+	ActionSetGuardian     = "set_guardian"
+	ActionSetMentoring    = "set_mentoring_done"
+	ActionSetGroupApprove = "set_group_approved"
+	ActionSetAdminApprove = "set_admin_approved"
 )

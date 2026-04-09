@@ -80,7 +80,8 @@ window.huuperRequestAssignmentSheet = (() => {
 
     window.huuperAuth.apiFetch(config.detailURL(config.requestID)).then((payload) => {
       const workflow = payload && typeof payload.workflow === "object" ? payload.workflow : {};
-      const mode = text(workflow.current_action || workflow.next_action) === "assign_guardian" ? "guardian" : "group";
+      const action = text(workflow.current_action || workflow.next_action);
+      const mode = action === "set_guardian" ? "guardian" : "group";
       const options = workflow.options || {};
       const items = mode === "guardian"
         ? (Array.isArray(options.guardians) ? options.guardians : [])
@@ -105,7 +106,7 @@ window.huuperRequestAssignmentSheet = (() => {
               return;
             }
             button.disabled = true;
-            const body = { action: "advance" };
+            const body = { action };
             if (mode === "guardian") {
               body.guardian = selectedID;
             } else {

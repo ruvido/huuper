@@ -52,24 +52,39 @@ window.huuperRequestDetail = (() => {
     }
     function renderWorkflow(payload) {
       const workflow = payload && typeof payload.workflow === "object" ? payload.workflow : {};
-      if (!workflow.can_advance) {
+      const canTakeAction = workflow.can_take_action === true;
+      const canReject = workflow.can_reject === true;
+      if (!canTakeAction && !canReject) {
         workflowNode.hidden = true;
         workflowNode.innerHTML = "";
         return;
       }
 
       const requiredField = workflow.required_field || "";
-      const actionLabel = actionText(workflow.next_action || workflow.current_action);
+      const action = text(workflow.current_action || workflow.next_action);
       const parts = [`<article class="request-workflow-card">`];
-      if (requiredField === "mentoring_notes") {
+      if (canTakeAction && requiredField === "mentoring_notes") {
         parts.push(`<label class="form-field"><span>Mentoring notes</span><textarea id="request-mentoring-notes"></textarea></label>`);
       }
-      parts.push(`<div class="action-row request-page-actions"><button id="request-advance" class="primary" type="button">${window.huuperListPage.escapeHTML(actionLabel)}</button><button id="request-reject" class="request-reject-button" type="button">Reject</button></div>`);
+      const actions = [];
+      if (canTakeAction && action) {
+        const actionLabel = text(workflow.current_action_label || workflow.next_action_label) || actionText(action);
+        actions.push(`<button id="request-action" class="primary" type="button">${window.huuperListPage.escapeHTML(actionLabel)}</button>`);
+      }
+      if (canReject) {
+        actions.push(`<button id="request-reject" class="request-reject-button" type="button">Reject</button>`);
+      }
+      if (actions.length === 0) {
+        workflowNode.hidden = true;
+        workflowNode.innerHTML = "";
+        return;
+      }
+      parts.push(`<div class="action-row request-page-actions">${actions.join("")}</div>`);
       parts.push(`</article>`);
       workflowNode.innerHTML = parts.join("");
       workflowNode.hidden = false;
 
-      const button = workflowNode.querySelector("#request-advance");
+      const button = workflowNode.querySelector("#request-action");
       const rejectButton = workflowNode.querySelector("#request-reject");
 
       if (rejectButton) {
@@ -123,44 +138,49 @@ window.huuperRequestDetail = (() => {
         });
       }
 
-      button.addEventListener("click", async () => {
-        if ((requiredField === "group" || requiredField === "guardian") && window.huuperRequestAssignmentSheet) {
-          window.huuperRequestAssignmentSheet.open({
-            requestID: id,
-            requestsURL: config.requestsURL,
-            detailURL: config.detailURL,
-            actionURL: config.actionURL,
-          });
-          return;
-        }
-
-        const body = { action: "advance" };
-        if (requiredField === "mentoring_notes") {
-          body.mentoring_notes = text(workflowNode.querySelector("#request-mentoring-notes").value);
-          if (!body.mentoring_notes) {
-            window.huuperListPage.setStatus(statusNode, "Write notes.");
+      if (button) {
+        button.addEventListener("click", async () => {
+          if (!action) {
             return;
           }
-        }
-
-        try {
-          button.disabled = true;
-          window.huuperListPage.setStatus(statusNode, "");
-          await window.huuperAuth.apiFetch(config.actionURL(id), {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          });
-          redirectToRequests(config.requestsURL);
-        } catch (error) {
-          if (error && error.message === "missing_mentoring_notes") {
-            window.huuperListPage.setStatus(statusNode, "Write notes.");
-          } else {
-            window.huuperListPage.setStatus(statusNode, "Action unavailable.");
+          if ((requiredField === "group" || requiredField === "guardian") && window.huuperRequestAssignmentSheet) {
+            window.huuperRequestAssignmentSheet.open({
+              requestID: id,
+              requestsURL: config.requestsURL,
+              detailURL: config.detailURL,
+              actionURL: config.actionURL,
+            });
+            return;
           }
-          button.disabled = false;
-        }
-      });
+
+          const body = { action };
+          if (requiredField === "mentoring_notes") {
+            body.mentoring_notes = text(workflowNode.querySelector("#request-mentoring-notes").value);
+            if (!body.mentoring_notes) {
+              window.huuperListPage.setStatus(statusNode, "Write notes.");
+              return;
+            }
+          }
+
+          try {
+            button.disabled = true;
+            window.huuperListPage.setStatus(statusNode, "");
+            await window.huuperAuth.apiFetch(config.actionURL(id), {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            });
+            redirectToRequests(config.requestsURL);
+          } catch (error) {
+            if (error && error.message === "missing_mentoring_notes") {
+              window.huuperListPage.setStatus(statusNode, "Write notes.");
+            } else {
+              window.huuperListPage.setStatus(statusNode, "Action unavailable.");
+            }
+            button.disabled = false;
+          }
+        });
+      }
     }
 
     window.huuperAuth.apiFetch(config.detailURL(id)).then((payload) => {

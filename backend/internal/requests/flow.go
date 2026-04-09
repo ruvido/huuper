@@ -61,6 +61,7 @@ type FlowConfig struct {
 
 const (
 	FlowVersionDataKey = "__flow_version"
+	RequestFlowDataKey = "__request_flow"
 )
 
 var allowedRoles = map[string]struct{}{
@@ -316,6 +317,11 @@ func ParseVersion(raw any) int {
 func FlowVersionFromData(data map[string]any) int {
 	flowVersion := ParseVersion(data[FlowVersionDataKey])
 	if flowVersion < 1 {
+		if snapshot, ok := RequestFlowSnapshotFromData(data); ok {
+			return snapshot.Version
+		}
+	}
+	if flowVersion < 1 {
 		return 1
 	}
 	return flowVersion
@@ -421,4 +427,38 @@ func ApplyStepAction(app core.App, actor *core.Record, record *core.Record, data
 		return nil
 	}
 	return spec.Apply(app, actor, record, data, payload, step)
+}
+
+func ActionForFlowAction(action string) string {
+	switch strings.TrimSpace(action) {
+	case FlowActionAssignGroup:
+		return ActionSetGroup
+	case FlowActionAssignGuardian:
+		return ActionSetGuardian
+	case FlowActionMentoring:
+		return ActionSetMentoring
+	case FlowActionGroupApproved:
+		return ActionSetGroupApprove
+	case FlowActionAdminApproved:
+		return ActionSetAdminApprove
+	default:
+		return ""
+	}
+}
+
+func FlowActionForAction(action string) string {
+	switch strings.TrimSpace(action) {
+	case ActionSetGroup:
+		return FlowActionAssignGroup
+	case ActionSetGuardian:
+		return FlowActionAssignGuardian
+	case ActionSetMentoring:
+		return FlowActionMentoring
+	case ActionSetGroupApprove:
+		return FlowActionGroupApproved
+	case ActionSetAdminApprove:
+		return FlowActionAdminApproved
+	default:
+		return ""
+	}
 }

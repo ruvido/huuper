@@ -70,7 +70,7 @@ window.huuperRequestListPage = (() => {
         const workflow = item && typeof item.workflow === "object" ? item.workflow : {};
         const nextRole = text(workflow.next_role);
         const allowedRoles = Array.isArray(config.roles) ? config.roles : [];
-        return workflow.can_advance === true && allowedRoles.includes(nextRole);
+        return workflow.can_take_action === true && allowedRoles.includes(nextRole);
       });
     }
 

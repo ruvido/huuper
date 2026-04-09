@@ -46,7 +46,7 @@ func SubmitRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 
 		record := core.NewRecord(requestsCollection)
 		record.Set("email", email)
-		data[backendrequests.FlowVersionDataKey] = flow.Version
+		data = backendrequests.SetRequestFlowSnapshot(data, flow)
 		record.Set("data", data)
 		record.Set("rejected", false)
 		if err := app.Save(record); err != nil {

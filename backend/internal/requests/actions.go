@@ -11,37 +11,61 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
-func ApplyAdvanceAction(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any, payload ActionPayload) error {
+func expectedCurrentStep(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any, expectedAction string) (FlowConfig, FlowStep, error) {
 	if record.GetBool("rejected") {
-		return apis.NewBadRequestError("request_rejected", nil)
+		return FlowConfig{}, FlowStep{}, apis.NewBadRequestError("request_rejected", nil)
 	}
 
-	flow, err := LoadFlowSettings(app)
+	flow, err := LoadFlowForRequest(app, data)
 	if err != nil {
-		return apis.NewBadRequestError("invalid_requests_flow_settings", err)
+		return FlowConfig{}, FlowStep{}, apis.NewBadRequestError("invalid_requests_flow_settings", err)
 	}
 
 	stepIndex := EffectiveStepIndex(record, data, flow)
 	nextStep, hasNext := FlowStepAt(flow, stepIndex)
 	if !hasNext {
-		return apis.NewBadRequestError("last_step_reached", nil)
+		return FlowConfig{}, FlowStep{}, apis.NewBadRequestError("last_step_reached", nil)
+	}
+	if nextStep.Action != expectedAction {
+		return FlowConfig{}, FlowStep{}, apis.NewBadRequestError("invalid_current_step", nil)
 	}
 
 	ok, err := backendinternal.HasRoleForRequest(app, actor, record, nextStep.Role, RoleAdmin, RoleGuardian, RoleAssistant)
 	if err != nil {
-		return apis.NewBadRequestError("role_resolution_failed", err)
+		return FlowConfig{}, FlowStep{}, apis.NewBadRequestError("role_resolution_failed", err)
 	}
 	if !ok {
-		return apis.NewForbiddenError("forbidden_transition", nil)
+		return FlowConfig{}, FlowStep{}, apis.NewForbiddenError("forbidden_transition", nil)
+	}
+
+	return flow, nextStep, nil
+}
+
+func applyExpectedStepAction(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any, payload ActionPayload, expectedAction string) error {
+	flow, nextStep, err := expectedCurrentStep(app, actor, record, data, expectedAction)
+	if err != nil {
+		return err
 	}
 
 	if err := ApplyStepAction(app, actor, record, data, payload, nextStep); err != nil {
 		return err
 	}
 
-	data[FlowVersionDataKey] = flow.Version
+	data = SetRequestFlowSnapshot(data, flow)
 	record.Set("data", data)
 	return nil
+}
+
+func ApplySetMentoringAction(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any, payload ActionPayload) error {
+	return applyExpectedStepAction(app, actor, record, data, payload, FlowActionMentoring)
+}
+
+func ApplySetGroupApprovedAction(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any, payload ActionPayload) error {
+	return applyExpectedStepAction(app, actor, record, data, payload, FlowActionGroupApproved)
+}
+
+func ApplySetAdminApprovedAction(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any, payload ActionPayload) error {
+	return applyExpectedStepAction(app, actor, record, data, payload, FlowActionAdminApproved)
 }
 
 func ApplyRejectAction(actor *core.Record, record *core.Record, data map[string]any, reason string) error {
@@ -64,64 +88,41 @@ func ApplyRejectAction(actor *core.Record, record *core.Record, data map[string]
 }
 
 func ApplySetGuardianAction(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any, guardianID string) error {
-	if record.GetBool("rejected") {
-		return apis.NewBadRequestError("request_rejected", nil)
-	}
-
-	flow, err := LoadFlowSettings(app)
+	flow, step, err := expectedCurrentStep(app, actor, record, data, FlowActionAssignGuardian)
 	if err != nil {
-		return apis.NewBadRequestError("invalid_requests_flow_settings", err)
-	}
-
-	ok, err := backendinternal.HasRoleForRequest(app, actor, record, RoleAssistant, RoleAdmin, RoleGuardian, RoleAssistant)
-	if err != nil {
-		return apis.NewBadRequestError("role_resolution_failed", err)
-	}
-	if !ok {
-		return apis.NewForbiddenError("forbidden_transition", nil)
+		return err
 	}
 
 	if guardianID == "" {
 		record.Set("guardian", "")
 		delete(data, "guardian")
 		ResetStepsAfterAction(flow, record, data, FlowActionAssignGuardian)
+		data = SetRequestFlowSnapshot(data, flow)
 		record.Set("data", data)
 		return nil
 	}
 
-	if err := applyGuardianAssignment(app, record, data, actor, guardianID, FilterGroupMembers); err != nil {
+	if err := applyGuardianAssignment(app, record, data, actor, guardianID, step.Filter); err != nil {
 		return err
 	}
 	ResetStepsAfterAction(flow, record, data, FlowActionAssignGuardian)
+	data = SetRequestFlowSnapshot(data, flow)
 	record.Set("data", data)
 	return nil
 }
 
 func ApplySetGroupAction(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any, groupID string) error {
-	if record.GetBool("rejected") {
-		return apis.NewBadRequestError("request_rejected", nil)
-	}
-
-	flow, err := LoadFlowSettings(app)
+	flow, step, err := expectedCurrentStep(app, actor, record, data, FlowActionAssignGroup)
 	if err != nil {
-		return apis.NewBadRequestError("invalid_requests_flow_settings", err)
+		return err
 	}
 
-	ok, err := backendinternal.HasRoleForRequest(app, actor, record, RoleAssistant, RoleAdmin, RoleGuardian, RoleAssistant)
-	if err != nil {
-		return apis.NewBadRequestError("role_resolution_failed", err)
-	}
-	if !ok {
-		if actor == nil || !actor.GetBool("admin") {
-			return apis.NewForbiddenError("forbidden_transition", nil)
-		}
-	}
-
-	if err := applyGroupAssignment(app, record, strings.TrimSpace(groupID), ""); err != nil {
+	if err := applyGroupAssignment(app, record, strings.TrimSpace(groupID), step.Filter); err != nil {
 		return err
 	}
 
 	ResetStepsAfterAction(flow, record, data, FlowActionAssignGroup)
+	data = SetRequestFlowSnapshot(data, flow)
 	record.Set("data", data)
 	return nil
 }
@@ -134,7 +135,7 @@ func ApplyPromoteAction(app *pocketbase.PocketBase, actor *core.Record, record *
 		return "", apis.NewBadRequestError("request_rejected", nil)
 	}
 
-	flow, err := LoadFlowSettings(app)
+	flow, err := LoadFlowForRequest(app, data)
 	if err != nil {
 		return "", apis.NewBadRequestError("invalid_requests_flow_settings", err)
 	}

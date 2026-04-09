@@ -1,4 +1,6 @@
 # PocketBase
+.codex
+.claude
 frontend/site
 .cache
 data/

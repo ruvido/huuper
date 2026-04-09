@@ -37,23 +37,7 @@ func upsertRequestsFlowSetting(app core.App, settings *core.Collection) error {
 		record.Set("name", "requests_flow")
 	}
 
-	record.Set("data", map[string]any{
-		"statuses": []string{
-			"1-submitted",
-			"2-group_assigned",
-			"3-guardian_assigned",
-			"4-mentoring",
-			"5-group_approved",
-			"6-admin_approved",
-		},
-		"set_status_by": map[string]string{
-			"2-group_assigned":    "admin",
-			"3-guardian_assigned": "assistant",
-			"4-mentoring":         "guardian",
-			"5-group_approved":    "assistant",
-			"6-admin_approved":    "admin",
-		},
-	})
+	record.Set("data", defaultRequestsFlowSettingsData())
 
 	return app.Save(record)
 }

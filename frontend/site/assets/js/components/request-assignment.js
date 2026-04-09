@@ -74,6 +74,8 @@ window.huuperRequestAssignment = (() => {
       button.addEventListener("click", () => {
         const choiceID = text(button.getAttribute("data-choice"));
         const choiceName = text(button.getAttribute("data-choice-label"));
+        const workflow = payload && typeof payload.workflow === "object" ? payload.workflow : {};
+        const action = text(workflow.current_action || workflow.next_action);
         window.huuperActionSheet.open({
           title: text(payload.full_name || payload.email || payload.id),
           meta: mode === "group" ? `Assign to ${choiceName}` : `Assign guardian ${choiceName}`,
@@ -83,7 +85,7 @@ window.huuperRequestAssignment = (() => {
               onSelect: async () => {
                 try {
                   window.huuperListPage.setStatus(statusNode, "");
-                  const body = { action: "advance" };
+                  const body = { action };
                   if (mode === "group") {
                     body.group = choiceID;
                   } else {
@@ -124,7 +126,8 @@ window.huuperRequestAssignment = (() => {
     window.huuperAuth.apiFetch(config.detailURL(requestID)).then((payload) => {
       const workflow = payload && typeof payload.workflow === "object" ? payload.workflow : {};
       const requiredField = text(workflow.required_field);
-      if (!workflow.can_advance || requiredField !== config.mode) {
+      const expectedAction = config.mode === "group" ? "set_group" : "set_guardian";
+      if (workflow.can_take_action !== true || requiredField !== config.mode || text(workflow.current_action || workflow.next_action) !== expectedAction) {
         window.huuperListPage.setStatus(statusNode, "Action unavailable.");
         return;
       }

@@ -4,7 +4,7 @@ Smoke test operativi per il backend v2.
 
 ## File
 - `run.sh`: entrypoint unico per lo smoke test `public / me / admin`
-- `request_notifications.sh`: smoke interattivo per verificare le email del request flow passo per passo
+- `request_notifications.sh`: smoke interattivo per verificare il request flow passo per passo e le email attese
 - `auth_admin.sh`: ottiene un token admin da `scripts/.env`
 - `auth_member.sh`: ottiene un token member da `scripts/.env`
 
@@ -36,4 +36,12 @@ Per verificare le email del request flow in modo interattivo:
 scripts/smoke/request_notifications.sh
 ```
 
-Lo script crea una request con email `requests.smoke.<timestamp>@realmen.it` e chiede conferma prima di ogni step che dovrebbe inviare un'email.
+Lo script crea una request con email `requests.smoke.<timestamp>@realmen.it` e chiede conferma prima di ogni step del flow:
+
+- `set_group`
+- `set_guardian`
+- `set_mentoring_done`
+- `set_group_approved`
+- `set_admin_approved`
+
+Per ogni step mostra quale email ti aspetti di vedere.

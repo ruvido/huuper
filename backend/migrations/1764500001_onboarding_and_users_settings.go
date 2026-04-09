@@ -35,45 +35,60 @@ func ensureRequestsFlowSettings(app core.App, settings *core.Collection) error {
 	if err != nil || record == nil {
 		record = core.NewRecord(settings)
 		record.Set("name", "requests_flow")
-		record.Set("data", map[string]any{
-			"statuses": []string{
-				"1-submitted",
-				"2-group_assigned",
-				"3-guardian_assigned",
-				"4-mentoring",
-				"5-group_approved",
-				"6-admin_approved",
-			},
-			"set_status_by": map[string]string{
-				"2-group_assigned":    "admin",
-				"3-guardian_assigned": "assistant",
-				"4-mentoring":         "guardian",
-				"5-group_approved":    "assistant",
-				"6-admin_approved":    "admin",
-			},
-		})
+		record.Set("data", defaultRequestsFlowSettingsData())
 		return app.Save(record)
 	}
 
-	data := map[string]any{}
-	_ = record.UnmarshalJSONField("data", &data)
-	data["statuses"] = []string{
-		"1-submitted",
-		"2-group_assigned",
-		"3-guardian_assigned",
-		"4-mentoring",
-		"5-group_approved",
-		"6-admin_approved",
-	}
-	data["set_status_by"] = map[string]string{
-		"2-group_assigned":    "admin",
-		"3-guardian_assigned": "assistant",
-		"4-mentoring":         "guardian",
-		"5-group_approved":    "assistant",
-		"6-admin_approved":    "admin",
-	}
-	record.Set("data", data)
+	record.Set("data", defaultRequestsFlowSettingsData())
 	return app.Save(record)
+}
+
+func defaultRequestsFlowSettingsData() map[string]any {
+	return map[string]any{
+		"version": 1,
+		"steps": []map[string]any{
+			{
+				"role":             "admin",
+				"action":           "assign_group",
+				"label":            "Assegna gruppo",
+				"filter":           "local",
+				"email_to":         "assistant",
+				"telegram_message": true,
+			},
+			{
+				"role":             "assistant",
+				"action":           "assign_guardian",
+				"label":            "Assegna guardian",
+				"filter":           "group_members",
+				"email_to":         "guardian",
+				"telegram_message": false,
+			},
+			{
+				"role":             "guardian",
+				"action":           "mentoring",
+				"label":            "Mentoring",
+				"notes":            "Consulta note su come fare l'angelo custode",
+				"email_to":         "assistant",
+				"telegram_message": false,
+			},
+			{
+				"role":             "assistant",
+				"action":           "group_approved",
+				"label":            "Approvazione gruppo",
+				"notes":            "Per approvare una richiesta è necessaria una votazione del gruppo",
+				"email_to":         "admin",
+				"telegram_message": false,
+			},
+			{
+				"role":             "admin",
+				"action":           "admin_approved",
+				"label":            "In verifica",
+				"notes":            "In attesa di approvazione finale.",
+				"email_to":         "candidate",
+				"telegram_message": true,
+			},
+		},
+	}
 }
 
 func ensureUsersSettings(app core.App, settings *core.Collection) error {

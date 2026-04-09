@@ -87,18 +87,16 @@ The project follows these principles:
 - **Best practices only**: Follow official conventions
 - **Zero redundancy**: Avoid complex and duplicated code
 
-## Request Notifications
+## Request Pipeline
 
-Request notifications are configured through PocketBase settings and templates:
+The request pipeline is configured in PocketBase through `settings.requests_flow`.
 
-- `settings.requests_flow` controls the workflow steps.
-- Each step can define:
-  - `email_to`: `admin`, `assistant`, `guardian`, or `candidate`
-  - `telegram_message`: `true` to send a Telegram message to the request group
-- New request submissions send an email to `settings.email.admin`.
-- Notification content lives in the `templates` collection.
+- The configured step actions are `assign_group`, `assign_guardian`, `mentoring`, `group_approved`, `admin_approved`.
+- The runtime API exposes explicit action names: `set_group`, `set_guardian`, `set_mentoring_done`, `set_group_approved`, `set_admin_approved`.
+- Each request stores a snapshot of the active flow when it is created, so later settings changes do not rewrite requests already in progress.
+- Notification routing and content are also driven by the same flow configuration plus PocketBase templates.
 
-See [`docs/REQUESTS_NOTIFICATIONS.md`](docs/REQUESTS_NOTIFICATIONS.md) for the full schema.
+See [`docs/REQUESTS_NOTIFICATIONS.md`](docs/REQUESTS_NOTIFICATIONS.md) for the compact reference.
 
 ## Avatar upload test
 

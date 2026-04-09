@@ -21,11 +21,6 @@ func GuardianRequestsForUser(app *pocketbase.PocketBase, userID string, visibleG
 		return nil, err
 	}
 
-	flow, err := LoadFlowSettings(app)
-	if err != nil {
-		return nil, err
-	}
-
 	groupIDs := make([]string, 0, len(records))
 	seenGroups := map[string]struct{}{}
 	for _, record := range records {
@@ -72,6 +67,10 @@ func GuardianRequestsForUser(app *pocketbase.PocketBase, userID string, visibleG
 		}
 
 		data := backendinternal.ParseJSONMap(record.Get("data"))
+		flow, err := LoadFlowForRequest(app, data)
+		if err != nil {
+			return nil, err
+		}
 		stepIndex := EffectiveStepIndex(record, data, flow)
 		status := StatusForItem(record.GetBool("rejected"), stepIndex, flow.Steps)
 		statusLabel := status

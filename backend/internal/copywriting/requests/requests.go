@@ -12,6 +12,10 @@ type EmailTemplate struct {
 }
 
 func emailLayout(preheader string, title string, intro string, rows [][2]string) string {
+	return emailLayoutWithCTA(preheader, title, intro, rows, "Take action")
+}
+
+func emailLayoutWithCTA(preheader string, title string, intro string, rows [][2]string, ctaLabel string) string {
 	var b strings.Builder
 	b.WriteString("html:")
 	b.WriteString(`<div style="margin:0;padding:24px 0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#111827;">`)
@@ -19,11 +23,10 @@ func emailLayout(preheader string, title string, intro string, rows [][2]string)
 	b.WriteString(`<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td align="center">`)
 	b.WriteString(`<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:640px;background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;">`)
 	b.WriteString(`<tr><td style="padding:32px 32px 16px 32px;">`)
-	b.WriteString(`<div style="font-size:12px;line-height:18px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#6b7280;">Realmen</div>`)
-	b.WriteString(`<h1 style="margin:12px 0 0 0;font-size:28px;line-height:34px;font-weight:700;color:#111827;">` + escape(title) + `</h1>`)
+	b.WriteString(`<h1 style="margin:0;font-size:28px;line-height:34px;font-weight:700;color:#111827;">` + escape(title) + `</h1>`)
 	b.WriteString(`</td></tr>`)
 	if strings.TrimSpace(intro) != "" {
-		b.WriteString(`<tr><td style="padding:0 32px 20px 32px;"><p style="margin:0;font-size:16px;line-height:24px;color:#374151;">` + escape(intro) + `</p></td></tr>`)
+		b.WriteString(`<tr><td style="padding:0 32px 20px 32px;"><p style="margin:0;font-size:16px;line-height:24px;color:#374151;">` + intro + `</p></td></tr>`)
 	}
 	if len(rows) > 0 {
 		b.WriteString(`<tr><td style="padding:0 32px 8px 32px;">`)
@@ -40,7 +43,7 @@ func emailLayout(preheader string, title string, intro string, rows [][2]string)
 		b.WriteString(`</table></td></tr>`)
 	}
 	b.WriteString(`<tr><td style="padding:24px 32px 32px 32px;">`)
-	b.WriteString(`<a href="https://branco.realmen.it" style="display:inline-block;padding:12px 18px;background:#111827;color:#ffffff;text-decoration:none;border-radius:10px;font-size:15px;line-height:20px;font-weight:600;">Take action</a>`)
+	b.WriteString(`<a href="https://branco.realmen.it" style="display:inline-block;padding:12px 18px;background:#111827;color:#ffffff;text-decoration:none;border-radius:10px;font-size:15px;line-height:20px;font-weight:600;">` + escape(ctaLabel) + `</a>`)
 	b.WriteString(`</td></tr>`)
 	b.WriteString(`</table></td></tr></table></div>`)
 	return b.String()
@@ -48,6 +51,10 @@ func emailLayout(preheader string, title string, intro string, rows [][2]string)
 
 func escape(value string) string {
 	return html.EscapeString(strings.TrimSpace(value))
+}
+
+func intro(text string) string {
+	return escape(text)
 }
 
 func row(label string, value string) [2]string {

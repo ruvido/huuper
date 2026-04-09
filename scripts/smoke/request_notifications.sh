@@ -129,6 +129,37 @@ print_body() {
   fi
 }
 
+random_request_name() {
+  local -a first_names=(
+    "Luca"
+    "Marco"
+    "Andrea"
+    "Matteo"
+    "Simone"
+    "Davide"
+    "Federico"
+    "Alessandro"
+    "Gabriele"
+    "Stefano"
+  )
+  local -a last_names=(
+    "Rossi"
+    "Ferrari"
+    "Esposito"
+    "Romano"
+    "Conti"
+    "Moretti"
+    "Ricci"
+    "Marini"
+    "Greco"
+    "Lombardi"
+  )
+
+  local first_index=$((RANDOM % ${#first_names[@]}))
+  local last_index=$((RANDOM % ${#last_names[@]}))
+  printf '%s %s' "${first_names[$first_index]}" "${last_names[$last_index]}"
+}
+
 json_value() {
   jq -r "$1 // empty" "${tmp_body}"
 }
@@ -195,7 +226,7 @@ load_admin_notification_email
 
 uniq="$(date +%s)"
 request_email="requests.smoke.${uniq}@realmen.it"
-request_name="Request Smoke ${uniq}"
+request_name="$(random_request_name)"
 request_id=""
 
 echo "BASE_URL=${BASE_URL}"
@@ -234,27 +265,27 @@ else
 fi
 
 if confirm_step "Assign group" "${MEMBER_EMAIL}"; then
-  code="$(call POST "${BASE_URL}/api/admin/requests/${request_id}/actions" admin "$(request_action_payload "advance" "${REQUEST_SMOKE_GROUP_ID}")")"
+  code="$(call POST "${BASE_URL}/api/admin/requests/${request_id}/actions" admin "$(request_action_payload "set_group" "${REQUEST_SMOKE_GROUP_ID}")")"
   assert_code "${code}" "200" "assign_group"
 fi
 
 if confirm_step "Assign guardian" "${GUARDIAN_EMAIL}"; then
-  code="$(call POST "${BASE_URL}/api/me/requests/${request_id}/actions" member "$(request_action_payload "advance" "" "${REQUEST_SMOKE_GUARDIAN_ID}")")"
+  code="$(call POST "${BASE_URL}/api/me/requests/${request_id}/actions" member "$(request_action_payload "set_guardian" "" "${REQUEST_SMOKE_GUARDIAN_ID}")")"
   assert_code "${code}" "200" "assign_guardian"
 fi
 
 if confirm_step "Complete mentoring" "${MEMBER_EMAIL}"; then
-  code="$(call POST "${BASE_URL}/api/me/requests/${request_id}/actions" guardian "$(request_action_payload "advance" "" "" "Interactive request email smoke.")")"
+  code="$(call POST "${BASE_URL}/api/me/requests/${request_id}/actions" guardian "$(request_action_payload "set_mentoring_done" "" "" "Interactive request email smoke.")")"
   assert_code "${code}" "200" "mentoring"
 fi
 
 if confirm_step "Group approval" "${ADMIN_NOTIFICATION_EMAIL}"; then
-  code="$(call POST "${BASE_URL}/api/me/requests/${request_id}/actions" member "$(request_action_payload "advance")")"
+  code="$(call POST "${BASE_URL}/api/me/requests/${request_id}/actions" member "$(request_action_payload "set_group_approved")")"
   assert_code "${code}" "200" "group_approved"
 fi
 
 if confirm_step "Admin approval" "${request_email}"; then
-  code="$(call POST "${BASE_URL}/api/admin/requests/${request_id}/actions" admin "$(request_action_payload "advance")")"
+  code="$(call POST "${BASE_URL}/api/admin/requests/${request_id}/actions" admin "$(request_action_payload "set_admin_approved")")"
   assert_code "${code}" "200" "admin_approved"
 fi
 

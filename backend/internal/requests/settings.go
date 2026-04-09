@@ -71,6 +71,62 @@ func LoadFlowSettings(app *pocketbase.PocketBase) (FlowConfig, error) {
 	return ParseFlowConfig(raw)
 }
 
+func LoadFlowForRequest(app *pocketbase.PocketBase, data map[string]any) (FlowConfig, error) {
+	if snapshot, ok := RequestFlowSnapshotFromData(data); ok {
+		return snapshot, nil
+	}
+	return LoadFlowSettings(app)
+}
+
+func RequestFlowSnapshotFromData(data map[string]any) (FlowConfig, bool) {
+	if data == nil {
+		return FlowConfig{}, false
+	}
+
+	raw, ok := data[RequestFlowDataKey]
+	if !ok || raw == nil {
+		return FlowConfig{}, false
+	}
+
+	snapshotData, ok := raw.(map[string]any)
+	if !ok || snapshotData == nil {
+		return FlowConfig{}, false
+	}
+
+	snapshot, err := ParseFlowConfig(snapshotData)
+	if err != nil {
+		return FlowConfig{}, false
+	}
+
+	return snapshot, true
+}
+
+func SetRequestFlowSnapshot(data map[string]any, flow FlowConfig) map[string]any {
+	if data == nil {
+		data = map[string]any{}
+	}
+
+	steps := make([]any, 0, len(flow.Steps))
+	for _, step := range flow.Steps {
+		steps = append(steps, map[string]any{
+			"role":             step.Role,
+			"action":           step.Action,
+			"label":            step.Label,
+			"notes":            step.Notes,
+			"filter":           step.Filter,
+			"email_to":         step.EmailTo,
+			"telegram_message": step.TelegramMessage,
+		})
+	}
+
+	data[FlowVersionDataKey] = flow.Version
+	data[RequestFlowDataKey] = map[string]any{
+		"version": flow.Version,
+		"steps":   steps,
+	}
+	return data
+}
+
 func NormalizeSubmitInput(raw map[string]any) map[string]any {
 	if raw == nil {
 		return map[string]any{}

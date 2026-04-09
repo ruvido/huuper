@@ -23,8 +23,12 @@ func MapItem(record *core.Record) ListItem {
 	}
 }
 
-func MapItemWithWorkflow(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, flow FlowConfig) (ListItem, error) {
+func MapItemWithWorkflow(app *pocketbase.PocketBase, actor *core.Record, record *core.Record) (ListItem, error) {
 	item := MapItem(record)
+	flow, err := LoadFlowForRequest(app, item.Data)
+	if err != nil {
+		return ListItem{}, err
+	}
 	state, err := BuildWorkflowState(app, actor, record, item.Data, item.Rejected, flow)
 	if err != nil {
 		return ListItem{}, err
@@ -32,20 +36,26 @@ func MapItemWithWorkflow(app *pocketbase.PocketBase, actor *core.Record, record 
 
 	item.FlowVersion = FlowVersionFromData(item.Data)
 	item.Status = state.Status
-	item.Workflow = map[string]any{
+	item.Workflow = BuildWorkflowPayload(state, flow)
+	return item, nil
+}
+
+func BuildWorkflowPayload(state WorkflowState, flow FlowConfig) map[string]any {
+	action := state.CurrentAction
+	return map[string]any{
 		"total_steps":          len(flow.Steps),
 		"has_next_step":        state.HasNext,
-		"current_action":       state.CurrentAction,
+		"current_action":       action,
 		"current_action_label": state.CurrentActionLabel,
 		"next_role":            state.NextStep.Role,
-		"next_action":          state.NextStep.Action,
+		"next_action":          action,
 		"next_action_label":    state.NextStep.Label,
 		"next_action_notes":    state.NextStep.Notes,
 		"required_field":       state.RequiredField,
-		"can_advance":          state.CanAdvance,
+		"can_take_action":      state.CanTakeAction,
+		"can_reject":           state.CanReject,
 		"current_version":      flow.Version,
 	}
-	return item, nil
 }
 
 func EffectiveStepIndex(record *core.Record, data map[string]any, flow FlowConfig) int {
@@ -70,7 +80,8 @@ type WorkflowState struct {
 	HasNext            bool
 	NextStep           FlowStep
 	RequiredField      string
-	CanAdvance         bool
+	CanTakeAction      bool
+	CanReject          bool
 	CurrentAction      string
 	CurrentActionLabel string
 }
@@ -87,7 +98,7 @@ func BuildWorkflowState(app *pocketbase.PocketBase, actor *core.Record, record *
 		NextStep:  nextStep,
 	}
 	if hasNext {
-		state.CurrentAction = nextStep.Action
+		state.CurrentAction = ActionForFlowAction(nextStep.Action)
 		state.CurrentActionLabel = nextStep.Label
 	}
 	if state.CurrentActionLabel == "" {
@@ -99,7 +110,8 @@ func BuildWorkflowState(app *pocketbase.PocketBase, actor *core.Record, record *
 		if err != nil {
 			return WorkflowState{}, err
 		}
-		state.CanAdvance = ok
+		state.CanTakeAction = ok
 	}
+	state.CanReject = actor != nil && actor.GetBool("admin") && !rejected
 	return state, nil
 }

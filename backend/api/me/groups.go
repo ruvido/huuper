@@ -143,18 +143,18 @@ func GroupGetHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) erro
 				return apis.NewBadRequestError("failed_group_requests", err)
 			}
 			requestsCount = len(requests)
-			flow, err := backendrequests.LoadFlowSettings(app)
-			if err != nil {
-				return apis.NewBadRequestError("invalid_requests_flow_settings", err)
-			}
 			pendingRequests = make([]groupinternal.PendingRequestItem, 0, len(requests))
 			for _, record := range requests {
-				item, err := backendrequests.MapItemWithWorkflow(app, actor, record, flow)
+				item, err := backendrequests.MapItemWithWorkflow(app, actor, record)
 				if err != nil {
 					return apis.NewBadRequestError("failed_group_request_workflow", err)
 				}
 				statusLabel := strings.TrimSpace(backendinternal.AnyToString(item.Workflow["current_action_label"]))
 				if statusLabel == "" {
+					flow, err := backendrequests.LoadFlowForRequest(app, item.Data)
+					if err != nil {
+						return apis.NewBadRequestError("invalid_requests_flow_settings", err)
+					}
 					stepIndex := backendrequests.EffectiveStepIndex(record, item.Data, flow)
 					statusLabel = requestStatusLabel(item.Status, stepIndex, flow)
 				}

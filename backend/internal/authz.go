@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/pocketbase/pocketbase"
@@ -89,6 +90,43 @@ func AssistantGroupIDsForUser(app *pocketbase.PocketBase, user *core.Record) (ma
 		out[group.Id] = struct{}{}
 	}
 	return out, nil
+}
+
+func VisibleRequestsFilter(app *pocketbase.PocketBase, actor *core.Record) (string, map[string]any, error) {
+	if actor == nil {
+		return "", nil, apis.NewUnauthorizedError("Unauthorized", nil)
+	}
+	if actor.GetBool("admin") {
+		return "", map[string]any{}, nil
+	}
+
+	assistantGroups, err := AssistantGroupIDsForUser(app, actor)
+	if err != nil {
+		return "", nil, err
+	}
+
+	clauses := []string{"guardian = {:visible_guardian}"}
+	params := map[string]any{"visible_guardian": actor.Id}
+
+	if len(assistantGroups) > 0 {
+		groupClauses := make([]string, 0, len(assistantGroups))
+		index := 0
+		for groupID := range assistantGroups {
+			key := fmt.Sprintf("assistant_group_%d", index)
+			groupClauses = append(groupClauses, fmt.Sprintf("group = {:%s}", key))
+			params[key] = groupID
+			index++
+		}
+		if len(groupClauses) > 0 {
+			clauses = append(clauses, "("+strings.Join(groupClauses, " || ")+")")
+		}
+	}
+
+	if len(clauses) == 0 {
+		return "id = ''", params, nil
+	}
+
+	return "(" + strings.Join(clauses, " || ") + ")", params, nil
 }
 
 func CanViewRequest(actor *core.Record, request *core.Record, assistantGroups map[string]struct{}) bool {

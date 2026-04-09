@@ -53,13 +53,13 @@ window.huuperRequestItem = (() => {
 
     const normalized = raw.replace(/^\d+-/, "").trim();
     const labels = {
-      submitted: "Submitted",
-      assign_group: "Group assignment",
-      assign_guardian: "Guardian assignment",
+      submitted: "New request",
+      assign_group: "Assign group",
+      assign_guardian: "Assign guardian",
       guardian_assigned: "Mentoring",
       mentoring: "Mentoring",
       group_approved: "Group approval",
-      admin_approved: "Final approval",
+      admin_approved: "Final review",
       rejected: "Rejected",
       promoted: "Promoted",
     };
@@ -79,14 +79,13 @@ window.huuperRequestItem = (() => {
   function actionText(value) {
     const raw = text(value);
     const labels = {
-      assign_group: "Assign group",
-      assign_guardian: "Assign guardian",
-      mentoring: "Complete mentoring",
-      group_approved: "Approve group",
-      admin_approved: "Approve request",
+      set_group: "Assign group",
+      set_guardian: "Assign guardian",
+      set_mentoring_done: "Complete mentoring",
+      set_group_approved: "Approve group",
+      set_admin_approved: "Approve request",
       reject: "Reject request",
       promote: "Promote request",
-      advance: "Continue",
     };
 
     return labels[raw] || raw.replaceAll("_", " ").replaceAll("-", " ").trim() || "Continue";
@@ -181,7 +180,7 @@ window.huuperRequestItem = (() => {
     if (!Number.isFinite(parsed) || parsed < 1900 || parsed > currentYear) {
       return "";
     }
-    return `${currentYear - parsed} anni`;
+    return `${currentYear - parsed} years`;
   }
 
   function requestAgeDays(createdAt) {
@@ -217,10 +216,10 @@ window.huuperRequestItem = (() => {
           ? escapeHTML(location)
           : "";
     const details = [
-      detailField("Telefono", data.mobile),
+      detailField("Phone", data.mobile),
       detailField("Email", item.email),
       detailField("Marital status", data.marital_status),
-      detailField("Figli", data.children),
+      detailField("Children", data.children),
     ].filter(Boolean).join("");
     const motivationText = text(data.motivation) || inlineMentoring;
     const notesBlock = renderedMentoringNotes
@@ -251,13 +250,13 @@ window.huuperRequestItem = (() => {
   function actionHref(item, options = {}) {
     const workflow = item && typeof item.workflow === "object" ? item.workflow : {};
     const action = text(workflow.current_action || workflow.next_action);
-    if (workflow.can_advance !== true) {
+    if (workflow.can_take_action !== true) {
       return "";
     }
-    if (action === "assign_group" && typeof options.assignGroupURL === "function") {
+    if (action === "set_group" && typeof options.assignGroupURL === "function") {
       return options.assignGroupURL(item.id);
     }
-    if (action === "assign_guardian" && typeof options.assignGuardianURL === "function") {
+    if (action === "set_guardian" && typeof options.assignGuardianURL === "function") {
       return options.assignGuardianURL(item.id);
     }
     return "";

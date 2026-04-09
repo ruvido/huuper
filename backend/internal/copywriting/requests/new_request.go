@@ -8,8 +8,8 @@ var newRequestTemplate = EmailTemplate{
 		titleFor("{{full_name}}"),
 		"A new request is ready for review.",
 		[][2]string{
-			row("Age", "{{age}}"),
 			row("Region", "{{region}}"),
+			row("Age", "{{age}}"),
 			row("Marital status", "{{marital_status}}"),
 			row("Children", "{{children}}"),
 			row("Motivation", "{{motivation}}"),
