@@ -122,9 +122,11 @@ func GetRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) er
 			return apis.NewBadRequestError("invalid_requests_flow_settings", err)
 		}
 		flowVersion := backendrequests.FlowVersionFromData(item.Data)
-		stepIndex := backendrequests.EffectiveStepIndex(record, item.Data, flow)
-		computedStatus := backendrequests.StatusForItem(item.Rejected, stepIndex, flow.Steps)
-		statusLabel := requestStatusLabel(computedStatus, stepIndex, flow)
+		state, err := backendrequests.BuildWorkflowState(app, actor, record, item.Data, item.Rejected, flow)
+		if err != nil {
+			return apis.NewBadRequestError("failed_requests_workflow", err)
+		}
+		statusLabel := requestStatusLabel(state.Status, state.StepIndex, flow)
 		fullName := requestDisplayName(item.Data, item.Email, item.ID)
 		groupName, err := requestGroupName(app, item.GroupID)
 		if err != nil {
@@ -135,17 +137,7 @@ func GetRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) er
 			return apis.NewBadRequestError("failed_guardian_lookup", err)
 		}
 
-		nextStep, hasNext := backendrequests.FlowStepAt(flow, stepIndex)
-		canAdvance := false
-		requiredField := ""
-		if hasNext && !item.Rejected {
-			requiredField = backendrequests.RequiredFieldForAction(nextStep.Action)
-			canAdvance, err = backendinternal.HasRoleForRequest(app, actor, record, nextStep.Role, backendrequests.RoleAdmin, backendrequests.RoleGuardian, backendrequests.RoleAssistant)
-			if err != nil {
-				return apis.NewBadRequestError("role_resolution_failed", err)
-			}
-		}
-		options, err := requestWorkflowOptions(app, actor, record, nextStep, requiredField, canAdvance)
+		options, err := requestWorkflowOptions(app, actor, record, state.NextStep, state.RequiredField, state.CanAdvance)
 		if err != nil {
 			return apis.NewBadRequestError("workflow_options_failed", err)
 		}
@@ -154,7 +146,7 @@ func GetRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) er
 			"id":                   item.ID,
 			"full_name":            fullName,
 			"email":                item.Email,
-			"status":               computedStatus,
+			"status":               state.Status,
 			"status_label":         statusLabel,
 			"rejected":             item.Rejected,
 			"group":                item.GroupID,
@@ -170,15 +162,15 @@ func GetRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) er
 			"data":                 item.Data,
 			"workflow": map[string]any{
 				"total_steps":            len(flow.Steps),
-				"has_next_step":          hasNext,
-				"next_role":              nextStep.Role,
-				"next_action":            nextStep.Action,
-				"next_action_label":      nextStep.Label,
-				"next_action_notes":      nextStep.Notes,
-				"next_action_notes_html": requestNotesHTML(nextStep.Notes),
-				"filter":                 nextStep.Filter,
-				"required_field":         requiredField,
-				"can_advance":            canAdvance,
+				"has_next_step":          state.HasNext,
+				"next_role":              state.NextStep.Role,
+				"next_action":            state.NextStep.Action,
+				"next_action_label":      state.NextStep.Label,
+				"next_action_notes":      state.NextStep.Notes,
+				"next_action_notes_html": requestNotesHTML(state.NextStep.Notes),
+				"filter":                 state.NextStep.Filter,
+				"required_field":         state.RequiredField,
+				"can_advance":            state.CanAdvance,
 				"options":                options,
 				"current_version":        flow.Version,
 			},
@@ -291,12 +283,7 @@ func requestWorkflowOptions(app *pocketbase.PocketBase, actor *core.Record, reco
 		if err != nil {
 			return nil, err
 		}
-		items := response.Items
-		if step.Filter == backendrequests.FilterGroupMembers {
-			options["guardians"] = items
-			return options, nil
-		}
-		options["guardians"] = items
+		options["guardians"] = response.Items
 	}
 
 	return options, nil
@@ -334,8 +321,12 @@ func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		deleteRequest := false
 		promotedUserID := ""
 		switch action {
-		case backendrequests.ActionAdvance, "transition":
+		case backendrequests.ActionAdvance:
 			if err := backendrequests.ApplyAdvanceAction(app, actor, record, data, payload); err != nil {
+				return err
+			}
+		case backendrequests.ActionSetGroup:
+			if err := backendrequests.ApplySetGroupAction(app, actor, record, data, strings.TrimSpace(payload.GroupID)); err != nil {
 				return err
 			}
 		case backendrequests.ActionSetGuardian:
@@ -361,14 +352,7 @@ func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 			if err := app.Delete(record); err != nil {
 				return apis.NewBadRequestError("failed_to_delete_request", err)
 			}
-			return e.JSON(http.StatusOK, map[string]any{
-				"id":       id,
-				"promoted": true,
-				"user_id":  promotedUserID,
-			})
-		}
-
-		if err := app.Save(record); err != nil {
+		} else if err := app.Save(record); err != nil {
 			return apis.NewBadRequestError("failed_to_update_request", err)
 		}
 
@@ -376,12 +360,39 @@ func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		if err != nil {
 			return apis.NewBadRequestError("invalid_requests_flow_settings", err)
 		}
-		stepIndex := backendrequests.EffectiveStepIndex(record, data, flow)
-		status := backendrequests.StatusForItem(record.GetBool("rejected"), stepIndex, flow.Steps)
+
+		var notificationStep backendrequests.FlowStep
+		switch action {
+		case backendrequests.ActionAdvance:
+			stepIndex := backendrequests.EffectiveStepIndex(record, data, flow)
+			if stepIndex > 0 && stepIndex <= len(flow.Steps) {
+				notificationStep = flow.Steps[stepIndex-1]
+			}
+		case backendrequests.ActionPromote:
+			if step, ok := backendrequests.FlowStepForAction(flow, backendrequests.FlowActionAdminApproved); ok {
+				notificationStep = step
+			}
+		}
+		if strings.TrimSpace(notificationStep.Action) != "" {
+			backendrequests.NotifyRequestStep(app, actor, record, data, notificationStep)
+		}
+
+		if deleteRequest {
+			return e.JSON(http.StatusOK, map[string]any{
+				"id":       id,
+				"promoted": true,
+				"user_id":  promotedUserID,
+			})
+		}
+
+		state, err := backendrequests.BuildWorkflowState(app, actor, record, data, record.GetBool("rejected"), flow)
+		if err != nil {
+			return apis.NewBadRequestError("failed_requests_workflow", err)
+		}
 
 		return e.JSON(http.StatusOK, map[string]any{
 			"id":       record.Id,
-			"status":   status,
+			"status":   state.Status,
 			"rejected": record.GetBool("rejected"),
 			"data":     record.Get("data"),
 		})

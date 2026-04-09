@@ -25,43 +25,24 @@ func MapItem(record *core.Record) ListItem {
 
 func MapItemWithWorkflow(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, flow FlowConfig) (ListItem, error) {
 	item := MapItem(record)
-	flowVersion := FlowVersionFromData(item.Data)
-	stepIndex := EffectiveStepIndex(record, item.Data, flow)
-
-	nextStep, hasNext := FlowStepAt(flow, stepIndex)
-	canAdvance := false
-	requiredField := ""
-	if hasNext && !item.Rejected {
-		requiredField = RequiredFieldForAction(nextStep.Action)
-		ok, err := backendinternal.HasRoleForRequest(app, actor, record, nextStep.Role, RoleAdmin, RoleGuardian, RoleAssistant)
-		if err != nil {
-			return ListItem{}, err
-		}
-		canAdvance = ok
+	state, err := BuildWorkflowState(app, actor, record, item.Data, item.Rejected, flow)
+	if err != nil {
+		return ListItem{}, err
 	}
 
-	item.FlowVersion = flowVersion
-	item.Status = StatusForItem(item.Rejected, stepIndex, flow.Steps)
-	currentAction := ""
-	currentActionLabel := ""
-	if hasNext {
-		currentAction = nextStep.Action
-		currentActionLabel = nextStep.Label
-	}
-	if currentActionLabel == "" {
-		currentActionLabel = strings.ReplaceAll(NormalizeStatus(item.Status), "_", " ")
-	}
+	item.FlowVersion = FlowVersionFromData(item.Data)
+	item.Status = state.Status
 	item.Workflow = map[string]any{
 		"total_steps":          len(flow.Steps),
-		"has_next_step":        hasNext,
-		"current_action":       currentAction,
-		"current_action_label": currentActionLabel,
-		"next_role":            nextStep.Role,
-		"next_action":          nextStep.Action,
-		"next_action_label":    nextStep.Label,
-		"next_action_notes":    nextStep.Notes,
-		"required_field":       requiredField,
-		"can_advance":          canAdvance,
+		"has_next_step":        state.HasNext,
+		"current_action":       state.CurrentAction,
+		"current_action_label": state.CurrentActionLabel,
+		"next_role":            state.NextStep.Role,
+		"next_action":          state.NextStep.Action,
+		"next_action_label":    state.NextStep.Label,
+		"next_action_notes":    state.NextStep.Notes,
+		"required_field":       state.RequiredField,
+		"can_advance":          state.CanAdvance,
 		"current_version":      flow.Version,
 	}
 	return item, nil
@@ -74,7 +55,7 @@ func EffectiveStepIndex(record *core.Record, data map[string]any, flow FlowConfi
 
 	stepIndex := 0
 	for stepIndex < len(flow.Steps) {
-		if stepSatisfied(record, data, flow.Steps[stepIndex].Action) {
+		if StepSatisfied(record, data, flow.Steps[stepIndex].Action) {
 			stepIndex++
 			continue
 		}
@@ -83,22 +64,42 @@ func EffectiveStepIndex(record *core.Record, data map[string]any, flow FlowConfi
 	return stepIndex
 }
 
-func stepSatisfied(record *core.Record, data map[string]any, action string) bool {
-	switch action {
-	case FlowActionAssignGroup:
-		return strings.TrimSpace(record.GetString("group")) != ""
-	case FlowActionAssignGuardian:
-		return strings.TrimSpace(record.GetString("guardian")) != ""
-	case FlowActionMentoring:
-		value, _ := data["mentoring_done_at"].(string)
-		return strings.TrimSpace(value) != ""
-	case FlowActionGroupApproved:
-		value, _ := data["group_approved_at"].(string)
-		return strings.TrimSpace(value) != ""
-	case FlowActionAdminApproved:
-		value, _ := data["admin_approved_at"].(string)
-		return strings.TrimSpace(value) != ""
-	default:
-		return false
+type WorkflowState struct {
+	StepIndex          int
+	Status             string
+	HasNext            bool
+	NextStep           FlowStep
+	RequiredField      string
+	CanAdvance         bool
+	CurrentAction      string
+	CurrentActionLabel string
+}
+
+func BuildWorkflowState(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any, rejected bool, flow FlowConfig) (WorkflowState, error) {
+	stepIndex := EffectiveStepIndex(record, data, flow)
+	nextStep, hasNext := FlowStepAt(flow, stepIndex)
+	status := StatusForItem(rejected, stepIndex, flow.Steps)
+
+	state := WorkflowState{
+		StepIndex: stepIndex,
+		Status:    status,
+		HasNext:   hasNext,
+		NextStep:  nextStep,
 	}
+	if hasNext {
+		state.CurrentAction = nextStep.Action
+		state.CurrentActionLabel = nextStep.Label
+	}
+	if state.CurrentActionLabel == "" {
+		state.CurrentActionLabel = strings.ReplaceAll(NormalizeStatus(status), "_", " ")
+	}
+	if hasNext && !rejected {
+		state.RequiredField = RequiredFieldForAction(nextStep.Action)
+		ok, err := backendinternal.HasRoleForRequest(app, actor, record, nextStep.Role, RoleAdmin, RoleGuardian, RoleAssistant)
+		if err != nil {
+			return WorkflowState{}, err
+		}
+		state.CanAdvance = ok
+	}
+	return state, nil
 }

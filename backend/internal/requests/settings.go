@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	backendinternal "members/backend/internal"
+	backendsettings "members/backend/internal/settings"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
@@ -103,16 +104,14 @@ func EnsureSubmitEmailAvailable(app *pocketbase.PocketBase, email string) error 
 }
 
 func FindSettingData(app core.App, name string) (map[string]any, error) {
-	record, err := app.FindFirstRecordByFilter(
-		"settings",
-		"name = {:name}",
-		map[string]any{"name": name},
-	)
-	if err != nil || record == nil {
+	raw, err := backendsettings.FindSettingData(app, name)
+	if err != nil {
 		return nil, fmt.Errorf("%s settings not found", name)
 	}
-
-	return backendinternal.UnwrapSettingData(record.Get("data")), nil
+	if raw == nil {
+		return nil, fmt.Errorf("%s settings not found", name)
+	}
+	return raw, nil
 }
 
 func BuildUserData(data map[string]any) map[string]any {

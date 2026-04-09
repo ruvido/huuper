@@ -26,6 +26,15 @@ func GetBot() *tgbotapi.BotAPI {
 	return bot
 }
 
+func SendMessage(chatID int64, message string) error {
+	if bot == nil {
+		return fmt.Errorf("telegram bot not initialized")
+	}
+	msg := tgbotapi.NewMessage(chatID, message)
+	_, err := bot.Send(msg)
+	return err
+}
+
 // StartTelegramBot initializes and starts the Telegram bot
 func StartTelegramBot(pbApp *pocketbase.PocketBase) error {
 	app = pbApp

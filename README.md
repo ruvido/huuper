@@ -87,6 +87,19 @@ The project follows these principles:
 - **Best practices only**: Follow official conventions
 - **Zero redundancy**: Avoid complex and duplicated code
 
+## Request Notifications
+
+Request notifications are configured through PocketBase settings and templates:
+
+- `settings.requests_flow` controls the workflow steps.
+- Each step can define:
+  - `email_to`: `admin`, `assistant`, `guardian`, or `candidate`
+  - `telegram_message`: `true` to send a Telegram message to the request group
+- New request submissions send an email to `settings.email.admin`.
+- Notification content lives in the `templates` collection.
+
+See [`docs/REQUESTS_NOTIFICATIONS.md`](docs/REQUESTS_NOTIFICATIONS.md) for the full schema.
+
 ## Avatar upload test
 
 You can quickly verify that the `users` collection accepts JPEG, PNG, WebP, and GIF avatars thanks to the fixtures in `extra/test/images/`. Each format has a 1:1 sample file that mirrors what the onboarding flow produces.

@@ -37,6 +37,10 @@ func Unwrap(raw any) map[string]any {
 	return backendinternal.UnwrapSettingData(raw)
 }
 
+func FindSettingData(app core.App, name string) (map[string]any, error) {
+	return backendinternal.FindSettingData(app, name)
+}
+
 func GetVisible(app *pocketbase.PocketBase, name string) (*core.Record, map[string]any, error) {
 	rawName := strings.TrimSpace(name)
 	if rawName == "" {

@@ -4,8 +4,13 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	backendinternal "members/backend/internal"
+
+	"github.com/pocketbase/pocketbase"
+	"github.com/pocketbase/pocketbase/apis"
+	"github.com/pocketbase/pocketbase/core"
 )
 
 const (
@@ -23,6 +28,13 @@ const (
 )
 
 const (
+	EmailToAdmin     = "admin"
+	EmailToAssistant = "assistant"
+	EmailToGuardian  = "guardian"
+	EmailToCandidate = "candidate"
+)
+
+const (
 	StatusSubmitted        = "1-submitted"
 	StatusGroupAssigned    = "2-group_assigned"
 	StatusGuardianAssigned = "3-guardian_assigned"
@@ -33,11 +45,13 @@ const (
 )
 
 type FlowStep struct {
-	Role   string `json:"role"`
-	Action string `json:"action"`
-	Label  string `json:"label"`
-	Notes  string `json:"notes,omitempty"`
-	Filter string `json:"filter,omitempty"`
+	Role            string `json:"role"`
+	Action          string `json:"action"`
+	Label           string `json:"label"`
+	Notes           string `json:"notes,omitempty"`
+	Filter          string `json:"filter,omitempty"`
+	EmailTo         string `json:"email_to,omitempty"`
+	TelegramMessage bool   `json:"telegram_message,omitempty"`
 }
 
 type FlowConfig struct {
@@ -63,12 +77,120 @@ var allowedActions = map[string]struct{}{
 	FlowActionAdminApproved:  {},
 }
 
+var allowedEmailTargets = map[string]struct{}{
+	EmailToAdmin:     {},
+	EmailToAssistant: {},
+	EmailToGuardian:  {},
+	EmailToCandidate: {},
+}
+
 var actionToStatus = map[string]string{
 	FlowActionAssignGroup:    StatusGroupAssigned,
 	FlowActionAssignGuardian: StatusGuardianAssigned,
 	FlowActionMentoring:      StatusMentoring,
 	FlowActionGroupApproved:  StatusGroupApproved,
 	FlowActionAdminApproved:  StatusAdminApproved,
+}
+
+type flowActionSpec struct {
+	RequiredField string
+	IsDone        func(record *core.Record, data map[string]any) bool
+	Apply         func(app core.App, actor *core.Record, record *core.Record, data map[string]any, payload ActionPayload, step FlowStep) error
+	Reset         func(record *core.Record, data map[string]any)
+}
+
+var flowActionSpecs = map[string]flowActionSpec{
+	FlowActionAssignGroup: {
+		RequiredField: "group",
+		IsDone: func(record *core.Record, _ map[string]any) bool {
+			return strings.TrimSpace(record.GetString("group")) != ""
+		},
+		Apply: func(app core.App, _ *core.Record, record *core.Record, _ map[string]any, payload ActionPayload, step FlowStep) error {
+			pb, ok := app.(*pocketbase.PocketBase)
+			if !ok {
+				return fmt.Errorf("invalid app")
+			}
+			return applyGroupAssignment(pb, record, strings.TrimSpace(payload.GroupID), step.Filter)
+		},
+		Reset: func(record *core.Record, _ map[string]any) {
+			record.Set("group", "")
+		},
+	},
+	FlowActionAssignGuardian: {
+		RequiredField: "guardian",
+		IsDone: func(record *core.Record, _ map[string]any) bool {
+			return strings.TrimSpace(record.GetString("guardian")) != ""
+		},
+		Apply: func(app core.App, actor *core.Record, record *core.Record, data map[string]any, payload ActionPayload, step FlowStep) error {
+			pb, ok := app.(*pocketbase.PocketBase)
+			if !ok {
+				return fmt.Errorf("invalid app")
+			}
+			return applyGuardianAssignment(pb, record, data, actor, strings.TrimSpace(payload.GuardianID), step.Filter)
+		},
+		Reset: func(record *core.Record, data map[string]any) {
+			record.Set("guardian", "")
+			delete(data, "guardian")
+		},
+	},
+	FlowActionMentoring: {
+		RequiredField: "mentoring_notes",
+		IsDone: func(_ *core.Record, data map[string]any) bool {
+			value, _ := data["mentoring_done_at"].(string)
+			return strings.TrimSpace(value) != ""
+		},
+		Apply: func(_ core.App, actor *core.Record, _ *core.Record, data map[string]any, payload ActionPayload, _ FlowStep) error {
+			note := strings.TrimSpace(payload.MentoringNotes)
+			if note == "" {
+				return apis.NewBadRequestError("missing_mentoring_notes", nil)
+			}
+			data["mentoring_notes"] = note
+			data["mentoring_done_at"] = time.Now().UTC().Format(time.RFC3339)
+			if actor != nil {
+				data["mentoring_done_by"] = actorDisplayName(actor)
+			}
+			return nil
+		},
+		Reset: func(_ *core.Record, data map[string]any) {
+			delete(data, "mentoring_notes")
+			delete(data, "mentoring_done_at")
+			delete(data, "mentoring_done_by")
+		},
+	},
+	FlowActionGroupApproved: {
+		IsDone: func(_ *core.Record, data map[string]any) bool {
+			value, _ := data["group_approved_at"].(string)
+			return strings.TrimSpace(value) != ""
+		},
+		Apply: func(_ core.App, actor *core.Record, _ *core.Record, data map[string]any, _ ActionPayload, _ FlowStep) error {
+			data["group_approved_at"] = time.Now().UTC().Format(time.RFC3339)
+			if actor != nil {
+				data["group_approved_by"] = actorDisplayName(actor)
+			}
+			return nil
+		},
+		Reset: func(_ *core.Record, data map[string]any) {
+			delete(data, "group_approved_at")
+			delete(data, "group_approved_by")
+		},
+	},
+	FlowActionAdminApproved: {
+		IsDone: func(_ *core.Record, data map[string]any) bool {
+			value, _ := data["admin_approved_at"].(string)
+			return strings.TrimSpace(value) != ""
+		},
+		Apply: func(_ core.App, actor *core.Record, _ *core.Record, data map[string]any, _ ActionPayload, _ FlowStep) error {
+			data["admin_approved_at"] = time.Now().UTC().Format(time.RFC3339)
+			if actor != nil {
+				data["admin_approved_by"] = actorDisplayName(actor)
+			}
+			return nil
+		},
+		Reset: func(_ *core.Record, data map[string]any) {
+			delete(data, "admin_approved_at")
+			delete(data, "admin_approved_by")
+		},
+	},
 }
 
 const (
@@ -113,10 +235,35 @@ func ParseFlowConfig(data map[string]any) (FlowConfig, error) {
 		label := strings.TrimSpace(backendinternal.AnyToString(entry["label"]))
 		notes := strings.TrimSpace(backendinternal.AnyToString(entry["notes"]))
 		filter := strings.TrimSpace(backendinternal.AnyToString(entry["filter"]))
+		emailTo := strings.TrimSpace(backendinternal.AnyToString(entry["email_to"]))
+		if emailTo != "" {
+			if _, exists := allowedEmailTargets[emailTo]; !exists {
+				return FlowConfig{}, fmt.Errorf("settings.requests_flow steps[%d] invalid email_to: %s", i, emailTo)
+			}
+		}
+		telegramMessage := false
+		switch value := entry["telegram_message"].(type) {
+		case bool:
+			telegramMessage = value
+		default:
+			parsed, err := ParseBoolQuery(backendinternal.AnyToString(value), false)
+			if err != nil {
+				return FlowConfig{}, fmt.Errorf("settings.requests_flow steps[%d] invalid telegram_message", i)
+			}
+			telegramMessage = parsed
+		}
 		if err := validateFilterForAction(action, filter); err != nil {
 			return FlowConfig{}, fmt.Errorf("settings.requests_flow steps[%d] %w", i, err)
 		}
-		steps = append(steps, FlowStep{Role: role, Action: action, Label: label, Notes: notes, Filter: filter})
+		steps = append(steps, FlowStep{
+			Role:            role,
+			Action:          action,
+			Label:           label,
+			Notes:           notes,
+			Filter:          filter,
+			EmailTo:         emailTo,
+			TelegramMessage: telegramMessage,
+		})
 	}
 
 	return FlowConfig{Version: version, Steps: steps}, nil
@@ -175,16 +322,20 @@ func FlowVersionFromData(data map[string]any) int {
 }
 
 func RequiredFieldForAction(action string) string {
-	switch action {
-	case FlowActionAssignGroup:
-		return "group"
-	case FlowActionAssignGuardian:
-		return "guardian"
-	case FlowActionMentoring:
-		return "mentoring_notes"
-	default:
+	spec, ok := flowActionSpecs[action]
+	if !ok {
 		return ""
 	}
+	return spec.RequiredField
+}
+
+func FlowStepForAction(flow FlowConfig, action string) (FlowStep, bool) {
+	for _, step := range flow.Steps {
+		if step.Action == action {
+			return step, true
+		}
+	}
+	return FlowStep{}, false
 }
 
 func StatusForStepIndex(stepIndex int, steps []FlowStep) string {
@@ -234,4 +385,40 @@ func StepIndexFromStatus(status string, steps []FlowStep) int {
 		}
 	}
 	return 0
+}
+
+func StepSatisfied(record *core.Record, data map[string]any, action string) bool {
+	spec, ok := flowActionSpecs[action]
+	if !ok || spec.IsDone == nil {
+		return false
+	}
+	return spec.IsDone(record, data)
+}
+
+func ResetStep(record *core.Record, data map[string]any, action string) {
+	spec, ok := flowActionSpecs[action]
+	if !ok || spec.Reset == nil {
+		return
+	}
+	spec.Reset(record, data)
+}
+
+func ResetStepsAfterAction(flow FlowConfig, record *core.Record, data map[string]any, action string) {
+	found := false
+	for _, step := range flow.Steps {
+		if found {
+			ResetStep(record, data, step.Action)
+		}
+		if step.Action == action {
+			found = true
+		}
+	}
+}
+
+func ApplyStepAction(app core.App, actor *core.Record, record *core.Record, data map[string]any, payload ActionPayload, step FlowStep) error {
+	spec, ok := flowActionSpecs[step.Action]
+	if !ok || spec.Apply == nil {
+		return nil
+	}
+	return spec.Apply(app, actor, record, data, payload, step)
 }

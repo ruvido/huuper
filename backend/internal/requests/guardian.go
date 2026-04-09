@@ -21,6 +21,11 @@ func GuardianRequestsForUser(app *pocketbase.PocketBase, userID string, visibleG
 		return nil, err
 	}
 
+	flow, err := LoadFlowSettings(app)
+	if err != nil {
+		return nil, err
+	}
+
 	groupIDs := make([]string, 0, len(records))
 	seenGroups := map[string]struct{}{}
 	for _, record := range records {
@@ -67,24 +72,25 @@ func GuardianRequestsForUser(app *pocketbase.PocketBase, userID string, visibleG
 		}
 
 		data := backendinternal.ParseJSONMap(record.Get("data"))
-		fullName, _ := data["full_name"].(string)
-		if strings.TrimSpace(fullName) == "" {
-			if fallbackName, ok := data["name"].(string); ok {
-				fullName = fallbackName
-			}
+		stepIndex := EffectiveStepIndex(record, data, flow)
+		status := StatusForItem(record.GetBool("rejected"), stepIndex, flow.Steps)
+		statusLabel := status
+		if nextStep, hasNext := FlowStepAt(flow, stepIndex); hasNext && strings.TrimSpace(nextStep.Label) != "" {
+			statusLabel = strings.TrimSpace(nextStep.Label)
 		}
 		guardianData, _ := data["guardian"].(map[string]any)
 		assignedAt, _ := guardianData["assigned_at"].(string)
 
 		items = append(items, GuardianRequestItem{
-			ID:         record.Id,
-			FullName:   strings.TrimSpace(fullName),
-			Email:      strings.TrimSpace(record.GetString("email")),
-			Status:     strings.TrimSpace(record.GetString("status")),
-			GroupID:    groupID,
-			GroupName:  groupsByID[groupID],
-			Created:    strings.TrimSpace(record.GetString("created")),
-			AssignedAt: strings.TrimSpace(assignedAt),
+			ID:          record.Id,
+			FullName:    strings.TrimSpace(DisplayName(data, strings.TrimSpace(record.GetString("email")), record.Id)),
+			Email:       strings.TrimSpace(record.GetString("email")),
+			Status:      strings.TrimSpace(status),
+			StatusLabel: strings.TrimSpace(statusLabel),
+			GroupID:     groupID,
+			GroupName:   groupsByID[groupID],
+			Created:     strings.TrimSpace(record.GetString("created")),
+			AssignedAt:  strings.TrimSpace(assignedAt),
 		})
 	}
 

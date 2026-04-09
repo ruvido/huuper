@@ -35,42 +35,8 @@ func ApplyAdvanceAction(app *pocketbase.PocketBase, actor *core.Record, record *
 		return apis.NewForbiddenError("forbidden_transition", nil)
 	}
 
-	if nextStep.Action == FlowActionAssignGroup {
-		if err := applyGroupAssignment(app, record, strings.TrimSpace(payload.GroupID), nextStep.Filter); err != nil {
-			return err
-		}
-	}
-
-	if nextStep.Action == FlowActionAssignGuardian {
-		if err := applyGuardianAssignment(app, record, data, actor, strings.TrimSpace(payload.GuardianID), nextStep.Filter); err != nil {
-			return err
-		}
-	}
-
-	if nextStep.Action == FlowActionMentoring {
-		note := strings.TrimSpace(payload.MentoringNotes)
-		if note == "" {
-			return apis.NewBadRequestError("missing_mentoring_notes", nil)
-		}
-		data["mentoring_notes"] = note
-		data["mentoring_done_at"] = time.Now().UTC().Format(time.RFC3339)
-		if actor != nil {
-			data["mentoring_done_by"] = actorDisplayName(actor)
-		}
-	}
-
-	if nextStep.Action == FlowActionGroupApproved {
-		data["group_approved_at"] = time.Now().UTC().Format(time.RFC3339)
-		if actor != nil {
-			data["group_approved_by"] = actorDisplayName(actor)
-		}
-	}
-
-	if nextStep.Action == FlowActionAdminApproved {
-		data["admin_approved_at"] = time.Now().UTC().Format(time.RFC3339)
-		if actor != nil {
-			data["admin_approved_by"] = actorDisplayName(actor)
-		}
+	if err := ApplyStepAction(app, actor, record, data, payload, nextStep); err != nil {
+		return err
 	}
 
 	data[FlowVersionDataKey] = flow.Version
@@ -102,6 +68,11 @@ func ApplySetGuardianAction(app *pocketbase.PocketBase, actor *core.Record, reco
 		return apis.NewBadRequestError("request_rejected", nil)
 	}
 
+	flow, err := LoadFlowSettings(app)
+	if err != nil {
+		return apis.NewBadRequestError("invalid_requests_flow_settings", err)
+	}
+
 	ok, err := backendinternal.HasRoleForRequest(app, actor, record, RoleAssistant, RoleAdmin, RoleGuardian, RoleAssistant)
 	if err != nil {
 		return apis.NewBadRequestError("role_resolution_failed", err)
@@ -113,6 +84,7 @@ func ApplySetGuardianAction(app *pocketbase.PocketBase, actor *core.Record, reco
 	if guardianID == "" {
 		record.Set("guardian", "")
 		delete(data, "guardian")
+		ResetStepsAfterAction(flow, record, data, FlowActionAssignGuardian)
 		record.Set("data", data)
 		return nil
 	}
@@ -120,6 +92,36 @@ func ApplySetGuardianAction(app *pocketbase.PocketBase, actor *core.Record, reco
 	if err := applyGuardianAssignment(app, record, data, actor, guardianID, FilterGroupMembers); err != nil {
 		return err
 	}
+	ResetStepsAfterAction(flow, record, data, FlowActionAssignGuardian)
+	record.Set("data", data)
+	return nil
+}
+
+func ApplySetGroupAction(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any, groupID string) error {
+	if record.GetBool("rejected") {
+		return apis.NewBadRequestError("request_rejected", nil)
+	}
+
+	flow, err := LoadFlowSettings(app)
+	if err != nil {
+		return apis.NewBadRequestError("invalid_requests_flow_settings", err)
+	}
+
+	ok, err := backendinternal.HasRoleForRequest(app, actor, record, RoleAssistant, RoleAdmin, RoleGuardian, RoleAssistant)
+	if err != nil {
+		return apis.NewBadRequestError("role_resolution_failed", err)
+	}
+	if !ok {
+		if actor == nil || !actor.GetBool("admin") {
+			return apis.NewForbiddenError("forbidden_transition", nil)
+		}
+	}
+
+	if err := applyGroupAssignment(app, record, strings.TrimSpace(groupID), ""); err != nil {
+		return err
+	}
+
+	ResetStepsAfterAction(flow, record, data, FlowActionAssignGroup)
 	record.Set("data", data)
 	return nil
 }

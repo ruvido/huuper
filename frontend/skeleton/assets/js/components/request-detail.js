@@ -24,19 +24,7 @@ window.huuperRequestDetail = (() => {
   }
 
   function actionText(value) {
-    const raw = text(value);
-    const labels = {
-      assign_group: "Assign group",
-      assign_guardian: "Assign guardian",
-      mentoring: "Complete mentoring",
-      group_approved: "Approve group",
-      admin_approved: "Approve request",
-      reject: "Reject request",
-      promote: "Promote request",
-      advance: "Continue",
-    };
-
-    return labels[raw] || raw.replaceAll("_", " ").replaceAll("-", " ").trim() || "Continue";
+    return window.huuperRequestItem.actionText(value);
   }
 
   function row(label, value) {
@@ -73,16 +61,10 @@ window.huuperRequestDetail = (() => {
       const requiredField = workflow.required_field || "";
       const actionLabel = actionText(workflow.next_action || workflow.current_action);
       const parts = [`<article class="request-workflow-card">`];
-      if (requiredField === "group") {
-        parts.push(`<div class="action-row request-page-actions"><button id="request-advance" class="primary" type="button">${window.huuperListPage.escapeHTML(actionLabel)}</button><button id="request-reject" class="request-reject-button" type="button">Reject</button></div>`);
-      } else if (requiredField === "guardian") {
-        parts.push(`<div class="action-row request-page-actions"><button id="request-advance" class="primary" type="button">${window.huuperListPage.escapeHTML(actionLabel)}</button><button id="request-reject" class="request-reject-button" type="button">Reject</button></div>`);
-      } else if (requiredField === "mentoring_notes") {
+      if (requiredField === "mentoring_notes") {
         parts.push(`<label class="form-field"><span>Mentoring notes</span><textarea id="request-mentoring-notes"></textarea></label>`);
-        parts.push(`<div class="action-row request-page-actions"><button id="request-advance" class="primary" type="button">${window.huuperListPage.escapeHTML(actionLabel)}</button><button id="request-reject" class="request-reject-button" type="button">Reject</button></div>`);
-      } else {
-        parts.push(`<div class="action-row request-page-actions"><button id="request-advance" class="primary" type="button">${window.huuperListPage.escapeHTML(actionLabel)}</button><button id="request-reject" class="request-reject-button" type="button">Reject</button></div>`);
       }
+      parts.push(`<div class="action-row request-page-actions"><button id="request-advance" class="primary" type="button">${window.huuperListPage.escapeHTML(actionLabel)}</button><button id="request-reject" class="request-reject-button" type="button">Reject</button></div>`);
       parts.push(`</article>`);
       workflowNode.innerHTML = parts.join("");
       workflowNode.hidden = false;

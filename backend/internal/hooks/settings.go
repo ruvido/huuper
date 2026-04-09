@@ -59,28 +59,8 @@ func RegisterSettingsValidation(app *pocketbase.PocketBase) {
 }
 
 func validateRequestsFlowSettingData(data map[string]any) error {
-	if _, err := requestinternal.ParseFlowConfig(data); err == nil {
-		return nil
-	}
-	return validateLegacyRequestsFlowSettingData(data)
-}
-
-func validateLegacyRequestsFlowSettingData(data map[string]any) error {
-	rawStatuses, ok := data["statuses"]
-	if !ok {
-		return fmt.Errorf("settings.requests_flow missing statuses")
-	}
-	statuses, ok := rawStatuses.([]any)
-	if !ok || len(statuses) == 0 {
-		return fmt.Errorf("settings.requests_flow statuses must be a non-empty array")
-	}
-	for i, raw := range statuses {
-		status := strings.TrimSpace(backendinternal.AnyToString(raw))
-		if status == "" {
-			return fmt.Errorf("settings.requests_flow statuses[%d] is empty", i)
-		}
-	}
-	return nil
+	_, err := requestinternal.ParseFlowConfig(data)
+	return err
 }
 
 func loadProfileSchemaKeys(app core.App) (map[string]struct{}, error) {

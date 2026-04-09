@@ -76,6 +76,22 @@ window.huuperRequestItem = (() => {
     return humanized.charAt(0).toUpperCase() + humanized.slice(1);
   }
 
+  function actionText(value) {
+    const raw = text(value);
+    const labels = {
+      assign_group: "Assign group",
+      assign_guardian: "Assign guardian",
+      mentoring: "Complete mentoring",
+      group_approved: "Approve group",
+      admin_approved: "Approve request",
+      reject: "Reject request",
+      promote: "Promote request",
+      advance: "Continue",
+    };
+
+    return labels[raw] || raw.replaceAll("_", " ").replaceAll("-", " ").trim() || "Continue";
+  }
+
   function title(item) {
     const data = item && typeof item.data === "object" ? item.data : {};
     return escapeHTML(item.full_name || data.full_name || data.name || item.email || item.id || "");
@@ -290,6 +306,7 @@ window.huuperRequestItem = (() => {
   }
 
   return {
+    actionText,
     renderDetail,
     renderListItem,
     statusText,

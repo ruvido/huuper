@@ -53,6 +53,8 @@ func SubmitRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 			return apis.NewBadRequestError("failed_to_create_request", err)
 		}
 
+		backendrequests.NotifyNewRequest(app, record, data)
+
 		return e.JSON(http.StatusCreated, map[string]any{
 			"id":       record.Id,
 			"email":    record.GetString("email"),
