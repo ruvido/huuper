@@ -141,6 +141,7 @@ window.huuperRequestDetail = (() => {
           if ((requiredField === "group" || requiredField === "guardian") && window.huuperRequestAssignmentSheet) {
             window.huuperRequestAssignmentSheet.open({
               requestID: id,
+              payload,
               requestsURL: config.requestsURL,
               detailURL: config.detailURL,
               actionURL: config.actionURL,

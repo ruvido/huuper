@@ -9,7 +9,12 @@ type SignupSettingsConfig struct {
 }
 
 type ProfileFieldConfig struct {
-	Key string `json:"key"`
+	Key      string   `json:"key"`
+	Type     string   `json:"type"`
+	Required bool     `json:"required"`
+	Options  []string `json:"options"`
+	Min      int      `json:"min"`
+	Max      int      `json:"max"`
 }
 
 type ProfileSchemaConfig struct {

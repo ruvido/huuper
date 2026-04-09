@@ -74,7 +74,11 @@ window.huuperRequestAssignmentSheet = (() => {
       return;
     }
 
-    window.huuperAuth.apiFetch(config.detailURL(config.requestID)).then((payload) => {
+    const payloadPromise = config.payload
+      ? Promise.resolve(config.payload)
+      : window.huuperAuth.apiFetch(config.detailURL(config.requestID));
+
+    payloadPromise.then((payload) => {
       const workflow = payload && typeof payload.workflow === "object" ? payload.workflow : {};
       const action = text(workflow.pending_action);
       const mode = action === "set_guardian" ? "guardian" : "group";

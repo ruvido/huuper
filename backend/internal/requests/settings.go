@@ -3,6 +3,7 @@ package requests
 import (
 	"fmt"
 	"maps"
+	"strconv"
 	"strings"
 
 	backendinternal "members/backend/internal"
@@ -58,7 +59,27 @@ func LoadProfileSchemaSettings(app *pocketbase.PocketBase) (ProfileSchemaConfig,
 		if key == "" {
 			continue
 		}
-		cfg.Fields = append(cfg.Fields, ProfileFieldConfig{Key: key})
+
+		options := []string{}
+		if rawOptions, ok := field["options"].([]any); ok {
+			options = make([]string, 0, len(rawOptions))
+			for _, rawOption := range rawOptions {
+				option := strings.TrimSpace(backendinternal.AnyToString(rawOption))
+				if option == "" {
+					continue
+				}
+				options = append(options, option)
+			}
+		}
+
+		cfg.Fields = append(cfg.Fields, ProfileFieldConfig{
+			Key:      key,
+			Type:     strings.ToLower(strings.TrimSpace(backendinternal.AnyToString(field["type"]))),
+			Required: parseRequiredFlag(field["required"]),
+			Options:  options,
+			Min:      parseOptionalInt(field["min"]),
+			Max:      parseOptionalInt(field["max"]),
+		})
 	}
 	return cfg, nil
 }
@@ -202,5 +223,30 @@ func ParseBoolQuery(raw string, fallback bool) (bool, error) {
 		return false, nil
 	default:
 		return false, fmt.Errorf("invalid bool")
+	}
+}
+
+func parseOptionalInt(raw any) int {
+	value := strings.TrimSpace(backendinternal.AnyToString(raw))
+	if value == "" {
+		return 0
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return 0
+	}
+	return parsed
+}
+
+func parseRequiredFlag(raw any) bool {
+	switch value := raw.(type) {
+	case bool:
+		return value
+	default:
+		parsed, err := ParseBoolQuery(backendinternal.AnyToString(raw), false)
+		if err != nil {
+			return false
+		}
+		return parsed
 	}
 }

@@ -166,3 +166,114 @@ func TestParseFlowConfigRejectsAssistantAssignGroup(t *testing.T) {
 		t.Fatalf("expected assign_group with assistant role to be rejected")
 	}
 }
+
+func TestBuildWorkflowStateAllowsAssignedGuardianOnly(t *testing.T) {
+	record := testRequestRecord()
+	record.Set("group", "group-1")
+	record.Set("guardian", "guardian-1")
+	data := map[string]any{
+		"guardian": map[string]any{
+			"name":        "Guardian",
+			"assigned_at": "2026-04-09T10:00:00Z",
+		},
+	}
+	record.Set("data", SetRequestFlowSnapshot(data, testFlow()))
+
+	collection := core.NewBaseCollection("users")
+	collection.Fields.Add(
+		&core.TextField{Name: "email"},
+		&core.BoolField{Name: "admin"},
+		&core.JSONField{Name: "data"},
+	)
+	guardian := core.NewRecord(collection)
+	guardian.Set("id", "guardian-1")
+	other := core.NewRecord(collection)
+	other.Set("id", "guardian-2")
+
+	state, err := BuildWorkflowState(nil, guardian, record, data, false, testFlow())
+	if err != nil {
+		t.Fatalf("unexpected error for assigned guardian: %v", err)
+	}
+	if !state.CanTakeAction {
+		t.Fatalf("expected assigned guardian to be allowed to take action")
+	}
+	if state.RequiredField != "mentoring_notes" {
+		t.Fatalf("expected mentoring_notes required field, got %q", state.RequiredField)
+	}
+	if state.CurrentAction != ActionSetMentoring {
+		t.Fatalf("expected current action %q, got %q", ActionSetMentoring, state.CurrentAction)
+	}
+
+	state, err = BuildWorkflowState(nil, other, record, data, false, testFlow())
+	if err != nil {
+		t.Fatalf("unexpected error for unrelated guardian: %v", err)
+	}
+	if state.CanTakeAction {
+		t.Fatalf("expected unrelated guardian to be blocked")
+	}
+}
+
+func TestBuildWorkflowStateAllowsAdminOverride(t *testing.T) {
+	record := testRequestRecord()
+	data := map[string]any{}
+	record.Set("data", SetRequestFlowSnapshot(data, testFlow()))
+
+	collection := core.NewBaseCollection("users")
+	collection.Fields.Add(
+		&core.TextField{Name: "email"},
+		&core.BoolField{Name: "admin"},
+		&core.JSONField{Name: "data"},
+	)
+	admin := core.NewRecord(collection)
+	admin.Set("id", "admin-1")
+	admin.Set("admin", true)
+
+	state, err := BuildWorkflowState(nil, admin, record, data, false, testFlow())
+	if err != nil {
+		t.Fatalf("unexpected error for admin: %v", err)
+	}
+	if !state.CanTakeAction {
+		t.Fatalf("expected admin override to allow current step action")
+	}
+	if !state.CanReject {
+		t.Fatalf("expected admin to be allowed to reject")
+	}
+	if state.CurrentAction != ActionSetGroup {
+		t.Fatalf("expected current action %q, got %q", ActionSetGroup, state.CurrentAction)
+	}
+}
+
+func TestBuildWorkflowStateRejectedRequestDisablesActions(t *testing.T) {
+	record := testRequestRecord()
+	record.Set("rejected", true)
+	data := map[string]any{
+		"rejected": map[string]any{
+			"reason": "No fit",
+		},
+	}
+	record.Set("data", SetRequestFlowSnapshot(data, testFlow()))
+
+	collection := core.NewBaseCollection("users")
+	collection.Fields.Add(
+		&core.TextField{Name: "email"},
+		&core.BoolField{Name: "admin"},
+		&core.JSONField{Name: "data"},
+	)
+	admin := core.NewRecord(collection)
+	admin.Set("id", "admin-1")
+	admin.Set("admin", true)
+
+	state, err := BuildWorkflowState(nil, admin, record, data, true, testFlow())
+	if err != nil {
+		t.Fatalf("unexpected error for rejected request: %v", err)
+	}
+	if state.Status != StatusRejected {
+		t.Fatalf("expected rejected status, got %q", state.Status)
+	}
+	if state.CanTakeAction {
+		t.Fatalf("expected rejected request to block step actions")
+	}
+	if state.CanReject {
+		t.Fatalf("expected rejected request to block reject action")
+	}
+}
