@@ -139,12 +139,12 @@ window.huuperRequestItem = (() => {
 
   function workflowNotesHTML(item) {
     const workflow = item && typeof item.workflow === "object" ? item.workflow : {};
-    const rawHTML = text(workflow.next_action_notes_html);
+    const rawHTML = text(workflow.pending_action_notes_html);
     if (rawHTML) {
       return rawHTML;
     }
 
-    const rawText = notesText(workflow.next_action_notes);
+    const rawText = notesText(workflow.pending_action_notes);
     if (!rawText) {
       return "";
     }
@@ -249,8 +249,8 @@ window.huuperRequestItem = (() => {
 
   function actionHref(item, options = {}) {
     const workflow = item && typeof item.workflow === "object" ? item.workflow : {};
-    const action = text(workflow.current_action || workflow.next_action);
-    if (workflow.can_take_action !== true) {
+    const action = text(workflow.pending_action);
+    if (workflow.can_take_pending_action !== true) {
       return "";
     }
     if (action === "set_group" && typeof options.assignGroupURL === "function") {
@@ -285,7 +285,7 @@ window.huuperRequestItem = (() => {
     const safeTitle = escapeHTML(displayTitle);
     const meta = requestMeta(item);
     const workflow = item && typeof item.workflow === "object" ? item.workflow : {};
-    const status = text(workflow.current_action_label) || statusText(item.status_label || item.status);
+    const status = text(workflow.pending_action_label) || statusText(item.status_label || item.status);
     const nextHref = actionHref(item, options);
     const side = status
       ? (nextHref

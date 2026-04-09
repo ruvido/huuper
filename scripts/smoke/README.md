@@ -3,8 +3,7 @@
 Smoke test operativi per il backend v2.
 
 ## File
-- `run.sh`: entrypoint unico per lo smoke test `public / me / admin`
-- `request_notifications.sh`: smoke interattivo per verificare il request flow passo per passo e le email attese
+- `request_notifications.sh`: smoke interattivo canonico per verificare il request flow passo per passo, con ruoli reali e email attese
 - `auth_admin.sh`: ottiene un token admin da `scripts/.env`
 - `auth_member.sh`: ottiene un token member da `scripts/.env`
 
@@ -16,27 +15,20 @@ Smoke test operativi per il backend v2.
 - `MEMBER_PASSWORD` oppure `USER_PASSWORD`
 
 ## Variabili opzionali
-- `EVENT_SLUG`: abilita il blocco smoke per gli eventi
 - `ADMIN_TOKEN`: bypass del login admin
 - `MEMBER_TOKEN`: bypass del login member
-- `GUARDIAN_TOKEN`: bypass del login guardian per lo smoke request a ruoli reali
+- `GUARDIAN_TOKEN`: bypass del login guardian per lo smoke request
 - `GUARDIAN_EMAIL`
 - `GUARDIAN_PASSWORD`
-- `REQUEST_SMOKE_GROUP_ID`: gruppo usato per il pipeline smoke delle request
-- `REQUEST_SMOKE_GUARDIAN_ID`: guardian usato per il pipeline smoke delle request
+- `REQUEST_SMOKE_GROUP_ID`: gruppo usato per lo smoke request
+- `REQUEST_SMOKE_GUARDIAN_ID`: guardian usato per lo smoke request
 
 ## Uso
-```bash
-scripts/smoke/run.sh
-```
-
-Per verificare le email del request flow in modo interattivo:
-
 ```bash
 scripts/smoke/request_notifications.sh
 ```
 
-Lo script crea una request con email `requests.smoke.<timestamp>@realmen.it` e chiede conferma prima di ogni step del flow:
+Lo script crea una request con email `requests.smoke.<timestamp>@realmen.it`, usa i ruoli reali del flow e chiede conferma prima di ogni step:
 
 - `set_group`
 - `set_guardian`
@@ -45,3 +37,5 @@ Lo script crea una request con email `requests.smoke.<timestamp>@realmen.it` e c
 - `set_admin_approved`
 
 Per ogni step mostra quale email ti aspetti di vedere.
+
+Non esiste piu' un entrypoint smoke generico: per il dominio `request` questo script e' la source of truth operativa.

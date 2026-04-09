@@ -149,7 +149,7 @@ func GroupGetHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) erro
 				if err != nil {
 					return apis.NewBadRequestError("failed_group_request_workflow", err)
 				}
-				statusLabel := strings.TrimSpace(backendinternal.AnyToString(item.Workflow["current_action_label"]))
+				statusLabel := strings.TrimSpace(backendinternal.AnyToString(item.Workflow["pending_action_label"]))
 				if statusLabel == "" {
 					flow, err := backendrequests.LoadFlowForRequest(app, item.Data)
 					if err != nil {

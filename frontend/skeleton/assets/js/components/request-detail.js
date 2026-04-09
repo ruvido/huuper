@@ -1,8 +1,4 @@
 window.huuperRequestDetail = (() => {
-  function redirectToRequests(requestsURL) {
-    window.location.replace(requestsURL);
-  }
-
   function text(value) {
     return window.huuperListPage.text(value);
   }
@@ -40,7 +36,7 @@ window.huuperRequestDetail = (() => {
     const summaryNode = document.querySelector("#request-summary");
     const workflowNode = document.querySelector("#request-workflow");
     const topbarMetaNode = document.querySelector("#request-topbar-meta");
-    if (!statusNode || !summaryNode || !workflowNode || !window.huuperAuth || !window.huuperListPage || !window.huuperRequestItem || !window.huuperActionSheet) {
+    if (!statusNode || !summaryNode || !workflowNode || !window.huuperAuth || !window.huuperListPage || !window.huuperRequestItem || !window.huuperActionSheet || !window.huuperRequestActions) {
       return;
     }
 
@@ -52,7 +48,7 @@ window.huuperRequestDetail = (() => {
     }
     function renderWorkflow(payload) {
       const workflow = payload && typeof payload.workflow === "object" ? payload.workflow : {};
-      const canTakeAction = workflow.can_take_action === true;
+      const canTakeAction = workflow.can_take_pending_action === true;
       const canReject = workflow.can_reject === true;
       if (!canTakeAction && !canReject) {
         workflowNode.hidden = true;
@@ -61,14 +57,14 @@ window.huuperRequestDetail = (() => {
       }
 
       const requiredField = workflow.required_field || "";
-      const action = text(workflow.current_action || workflow.next_action);
+      const action = text(workflow.pending_action);
       const parts = [`<article class="request-workflow-card">`];
       if (canTakeAction && requiredField === "mentoring_notes") {
         parts.push(`<label class="form-field"><span>Mentoring notes</span><textarea id="request-mentoring-notes"></textarea></label>`);
       }
       const actions = [];
       if (canTakeAction && action) {
-        const actionLabel = text(workflow.current_action_label || workflow.next_action_label) || actionText(action);
+        const actionLabel = text(workflow.pending_action_label) || actionText(action);
         actions.push(`<button id="request-action" class="primary" type="button">${window.huuperListPage.escapeHTML(actionLabel)}</button>`);
       }
       if (canReject) {
@@ -118,16 +114,15 @@ window.huuperRequestDetail = (() => {
                 }
                 try {
                   sheetButton.disabled = true;
-                  await window.huuperAuth.apiFetch(config.actionURL(id), {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
+                  window.huuperActionSheet.close();
+                  await window.huuperRequestActions.submitAndRedirect({
+                    actionURL: config.actionURL(id),
+                    body: {
                       action: "reject",
                       reason,
-                    }),
+                    },
+                    redirectURL: config.requestsURL,
                   });
-                  window.huuperActionSheet.close();
-                  redirectToRequests(config.requestsURL);
                 } catch (_) {
                   sheetButton.disabled = false;
                   window.huuperListPage.setStatus(statusNode, "Reject unavailable.");
@@ -165,12 +160,11 @@ window.huuperRequestDetail = (() => {
           try {
             button.disabled = true;
             window.huuperListPage.setStatus(statusNode, "");
-            await window.huuperAuth.apiFetch(config.actionURL(id), {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(body),
+            await window.huuperRequestActions.submitAndRedirect({
+              actionURL: config.actionURL(id),
+              body,
+              redirectURL: config.requestsURL,
             });
-            redirectToRequests(config.requestsURL);
           } catch (error) {
             if (error && error.message === "missing_mentoring_notes") {
               window.huuperListPage.setStatus(statusNode, "Write notes.");

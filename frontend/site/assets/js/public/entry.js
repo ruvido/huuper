@@ -63,6 +63,43 @@
     ready: false,
   };
 
+  async function submitRequest() {
+    requestState.submitting = true;
+    updateActions();
+
+    try {
+      const payload = collectRequestPayload();
+      const response = await fetch(submitURL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        throw new Error("request_failed");
+      }
+
+      requestState.submitting = false;
+      requestState.values = {};
+      requestState.showConfirmation = false;
+
+      if (requestState.success) {
+        requestState.showSuccess = true;
+        renderStep();
+        return;
+      }
+
+      requestState.stepIndex = hasStartPage() ? -1 : 0;
+      renderStep();
+    } catch (_) {
+      requestState.submitting = false;
+      updateActions();
+      requestStatusNode.textContent = "Request failed.";
+      requestStatusNode.hidden = false;
+    }
+  }
+
   function showMode(mode) {
     for (const tabNode of tabNodes) {
       const active = tabNode.dataset.publicMode === mode;
@@ -538,35 +575,8 @@
     }
 
     try {
-      requestState.submitting = true;
-      updateActions();
-      const payload = collectRequestPayload();
-      const response = await fetch(submitURL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-      if (!response.ok) {
-        throw new Error("request_failed");
-      }
-      requestState.submitting = false;
-      requestState.showConfirmation = false;
-      if (requestState.success) {
-        requestState.showSuccess = true;
-        renderStep();
-        return;
-      }
-      requestState.values = {};
-      requestState.stepIndex = hasStartPage() ? -1 : 0;
-      renderStep();
-    } catch (_) {
-      requestState.submitting = false;
-      updateActions();
-      requestStatusNode.textContent = "Request failed.";
-      requestStatusNode.hidden = false;
-    }
+      await submitRequest();
+    } catch (_) {}
   });
 
   requestForm.addEventListener("submit", async (event) => {
@@ -575,28 +585,7 @@
     requestStatusNode.textContent = "";
 
     if (isConfirmationScreen()) {
-      try {
-        const payload = collectRequestPayload();
-        const response = await fetch(submitURL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        });
-        if (!response.ok) {
-          throw new Error("request_failed");
-        }
-        requestState.values = {};
-        requestState.stepIndex = hasStartPage() ? -1 : 0;
-        requestState.showConfirmation = false;
-        renderStep();
-        requestStatusNode.textContent = "Request sent.";
-        requestStatusNode.hidden = false;
-      } catch (_) {
-        requestStatusNode.textContent = "Request failed.";
-        requestStatusNode.hidden = false;
-      }
+      await submitRequest();
       return;
     }
 

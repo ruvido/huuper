@@ -68,9 +68,9 @@ window.huuperRequestListPage = (() => {
     function urgentItems(items) {
       return items.filter((item) => {
         const workflow = item && typeof item.workflow === "object" ? item.workflow : {};
-        const nextRole = text(workflow.next_role);
+        const nextRole = text(workflow.pending_role);
         const allowedRoles = Array.isArray(config.roles) ? config.roles : [];
-        return workflow.can_take_action === true && allowedRoles.includes(nextRole);
+        return workflow.can_take_pending_action === true && allowedRoles.includes(nextRole);
       });
     }
 

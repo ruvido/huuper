@@ -79,21 +79,9 @@ func ListRequestsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) 
 		filters = append(filters, "rejected = false")
 
 		filter := strings.Join(filters, " && ")
-		records, err := app.FindRecordsByFilter("requests", filter, sort, perPage, (page-1)*perPage, params)
+		items, err := listRequestItems(app, actor, filter, sort, page, perPage, params, status)
 		if err != nil {
-			return apis.NewBadRequestError("failed_requests", err)
-		}
-
-		items := make([]backendrequests.ListItem, 0, len(records))
-		for _, record := range records {
-			item, err := backendrequests.MapItemWithWorkflow(app, actor, record)
-			if err != nil {
-				return apis.NewBadRequestError("failed_requests_workflow", err)
-			}
-			if status != "" && !strings.EqualFold(strings.TrimSpace(item.Status), strings.TrimSpace(status)) {
-				continue
-			}
-			items = append(items, item)
+			return err
 		}
 
 		return e.JSON(http.StatusOK, map[string]any{
@@ -101,6 +89,82 @@ func ListRequestsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) 
 			"page":  page,
 		})
 	}
+}
+
+func listRequestItems(app *pocketbase.PocketBase, actor *core.Record, filter string, sort string, page int, perPage int, params map[string]any, status string) ([]backendrequests.ListItem, error) {
+	if strings.TrimSpace(status) == "" {
+		records, err := app.FindRecordsByFilter("requests", filter, sort, perPage, (page-1)*perPage, params)
+		if err != nil {
+			return nil, apis.NewBadRequestError("failed_requests", err)
+		}
+		return mapRequestItems(app, actor, records, "")
+	}
+
+	targetCount := page * perPage
+	batchSize := perPage
+	if batchSize < 100 {
+		batchSize = 100
+	}
+	if batchSize > 500 {
+		batchSize = 500
+	}
+
+	start := (page - 1) * perPage
+	selected := make([]*core.Record, 0, perPage)
+	matched := 0
+
+	for offset := 0; ; offset += batchSize {
+		records, err := app.FindRecordsByFilter("requests", filter, sort, batchSize, offset, params)
+		if err != nil {
+			return nil, apis.NewBadRequestError("failed_requests", err)
+		}
+		if len(records) == 0 {
+			break
+		}
+
+		for _, record := range records {
+			ok, err := backendrequests.RecordMatchesStatus(app, record, status)
+			if err != nil {
+				return nil, apis.NewBadRequestError("failed_requests_workflow", err)
+			}
+			if !ok {
+				continue
+			}
+			if matched >= start && len(selected) < perPage {
+				selected = append(selected, record)
+			}
+			matched++
+			if len(selected) >= perPage && matched >= targetCount {
+				break
+			}
+		}
+		if len(selected) >= perPage && matched >= targetCount {
+			break
+		}
+		if len(records) < batchSize {
+			break
+		}
+	}
+
+	if len(selected) == 0 {
+		return []backendrequests.ListItem{}, nil
+	}
+	return mapRequestItems(app, actor, selected, "")
+}
+
+func mapRequestItems(app *pocketbase.PocketBase, actor *core.Record, records []*core.Record, status string) ([]backendrequests.ListItem, error) {
+	items := make([]backendrequests.ListItem, 0, len(records))
+	for _, record := range records {
+		item, err := backendrequests.MapItemWithWorkflow(app, actor, record)
+		if err != nil {
+			return nil, apis.NewBadRequestError("failed_requests_workflow", err)
+		}
+		if strings.TrimSpace(status) != "" && !strings.EqualFold(strings.TrimSpace(item.Status), strings.TrimSpace(status)) {
+			continue
+		}
+		items = append(items, item)
+	}
+	return items, nil
 }
 
 func GetRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
@@ -141,7 +205,7 @@ func GetRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) er
 		}
 
 		workflow := backendrequests.BuildWorkflowPayload(state, flow)
-		workflow["next_action_notes_html"] = requestNotesHTML(state.NextStep.Notes)
+		workflow["pending_action_notes_html"] = requestNotesHTML(state.NextStep.Notes)
 		workflow["filter"] = state.NextStep.Filter
 		workflow["options"] = options
 
@@ -393,7 +457,6 @@ func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 			"id":       record.Id,
 			"status":   state.Status,
 			"rejected": record.GetBool("rejected"),
-			"data":     record.Get("data"),
 		})
 	}
 }

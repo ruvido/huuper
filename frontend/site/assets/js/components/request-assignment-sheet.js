@@ -1,8 +1,4 @@
 window.huuperRequestAssignmentSheet = (() => {
-  function redirectToRequests(requestsURL) {
-    window.location.replace(requestsURL);
-  }
-
   function text(value) {
     return window.huuperListPage.text(value);
   }
@@ -74,13 +70,13 @@ window.huuperRequestAssignmentSheet = (() => {
   }
 
   function open(config) {
-    if (!window.huuperActionSheet || !window.huuperAuth || !window.huuperListPage || !window.huuperGroupMeta) {
+    if (!window.huuperActionSheet || !window.huuperAuth || !window.huuperListPage || !window.huuperGroupMeta || !window.huuperRequestActions) {
       return;
     }
 
     window.huuperAuth.apiFetch(config.detailURL(config.requestID)).then((payload) => {
       const workflow = payload && typeof payload.workflow === "object" ? payload.workflow : {};
-      const action = text(workflow.current_action || workflow.next_action);
+      const action = text(workflow.pending_action);
       const mode = action === "set_guardian" ? "guardian" : "group";
       const options = workflow.options || {};
       const items = mode === "guardian"
@@ -93,7 +89,7 @@ window.huuperRequestAssignmentSheet = (() => {
 
       let selectedID = "";
       let selectedLabel = "";
-      const actionLabel = text(workflow.current_action_label || workflow.next_action_label || (mode === "guardian" ? "Assign guardian" : "Assign group"));
+      const actionLabel = text(workflow.pending_action_label || (mode === "guardian" ? "Assign guardian" : "Assign group"));
 
       window.huuperActionSheet.open({
         title: actionLabel,
@@ -113,13 +109,11 @@ window.huuperRequestAssignmentSheet = (() => {
               body.group = selectedID;
             }
             try {
-              await window.huuperAuth.apiFetch(config.actionURL(config.requestID), {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(body),
+              await window.huuperRequestActions.submitAndRedirect({
+                actionURL: config.actionURL(config.requestID),
+                body,
+                redirectURL: config.requestsURL,
               });
-              window.huuperActionSheet.close();
-              redirectToRequests(config.requestsURL);
             } catch (_) {
               button.disabled = false;
             }

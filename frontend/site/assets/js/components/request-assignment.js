@@ -1,8 +1,4 @@
 window.huuperRequestAssignment = (() => {
-  function redirectToRequests(requestsURL) {
-    window.location.replace(requestsURL);
-  }
-
   function text(value) {
     return window.huuperListPage.text(value);
   }
@@ -75,7 +71,7 @@ window.huuperRequestAssignment = (() => {
         const choiceID = text(button.getAttribute("data-choice"));
         const choiceName = text(button.getAttribute("data-choice-label"));
         const workflow = payload && typeof payload.workflow === "object" ? payload.workflow : {};
-        const action = text(workflow.current_action || workflow.next_action);
+        const action = text(workflow.pending_action);
         window.huuperActionSheet.open({
           title: text(payload.full_name || payload.email || payload.id),
           meta: mode === "group" ? `Assign to ${choiceName}` : `Assign guardian ${choiceName}`,
@@ -91,12 +87,11 @@ window.huuperRequestAssignment = (() => {
                   } else {
                     body.guardian = choiceID;
                   }
-                  await window.huuperAuth.apiFetch(config.actionURL(config.requestID), {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(body),
+                  await window.huuperRequestActions.submitAndRedirect({
+                    actionURL: config.actionURL(config.requestID),
+                    body,
+                    redirectURL: config.requestsURL,
                   });
-                  redirectToRequests(config.requestsURL);
                 } catch (_) {
                   window.huuperListPage.setStatus(statusNode, "Action unavailable.");
                 }
@@ -112,7 +107,7 @@ window.huuperRequestAssignment = (() => {
     const statusNode = document.querySelector(config.statusSelector);
     const listNode = document.querySelector(config.listSelector);
     const titleNode = document.querySelector(".top-bar-title");
-    if (!statusNode || !listNode || !window.huuperAuth || !window.huuperListPage || !window.huuperActionSheet || !window.huuperListItem || !window.huuperGroupMeta) {
+    if (!statusNode || !listNode || !window.huuperAuth || !window.huuperListPage || !window.huuperActionSheet || !window.huuperListItem || !window.huuperGroupMeta || !window.huuperRequestActions) {
       return;
     }
 
@@ -127,7 +122,7 @@ window.huuperRequestAssignment = (() => {
       const workflow = payload && typeof payload.workflow === "object" ? payload.workflow : {};
       const requiredField = text(workflow.required_field);
       const expectedAction = config.mode === "group" ? "set_group" : "set_guardian";
-      if (workflow.can_take_action !== true || requiredField !== config.mode || text(workflow.current_action || workflow.next_action) !== expectedAction) {
+      if (workflow.can_take_pending_action !== true || requiredField !== config.mode || text(workflow.pending_action) !== expectedAction) {
         window.huuperListPage.setStatus(statusNode, "Action unavailable.");
         return;
       }

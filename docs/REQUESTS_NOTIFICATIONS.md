@@ -41,6 +41,12 @@ Supported step `action` values in settings:
 - `group_approved`
 - `admin_approved`
 
+Domain constraints:
+
+- `assign_group` must use role `admin`
+- `assistant` is always the assistant of a specific group, not a global request role
+- before a request has a `group`, no specific assistant can be resolved for it
+
 Supported `filter` values:
 
 - `local`
@@ -76,16 +82,17 @@ Additional actions outside the normal intermediate flow:
 
 The `workflow` payload returned by request list/detail exposes:
 
-- `current_action`
-- `current_action_label`
-- `next_action`
-- `next_action_label`
-- `next_role`
+- `pending_action`
+- `pending_flow_action`
+- `pending_action_label`
+- `pending_role`
+- `pending_action_notes`
 - `required_field`
-- `can_take_action`
+- `can_take_pending_action`
 - `can_reject`
+- `flow_version`
 
-`current_action` and `next_action` use the runtime action names above, not the raw step action names from settings.
+`pending_action` uses the runtime action names above, not the raw step action names from settings.
 
 ## Role visibility
 

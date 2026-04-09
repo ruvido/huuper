@@ -40,21 +40,42 @@ func MapItemWithWorkflow(app *pocketbase.PocketBase, actor *core.Record, record 
 	return item, nil
 }
 
+func StatusForRecord(app *pocketbase.PocketBase, record *core.Record) (string, error) {
+	item := MapItem(record)
+	flow, err := LoadFlowForRequest(app, item.Data)
+	if err != nil {
+		return "", err
+	}
+	stepIndex := EffectiveStepIndex(record, item.Data, flow)
+	return StatusForItem(item.Rejected, stepIndex, flow.Steps), nil
+}
+
+func RecordMatchesStatus(app *pocketbase.PocketBase, record *core.Record, status string) (bool, error) {
+	expected := NormalizeStatus(status)
+	if expected == "" {
+		return true, nil
+	}
+
+	current, err := StatusForRecord(app, record)
+	if err != nil {
+		return false, err
+	}
+	return strings.EqualFold(NormalizeStatus(current), expected), nil
+}
+
 func BuildWorkflowPayload(state WorkflowState, flow FlowConfig) map[string]any {
-	action := state.CurrentAction
 	return map[string]any{
-		"total_steps":          len(flow.Steps),
-		"has_next_step":        state.HasNext,
-		"current_action":       action,
-		"current_action_label": state.CurrentActionLabel,
-		"next_role":            state.NextStep.Role,
-		"next_action":          action,
-		"next_action_label":    state.NextStep.Label,
-		"next_action_notes":    state.NextStep.Notes,
-		"required_field":       state.RequiredField,
-		"can_take_action":      state.CanTakeAction,
-		"can_reject":           state.CanReject,
-		"current_version":      flow.Version,
+		"total_steps":             len(flow.Steps),
+		"has_pending_action":      state.HasNext,
+		"pending_role":            state.NextStep.Role,
+		"pending_action":          state.CurrentAction,
+		"pending_flow_action":     state.NextStep.Action,
+		"pending_action_label":    state.CurrentActionLabel,
+		"pending_action_notes":    state.NextStep.Notes,
+		"required_field":          state.RequiredField,
+		"can_take_pending_action": state.CanTakeAction,
+		"can_reject":              state.CanReject,
+		"flow_version":            flow.Version,
 	}
 }
 

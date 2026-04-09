@@ -232,6 +232,9 @@ func ParseFlowConfig(data map[string]any) (FlowConfig, error) {
 		if _, exists := allowedActions[action]; !exists {
 			return FlowConfig{}, fmt.Errorf("settings.requests_flow steps[%d] invalid action: %s", i, action)
 		}
+		if err := validateRoleForAction(action, role); err != nil {
+			return FlowConfig{}, fmt.Errorf("settings.requests_flow steps[%d] %w", i, err)
+		}
 
 		label := strings.TrimSpace(backendinternal.AnyToString(entry["label"]))
 		notes := strings.TrimSpace(backendinternal.AnyToString(entry["notes"]))
@@ -268,6 +271,16 @@ func ParseFlowConfig(data map[string]any) (FlowConfig, error) {
 	}
 
 	return FlowConfig{Version: version, Steps: steps}, nil
+}
+
+func validateRoleForAction(action, role string) error {
+	switch action {
+	case FlowActionAssignGroup:
+		if role != RoleAdmin {
+			return fmt.Errorf("invalid role for %s: %s", action, role)
+		}
+	}
+	return nil
 }
 
 func validateFilterForAction(action, filter string) error {
