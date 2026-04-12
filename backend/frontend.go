@@ -7,7 +7,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -16,6 +18,8 @@ const (
 )
 
 func buildFrontend(skeletonDir string, publicDir string, hotReload bool) error {
+	assetVersion := strconv.FormatInt(time.Now().Unix(), 10)
+
 	if err := os.RemoveAll(publicDir); err != nil {
 		return err
 	}
@@ -53,7 +57,7 @@ func buildFrontend(skeletonDir string, publicDir string, hotReload bool) error {
 		}
 
 		outPath := filepath.Join(publicDir, relPath)
-		return renderHTMLFile(path, outPath, componentFiles, hotReload)
+		return renderHTMLFile(path, outPath, componentFiles, hotReload, assetVersion)
 	})
 }
 
@@ -85,8 +89,8 @@ func frontendComponentFiles(componentsDir string) ([]string, error) {
 	return files, err
 }
 
-func renderHTMLFile(srcPath string, dstPath string, componentFiles []string, hotReload bool) error {
-	data, err := renderTemplate(srcPath, componentFiles)
+func renderHTMLFile(srcPath string, dstPath string, componentFiles []string, hotReload bool, assetVersion string) error {
+	data, err := renderTemplate(srcPath, componentFiles, assetVersion)
 	if err != nil {
 		return err
 	}
@@ -102,8 +106,18 @@ func renderHTMLFile(srcPath string, dstPath string, componentFiles []string, hot
 	return os.WriteFile(dstPath, data, 0o644)
 }
 
-func renderTemplate(pagePath string, componentFiles []string) ([]byte, error) {
+func renderTemplate(pagePath string, componentFiles []string, assetVersion string) ([]byte, error) {
 	funcs := template.FuncMap{
+		"asset": func(path string) string {
+			if assetVersion == "" {
+				return path
+			}
+			sep := "?"
+			if strings.Contains(path, "?") {
+				sep = "&"
+			}
+			return path + sep + "v=" + assetVersion
+		},
 		"dict": func(values ...any) (map[string]any, error) {
 			if len(values)%2 != 0 {
 				return nil, io.ErrUnexpectedEOF

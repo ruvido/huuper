@@ -56,10 +56,11 @@ window.huuperListPage = (() => {
     return parts.map((part) => part[0] || "").join("").toUpperCase();
   }
 
-  function renderListItemLink(href, title, meta) {
+  function renderListItemLink(href, title, meta, options = {}) {
     const safeHref = escapeHTML(href);
     const safeTitle = escapeHTML(title);
     const safeMeta = text(meta);
+    const sideHTML = options && options.sideHTML ? String(options.sideHTML) : "";
     return `
       <a class="list-item" href="${safeHref}">
         <span class="list-item-media" aria-hidden="true">
@@ -73,6 +74,7 @@ window.huuperListPage = (() => {
             ${safeMeta ? `<span class="list-item-meta">${escapeHTML(safeMeta)}</span>` : ""}
           </span>
         </span>
+        ${sideHTML ? `<span class="list-item-side list-item-side-badge">${sideHTML}</span>` : ""}
       </a>
     `;
   }

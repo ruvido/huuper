@@ -90,13 +90,15 @@ func UserGetHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error
 				continue
 			}
 			groupItems = append(groupItems, map[string]any{
-				"id":   group.Id,
-				"name": group.GetString("name"),
-				"type": group.GetString("type"),
+				"id":        group.Id,
+				"name":      group.GetString("name"),
+				"type":      group.GetString("type"),
+				"assistant": group.GetString("assistant"),
 			})
 		}
 
 		telegram := backendinternal.ParseJSONMap(user.Get("telegram"))
+		data := backendinternal.ParseJSONMap(user.Get("data"))
 		guardianRequests, err := requestinternal.GuardianRequestsForUser(app, userID, nil)
 		if err != nil {
 			return apis.NewBadRequestError("failed_guardian_requests", err)
@@ -106,6 +108,7 @@ func UserGetHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error
 			"email":             user.GetString("email"),
 			"full_name":         groupinternal.UserDisplayName(user),
 			"avatar":            strings.TrimSpace(user.GetString("avatar")),
+			"data":              data,
 			"status":            user.GetString("status"),
 			"admin":             user.GetBool("admin"),
 			"telegram":          telegram,

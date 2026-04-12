@@ -43,7 +43,7 @@
 
   const auth = window.huuperAuth.read();
   if (auth && auth.token) {
-    window.location.replace(auth.model && auth.model.admin === true ? "/admin/" : "/me/");
+    window.location.replace(window.huuperAuth.redirectAfterLogin(auth.model && auth.model.admin === true ? "admin" : "me"));
     return;
   }
 
@@ -630,7 +630,7 @@
 
     try {
       const result = await window.huuperAuth.login(email, password);
-      window.location.href = result.scope === "admin" ? "/admin/" : "/me/";
+      window.location.href = window.huuperAuth.redirectAfterLogin(result.scope);
     } catch (_) {
       loginErrorNode.textContent = "Invalid credentials.";
       loginErrorNode.hidden = false;

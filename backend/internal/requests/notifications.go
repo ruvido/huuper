@@ -2,6 +2,7 @@ package requests
 
 import (
 	"net/mail"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -111,6 +112,11 @@ func loadNotificationTemplate(app *pocketbase.PocketBase, kind string) (Notifica
 		return NotificationTemplate{}, false, nil
 	}
 
+	defaultTemplate, defaultFound, err := defaultNotificationTemplate(kind)
+	if err != nil || !defaultFound {
+		return NotificationTemplate{}, false, err
+	}
+
 	records, err := app.FindRecordsByFilter(
 		"templates",
 		"kind = {:kind}",
@@ -123,7 +129,7 @@ func loadNotificationTemplate(app *pocketbase.PocketBase, kind string) (Notifica
 		return NotificationTemplate{}, false, err
 	}
 	if len(records) == 0 || records[0] == nil {
-		return defaultNotificationTemplate(kind)
+		return defaultTemplate, true, nil
 	}
 	record := records[0]
 
@@ -131,6 +137,7 @@ func loadNotificationTemplate(app *pocketbase.PocketBase, kind string) (Notifica
 	if err := record.UnmarshalJSONField("data", &template); err != nil {
 		return NotificationTemplate{}, false, err
 	}
+	template = mergeNotificationTemplate(defaultTemplate, template)
 	return template, true, nil
 }
 
@@ -143,7 +150,21 @@ func defaultNotificationTemplate(kind string) (NotificationTemplate, bool, error
 	template := NotificationTemplate{}
 	template.Email.Subject = copy.Subject
 	template.Email.Body = copy.Body
+	template.Telegram.Body = copy.TelegramBody
 	return template, true, nil
+}
+
+func mergeNotificationTemplate(defaultTemplate NotificationTemplate, template NotificationTemplate) NotificationTemplate {
+	if strings.TrimSpace(template.Email.Subject) == "" {
+		template.Email.Subject = defaultTemplate.Email.Subject
+	}
+	if strings.TrimSpace(template.Email.Body) == "" {
+		template.Email.Body = defaultTemplate.Email.Body
+	}
+	if strings.TrimSpace(template.Telegram.Body) == "" {
+		template.Telegram.Body = defaultTemplate.Telegram.Body
+	}
+	return template
 }
 
 func sendNotificationEmail(app *pocketbase.PocketBase, recipients []mail.Address, template NotificationTemplate, values map[string]string) {
@@ -203,6 +224,7 @@ func requestNotificationValues(app *pocketbase.PocketBase, record *core.Record, 
 		"assistant_email": "",
 		"guardian_name":   "",
 		"guardian_email":  "",
+		"request_url":     "",
 		"data":            renderNotificationData(BuildUserData(data)),
 	}
 
@@ -211,6 +233,7 @@ func requestNotificationValues(app *pocketbase.PocketBase, record *core.Record, 
 		values["email"] = strings.TrimSpace(record.GetString("email"))
 		values["full_name"] = strings.TrimSpace(DisplayName(data, record.GetString("email"), record.Id))
 		values["name"] = values["full_name"]
+		values["request_url"] = "https://branco.realmen.it/me/request/?id=" + url.QueryEscape(record.Id)
 	}
 	if mobile, ok := data["mobile"].(string); ok {
 		values["mobile"] = strings.TrimSpace(mobile)

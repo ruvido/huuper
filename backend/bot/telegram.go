@@ -136,7 +136,7 @@ func listenForUpdates() {
 }
 
 func syncGroupNames() {
-	groups, err := app.FindRecordsByFilter("groups", "type = 'telegram'", "", 0, 0)
+	groups, err := app.FindRecordsByFilter("groups", "telegram.chat_id != ''", "", 0, 0)
 	if err != nil {
 		return
 	}
@@ -305,7 +305,7 @@ func handleChatMemberUpdate(update *tgbotapi.ChatMemberUpdated) {
 
 		// Update group data
 		group.Set("name", update.Chat.Title)
-		group.Set("type", "telegram")
+		group.Set("type", "local")
 		group.Set("telegram", map[string]any{
 			"chat_id": chatIDStr,
 			"type":    update.Chat.Type,

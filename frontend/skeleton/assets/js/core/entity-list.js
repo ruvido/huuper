@@ -37,6 +37,21 @@ window.huuperEntityList = (() => {
       }
     }
 
+    function shouldRefreshOnShow(event) {
+      if (event && event.persisted) {
+        return true;
+      }
+
+      const nav = performance.getEntriesByType && performance.getEntriesByType("navigation")[0];
+      return nav && nav.type === "back_forward";
+    }
+
+    window.addEventListener("pageshow", (event) => {
+      if (shouldRefreshOnShow(event)) {
+        load();
+      }
+    });
+
     load();
   }
 

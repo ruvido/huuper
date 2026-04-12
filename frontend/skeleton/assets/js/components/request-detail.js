@@ -3,6 +3,10 @@ window.huuperRequestDetail = (() => {
     return window.huuperListPage.text(value);
   }
 
+  function escapeHTML(value) {
+    return window.huuperListPage.escapeHTML(value);
+  }
+
   function requestAgeDaysLabel(value) {
     const raw = text(value);
     if (!raw) {
@@ -28,7 +32,268 @@ window.huuperRequestDetail = (() => {
     if (!rendered) {
       return "";
     }
-    return `<p class="request-row"><span>${window.huuperListPage.escapeHTML(label)}:</span> <strong>${window.huuperListPage.escapeHTML(rendered)}</strong></p>`;
+    return `<p class="request-row"><span>${escapeHTML(label)}:</span> <strong>${escapeHTML(rendered)}</strong></p>`;
+  }
+
+  function dateOnly(value) {
+    const raw = text(value);
+    if (!raw) {
+      return "";
+    }
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) {
+      return raw;
+    }
+    return new Intl.DateTimeFormat("it-IT", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }).format(parsed);
+  }
+
+  function processSignature(prefix, who, at) {
+    const cleanPrefix = text(prefix);
+    const cleanWho = text(who);
+    const parts = [];
+    if (cleanPrefix) {
+      parts.push(cleanPrefix);
+    }
+    if (cleanWho) {
+      parts.push(`by ${cleanWho}`);
+    }
+    const rendered = parts.join(" ").trim();
+    if (!rendered) {
+      return "";
+    }
+    return rendered;
+  }
+
+  function processNote(rawHTML, rawText) {
+    const html = text(rawHTML);
+    if (html) {
+      return html;
+    }
+    const plain = text(rawText);
+    if (!plain) {
+      return "";
+    }
+    return `<p>${escapeHTML(plain)}</p>`;
+  }
+
+  function requestFlowFromPayload(payload) {
+    if (payload && typeof payload.request_flow === "object" && payload.request_flow) {
+      const flowData = payload.request_flow.data;
+      if (flowData && typeof flowData === "object") {
+        return flowData;
+      }
+    }
+    return {};
+  }
+
+  function processStep(options) {
+    const title = text(options.title);
+    const info = text(options.info);
+    const date = dateOnly(options.date);
+    const value = text(options.valueText);
+    const subtitle = text(options.subtitle);
+    const signature = processSignature(options.signaturePrefix, options.signatureWho, options.signatureAt);
+    const note = processNote(options.noteHTML, options.noteText);
+    const flowNoteHTML = text(options.flowNoteHTML);
+    const flowNoteText = text(options.flowNoteText);
+    const completed = options.completed === true;
+    const current = options.current === true;
+    const classes = ["request-process-step"];
+    if (completed) {
+      classes.push("request-process-step-done");
+    } else if (current) {
+      classes.push("request-process-step-current");
+    } else {
+      classes.push("request-process-step-todo");
+    }
+    return `
+      <article class="${classes.join(" ")}">
+        <span class="request-process-marker" aria-hidden="true"></span>
+        <div class="request-process-content">
+          <div class="request-process-head">
+            ${title ? `
+              <div class="request-process-label-col">
+                <div class="request-process-label-wrap">
+                  <p class="request-detail-term request-process-label">${escapeHTML(title)}</p>
+                  ${info ? `<a class="request-process-info" href="${escapeHTML(info)}" target="_blank" rel="noreferrer" aria-label="${escapeHTML(`${title} info`)}">i</a>` : ""}
+                </div>
+                ${(value || date || subtitle || (completed && signature && options.showSignature !== false)) ? `
+                  <div class="request-process-meta">
+                    ${date ? `<p class="request-process-date">${escapeHTML(date)}</p>` : ""}
+                    ${value ? `<p class="request-process-value">${escapeHTML(value)}</p>` : ""}
+                    ${subtitle ? `<p class="request-process-note request-process-subtitle">${escapeHTML(subtitle)}</p>` : ""}
+                    ${(completed && signature && options.showSignature !== false) ? `<p class="request-process-signature">${escapeHTML(signature)}</p>` : ""}
+                  </div>
+                ` : ""}
+              </div>
+            ` : ""}
+          </div>
+          ${flowNoteHTML ? `<div class="request-process-flow-note">${flowNoteHTML}</div>` : flowNoteText ? `<p class="request-process-flow-note">${escapeHTML(flowNoteText)}</p>` : ""}
+          ${note ? `<div class="request-process-note">${note}</div>` : ""}
+        </div>
+      </article>
+    `;
+  }
+
+  function flowNoteForStep(step) {
+    const html = text(step && step.notes_html);
+    if (html) {
+      return { html, text: "" };
+    }
+    return {
+      html: "",
+      text: text(step && step.notes),
+    };
+  }
+
+  function renderProcessApproval(payload) {
+    const data = payload && typeof payload.data === "object" ? payload.data : {};
+    const flow = requestFlowFromPayload(payload);
+    const flowSteps = Array.isArray(flow.steps) ? flow.steps : [];
+    const flowTitle = text(flow.title);
+    const mentoringNoteHTML = text(payload.mentoring_notes_html);
+    const mentoringNoteText = text(payload.mentoring_notes || data.mentoring_notes);
+    const guardianData = data.guardian && typeof data.guardian === "object" ? data.guardian : {};
+    const groupName = text(payload.group_name);
+    const groupAssignedAt = text(data.group_assigned_at);
+    const groupAssignedBy = text(data.group_assigned_by);
+    const stepCompleted = (action) => {
+      switch (action) {
+        case "assign_group":
+          return groupAssignedAt !== "" || text(data.group) !== "";
+        case "assign_guardian":
+          return text(guardianData.assigned_at) !== "";
+        case "mentoring":
+          return text(data.mentoring_done_at) !== "";
+        case "group_approved":
+          return text(data.group_approved_at) !== "";
+        case "admin_approved":
+          return text(data.admin_approved_at) !== "";
+        default:
+          return false;
+      }
+    };
+    const currentIndex = flowSteps.findIndex((step) => !stepCompleted(text(step && step.action)));
+    const normalizedCurrentIndex = currentIndex < 0 ? flowSteps.length : currentIndex;
+    const stepStateForAction = (action, step, index) => {
+      const isCurrent = index === normalizedCurrentIndex;
+      const isDone = index < normalizedCurrentIndex;
+      const flowNote = flowNoteForStep(step);
+      switch (action) {
+        case "assign_group":
+          {
+            return {
+              completed: groupAssignedAt !== "" || text(data.group) !== "",
+              current: isCurrent,
+              date: groupAssignedAt,
+              subtitle: "",
+              signaturePrefix: groupAssignedBy ? "Assigned" : "",
+              signatureWho: groupAssignedBy,
+              signatureAt: groupAssignedAt,
+              flowNoteHTML: isCurrent ? flowNote.html : "",
+              flowNoteText: isCurrent ? flowNote.text : "",
+              valueText: groupName,
+            };
+          }
+        case "assign_guardian":
+          {
+            return {
+              completed: text(guardianData.assigned_at) !== "",
+              current: isCurrent,
+              date: guardianData.assigned_at,
+              subtitle: "",
+              signaturePrefix: text(guardianData.assigned_by) ? "Assigned" : "",
+              signatureWho: guardianData.assigned_by || payload.guardian_name,
+              signatureAt: guardianData.assigned_at,
+              flowNoteHTML: isCurrent ? flowNote.html : "",
+              flowNoteText: isCurrent ? flowNote.text : "",
+              valueText: text(guardianData.name),
+            };
+          }
+        case "mentoring":
+          return {
+            completed: text(data.mentoring_done_at) !== "",
+            current: isCurrent,
+            date: data.mentoring_done_at,
+            signaturePrefix: "Completed",
+            signatureWho: data.mentoring_done_by,
+            signatureAt: data.mentoring_done_at,
+            flowNoteHTML: mentoringNoteHTML ? "" : undefined,
+            flowNoteText: mentoringNoteHTML ? "" : undefined,
+            noteHTML: mentoringNoteHTML ? mentoringNoteHTML : "",
+            noteText: "",
+          };
+        case "group_approved":
+          return {
+            completed: text(data.group_approved_at) !== "",
+            current: isCurrent,
+            date: data.group_approved_at,
+            subtitle: text(data.group_approved_at) !== "" ? "Approved" : "",
+            signaturePrefix: "Completed",
+            signatureWho: data.group_approved_by,
+            signatureAt: data.group_approved_at,
+            flowNoteHTML: text(data.group_approved_at) !== "" ? "" : undefined,
+            flowNoteText: text(data.group_approved_at) !== "" ? "" : undefined,
+            noteText: "",
+          };
+        case "admin_approved":
+          return {
+            completed: text(data.admin_approved_at) !== "",
+            current: isCurrent,
+            date: data.admin_approved_at,
+            subtitle: text(data.admin_approved_at) !== "" ? "Approved" : "",
+            signaturePrefix: "Completed",
+            signatureWho: data.admin_approved_by,
+            signatureAt: data.admin_approved_at,
+            flowNoteHTML: text(data.admin_approved_at) !== "" ? "" : undefined,
+            flowNoteText: text(data.admin_approved_at) !== "" ? "" : undefined,
+            noteText: "",
+          };
+        default:
+          return {
+            completed: false,
+            current: false,
+          };
+      }
+    };
+
+    const steps = flowSteps.map((step, index) => {
+      const action = text(step && step.action);
+      if (!action) {
+        return "";
+      }
+      const state = stepStateForAction(action, step, index);
+      const displayTitle = text(step && step.label);
+      const stepFlowNoteHTML = state.flowNoteHTML !== undefined ? state.flowNoteHTML : text(step && step.notes_html);
+      const stepFlowNoteText = state.flowNoteText !== undefined ? state.flowNoteText : text(step && step.notes);
+      return processStep({
+        title: displayTitle,
+        info: text(step && step.info),
+        flowNoteHTML: stepFlowNoteHTML,
+        flowNoteText: stepFlowNoteText,
+        completed: state.completed === true,
+        current: state.current === true,
+        date: state.date,
+        subtitle: state.subtitle,
+        signaturePrefix: state.signaturePrefix,
+        signatureWho: state.signatureWho,
+        signatureAt: state.signatureAt,
+        noteHTML: state.noteHTML,
+        noteText: state.noteText,
+        valueText: state.valueText,
+      });
+    }).filter(Boolean).join("");
+
+    return `
+      <section class="request-process">
+        ${flowTitle ? `<p class="request-section-title request-process-title">${escapeHTML(flowTitle)}</p>` : ""}
+        <div class="request-process-list">${steps}</div>
+      </section>
+    `;
   }
 
   function init(config) {
@@ -50,7 +315,8 @@ window.huuperRequestDetail = (() => {
       const workflow = payload && typeof payload.workflow === "object" ? payload.workflow : {};
       const canTakeAction = workflow.can_take_pending_action === true;
       const canReject = workflow.can_reject === true;
-      if (!canTakeAction && !canReject) {
+      const processApproval = renderProcessApproval(payload);
+      if (!canTakeAction && !canReject && !processApproval) {
         workflowNode.hidden = true;
         workflowNode.innerHTML = "";
         return;
@@ -59,6 +325,9 @@ window.huuperRequestDetail = (() => {
       const requiredField = workflow.required_field || "";
       const action = text(workflow.pending_action);
       const parts = [`<article class="request-workflow-card">`];
+      if (processApproval) {
+        parts.push(processApproval);
+      }
       if (canTakeAction && requiredField === "mentoring_notes") {
         parts.push(`<label class="form-field"><span>Mentoring notes</span><textarea id="request-mentoring-notes"></textarea></label>`);
       }
@@ -67,15 +336,24 @@ window.huuperRequestDetail = (() => {
         const actionLabel = text(workflow.pending_action_label) || actionText(action);
         actions.push(`<button id="request-action" class="primary" type="button">${window.huuperListPage.escapeHTML(actionLabel)}</button>`);
       }
-      if (canReject) {
-        actions.push(`<button id="request-reject" class="request-reject-button" type="button">Reject</button>`);
-      }
-      if (actions.length === 0) {
+      const hasReject = canReject;
+      if (actions.length === 0 && !hasReject && !processApproval) {
         workflowNode.hidden = true;
         workflowNode.innerHTML = "";
         return;
       }
-      parts.push(`<div class="action-row request-page-actions">${actions.join("")}</div>`);
+      if (actions.length > 0 || hasReject) {
+        parts.push(`<div class="request-bottom-actions">`);
+        parts.push(`<div class="action-row request-bottom-actions-row">`);
+        if (actions.length > 0) {
+          parts.push(actions.join(""));
+        }
+        if (hasReject) {
+          parts.push(`<button id="request-reject" class="request-reject-button" type="button">Reject</button>`);
+        }
+        parts.push(`</div>`);
+        parts.push(`</div>`);
+      }
       parts.push(`</article>`);
       workflowNode.innerHTML = parts.join("");
       workflowNode.hidden = false;

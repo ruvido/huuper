@@ -6,16 +6,16 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Huuper / Admin / Events</title>
-  <link rel="icon" href="/assets/favicon/favicon.ico" sizes="any" />
-  <link rel="apple-touch-icon" href="/assets/favicon/apple-touch-icon.png" />
-  <script src="/copy/brand.js"></script>
-  <link rel="stylesheet" href="/assets/css/app.css" />
-  <script src="/assets/js/core/topbar.js" defer></script>
-  <script src="/assets/js/core/auth.js" defer></script>
-  <script src="/assets/js/core/guard-admin.js" defer></script>
-  <script src="/assets/js/core/list-page.js" defer></script>
-  <script src="/assets/js/core/entity-list.js" defer></script>
-  <script src="/assets/js/admin/events.js" defer></script>
+  <link rel="icon" href="/assets/favicon/favicon.ico?v=1775991833" sizes="any" />
+  <link rel="apple-touch-icon" href="/assets/favicon/apple-touch-icon.png?v=1775991833" />
+  <script src="/copy/brand.js?v=1775991833"></script>
+  <link rel="stylesheet" href="/assets/css/app.css?v=1775991833" />
+  <script src="/assets/js/core/topbar.js?v=1775991833" defer></script>
+  <script src="/assets/js/core/auth.js?v=1775991833" defer></script>
+  <script src="/assets/js/core/guard-admin.js?v=1775991833" defer></script>
+  <script src="/assets/js/core/list-page.js?v=1775991833" defer></script>
+  <script src="/assets/js/core/entity-list.js?v=1775991833" defer></script>
+  <script src="/assets/js/admin/events.js?v=1775991833" defer></script>
 </head>
 
   <body class="admin">
@@ -24,6 +24,37 @@
   (() => {
     const expectedScope = "admin";
     const storageKey = "huuper.auth";
+    const currentPath = window.location.pathname + window.location.search + window.location.hash;
+
+    function scopeRedirectPath(scope, next) {
+      const raw = String(next || "").trim();
+      if (!raw || raw.startsWith("//")) {
+        return "";
+      }
+
+      let url;
+      try {
+        url = new URL(raw, window.location.origin);
+      } catch (_) {
+        return "";
+      }
+      if (url.origin !== window.location.origin) {
+        return "";
+      }
+
+      const normalized = url.pathname + url.search + url.hash;
+      if (scope === "admin" && normalized.startsWith("/me/")) {
+        return "/admin/" + normalized.slice("/me/".length);
+      }
+      if (scope === "me" && normalized.startsWith("/admin/")) {
+        return "/me/" + normalized.slice("/admin/".length);
+      }
+      if (normalized.startsWith(scope === "admin" ? "/admin/" : "/me/")) {
+        return normalized;
+      }
+      return "";
+    }
+
     let auth = null;
     try {
       const raw = localStorage.getItem(storageKey);
@@ -33,19 +64,24 @@
     }
 
     if (!auth || !auth.token) {
-      window.location.replace("/");
+      const target = new URL("/login/", window.location.origin);
+      target.searchParams.set("next", currentPath);
+      window.location.replace(target.pathname + target.search + target.hash);
       return;
     }
 
     const actualScope = auth && auth.model && auth.model.admin === true ? "admin" : "me";
     if (actualScope !== expectedScope) {
-      window.location.replace(actualScope === "admin" ? "/admin/" : "/me/");
+      const target = scopeRedirectPath(actualScope, currentPath);
+      window.location.replace(target || (actualScope === "admin" ? "/admin/" : "/me/"));
     }
   })();
 </script>
 
     <main class="app">
       <section class="app-shell">
+        
+        
         
 <header class="top-bar">
   

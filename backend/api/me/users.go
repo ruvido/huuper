@@ -50,11 +50,13 @@ func UserGetHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error
 		}
 
 		telegram := backendinternal.ParseJSONMap(user.Get("telegram"))
+		data := backendinternal.ParseJSONMap(user.Get("data"))
 		return e.JSON(http.StatusOK, map[string]any{
 			"id":                user.Id,
 			"email":             user.GetString("email"),
 			"full_name":         groupinternal.UserDisplayName(user),
 			"avatar":            strings.TrimSpace(user.GetString("avatar")),
+			"data":              data,
 			"telegram":          telegram,
 			"guardian_requests": guardianRequests,
 		})

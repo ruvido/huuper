@@ -62,6 +62,7 @@ func ListForUser(app *pocketbase.PocketBase, userID string) ([]GroupListItem, er
 			Name:          strings.TrimSpace(group.GetString("name")),
 			Type:          strings.TrimSpace(group.GetString("type")),
 			Description:   strings.TrimSpace(group.GetString("description")),
+			Assistant:     strings.TrimSpace(group.GetString("assistant")),
 			MembersCount:  memberCounts[groupID],
 			RequestsCount: visibleRequestsCount,
 		})

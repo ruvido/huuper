@@ -117,7 +117,7 @@ func ApplySetGroupAction(app *pocketbase.PocketBase, actor *core.Record, record 
 		return err
 	}
 
-	if err := applyGroupAssignment(app, record, strings.TrimSpace(groupID), step.Filter); err != nil {
+	if err := applyGroupAssignment(app, record, data, actor, strings.TrimSpace(groupID), step.Filter); err != nil {
 		return err
 	}
 
@@ -195,7 +195,7 @@ func ApplyPromoteAction(app *pocketbase.PocketBase, actor *core.Record, record *
 	return user.Id, nil
 }
 
-func applyGroupAssignment(app *pocketbase.PocketBase, record *core.Record, groupID string, filter string) error {
+func applyGroupAssignment(app *pocketbase.PocketBase, record *core.Record, data map[string]any, actor *core.Record, groupID string, filter string) error {
 	if groupID == "" {
 		return apis.NewBadRequestError("missing_group", nil)
 	}
@@ -207,6 +207,15 @@ func applyGroupAssignment(app *pocketbase.PocketBase, record *core.Record, group
 		return apis.NewBadRequestError("invalid_group_filter", nil)
 	}
 	record.Set("group", groupID)
+	if data != nil {
+		assigned := map[string]any{
+			"assigned_at": time.Now().UTC().Format(time.RFC3339),
+		}
+		if actor != nil {
+			assigned["assigned_by"] = actorDisplayName(actor)
+		}
+		data["assign_group"] = assigned
+	}
 	return nil
 }
 

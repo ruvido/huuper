@@ -124,41 +124,6 @@ window.huuperRequestItem = (() => {
     return raw;
   }
 
-  function mentoringNotesHTML(item) {
-    const mentoringHTML = text(item.mentoring_notes_html);
-    if (mentoringHTML) {
-      return mentoringHTML;
-    }
-
-    const mentoringText = notesText(item.mentoring_notes);
-    if (mentoringText) {
-      return `<p>${escapeHTML(mentoringText)}</p>`;
-    }
-    return "";
-  }
-
-  function workflowNotesHTML(item) {
-    const workflow = item && typeof item.workflow === "object" ? item.workflow : {};
-    const rawHTML = text(workflow.pending_action_notes_html);
-    if (rawHTML) {
-      return rawHTML;
-    }
-
-    const rawText = notesText(workflow.pending_action_notes);
-    if (!rawText) {
-      return "";
-    }
-    return `<p>${escapeHTML(rawText)}</p>`;
-  }
-
-  function inlineMentoringNotes(item) {
-    const raw = notesText(item.mentoring_notes);
-    if (!raw || raw.includes("\n")) {
-      return "";
-    }
-    return raw;
-  }
-
   function detailField(label, value) {
     const rendered = text(value);
     if (!rendered) {
@@ -201,10 +166,7 @@ window.huuperRequestItem = (() => {
   }
 
   function renderDetail(item, options = {}) {
-    const showNotes = options.showNotes !== false;
     const data = item && typeof item.data === "object" ? item.data : {};
-    const inlineMentoring = inlineMentoringNotes(item);
-    const renderedMentoringNotes = showNotes && !inlineMentoring ? mentoringNotesHTML(item) : "";
     const fullName = text(data.full_name || item.full_name || item.email || item.id);
     const age = ageText(data.birth_year);
     const location = text(data.region);
@@ -221,28 +183,26 @@ window.huuperRequestItem = (() => {
       detailField("Marital status", data.marital_status),
       detailField("Children", data.children),
     ].filter(Boolean).join("");
-    const motivationText = text(data.motivation) || inlineMentoring;
-    const notesBlock = renderedMentoringNotes
-      ? `<div class="request-rich-text"><div>${renderedMentoringNotes}</div></div>`
+    const motivation = text(data.motivation)
+      ? `
+        <section class="request-motivation">
+          <span class="request-detail-term">Motivation</span>
+          <p class="request-motivation-quote">${escapeHTML(data.motivation)}</p>
+        </section>
+      `
       : "";
 
     return `
       <article class="request-sheet">
         <header class="request-sheet-header">
           <div class="request-identity">
-            <span class="request-eyebrow">Full name</span>
+            <span class="request-candidate-label">Candidate</span>
             <h1 class="request-title">${escapeHTML(fullName)}</h1>
             ${meta ? `<p class="request-subtitle">${meta}</p>` : ""}
           </div>
         </header>
         <section class="request-info-grid">${details}</section>
-        ${motivationText ? `
-          <section class="request-motivation">
-            <span class="request-detail-term">Motivation</span>
-            <blockquote class="request-motivation-quote">"${escapeHTML(motivationText)}"</blockquote>
-          </section>
-        ` : ""}
-        ${notesBlock}
+        ${motivation}
       </article>
     `;
   }

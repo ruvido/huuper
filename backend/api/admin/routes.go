@@ -12,6 +12,7 @@ type Handlers struct {
 	Summary              func(e *core.RequestEvent) error
 	GroupsList           func(e *core.RequestEvent) error
 	GroupGet             func(e *core.RequestEvent) error
+	GroupAssistant       func(e *core.RequestEvent) error
 	EventsList           func(e *core.RequestEvent) error
 	RequestsList         func(e *core.RequestEvent) error
 	RequestGet           func(e *core.RequestEvent) error
@@ -31,6 +32,7 @@ func Register(se *core.ServeEvent, h Handlers) {
 	se.Router.GET("/api/admin/summary", backendinternal.AdminOnly(h.Summary)).Bind(apis.RequireAuth())
 	se.Router.GET("/api/admin/groups", backendinternal.AdminOnly(h.GroupsList)).Bind(apis.RequireAuth())
 	se.Router.GET("/api/admin/groups/{id}", backendinternal.AdminOnly(h.GroupGet)).Bind(apis.RequireAuth())
+	se.Router.POST("/api/admin/groups/{id}/assistant", backendinternal.AdminOnly(h.GroupAssistant)).Bind(apis.RequireAuth())
 	se.Router.GET("/api/admin/events", backendinternal.AdminOnly(h.EventsList)).Bind(apis.RequireAuth())
 	se.Router.GET("/api/admin/requests", backendinternal.AdminOnly(h.RequestsList)).Bind(apis.RequireAuth())
 	se.Router.GET("/api/admin/requests/{id}", backendinternal.AdminOnly(h.RequestGet)).Bind(apis.RequireAuth())

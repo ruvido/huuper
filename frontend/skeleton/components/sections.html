@@ -37,11 +37,17 @@
 {{ end }}
 
 {{ define "user-detail-content" }}
-<p id="user-status" class="meta-text"></p>
-<section id="user-summary" class="view-stack" hidden></section>
-{{ if .ShowGroups }}
-<section id="user-groups" class="list-card list-card-default" hidden></section>
-{{ end }}
+<section class="user-page-layout">
+  <p id="user-status" class="meta-text"></p>
+  <div class="user-page-content">
+    <section id="user-summary" class="user-page-summary" hidden></section>
+    <section id="user-requests" class="list-card list-card-default" hidden></section>
+    {{ if .ShowGroups }}
+    <p id="user-groups-label" class="request-detail-term" hidden>Member of</p>
+    <section id="user-groups" class="list-card list-card-default" hidden></section>
+    {{ end }}
+  </div>
+</section>
 {{ end }}
 
 {{ define "group-detail-content" }}
@@ -56,6 +62,7 @@
 <section id="group-pending-section" hidden>
   <section id="group-pending" class="list-card list-card-default"></section>
 </section>
+<section id="group-assistant-section" class="action-row group-assistant-section" hidden></section>
 {{ end }}
 
 {{ define "event-detail-content" }}

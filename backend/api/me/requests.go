@@ -183,6 +183,11 @@ func GetRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) er
 		if err != nil {
 			return apis.NewBadRequestError("invalid_requests_flow_settings", err)
 		}
+		liveFlowData, err := backendrequests.FindSettingData(app, "requests_flow")
+		if err != nil {
+			return apis.NewBadRequestError("invalid_requests_flow_settings", err)
+		}
+		liveFlowData = requestFlowResponseData(liveFlowData)
 		flowVersion := backendrequests.FlowVersionFromData(item.Data)
 		state, err := backendrequests.BuildWorkflowState(app, actor, record, item.Data, item.Rejected, flow)
 		if err != nil {
@@ -224,6 +229,7 @@ func GetRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) er
 			"mentoring_notes":      requestMentoringNotes(item.Data),
 			"mentoring_notes_html": requestMentoringNotesHTML(item.Data),
 			"flow_version":         flowVersion,
+			"request_flow":         map[string]any{"data": liveFlowData},
 			"created":              item.Created,
 			"updated":              item.Updated,
 			"data":                 item.Data,
@@ -296,6 +302,47 @@ func requestNotesHTML(raw string) string {
 		return ""
 	}
 	return html
+}
+
+func requestFlowResponseData(data map[string]any) map[string]any {
+	if data == nil {
+		return map[string]any{}
+	}
+
+	steps, _ := data["steps"].([]any)
+	if len(steps) == 0 {
+		return data
+	}
+
+	out := backendinternal.ParseJSONMap(data)
+	if out == nil {
+		out = map[string]any{}
+	}
+
+	renderedSteps := make([]any, 0, len(steps))
+	for _, rawStep := range steps {
+		step, ok := rawStep.(map[string]any)
+		if !ok || step == nil {
+			continue
+		}
+
+		renderedStep := backendinternal.ParseJSONMap(step)
+		if renderedStep == nil {
+			renderedStep = map[string]any{}
+		}
+		if notes, ok := renderedStep["notes"].(string); ok {
+			if html, rendered := backendinternal.RenderMarkdownHTML(notes); rendered {
+				renderedStep["notes_html"] = html
+			}
+		}
+		if info, ok := renderedStep["info"].(string); ok {
+			renderedStep["info"] = strings.TrimSpace(info)
+		}
+		renderedSteps = append(renderedSteps, renderedStep)
+	}
+
+	out["steps"] = renderedSteps
+	return out
 }
 
 func requestWorkflowOptions(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, step backendrequests.FlowStep, requiredField string, canAdvance bool) (map[string]any, error) {

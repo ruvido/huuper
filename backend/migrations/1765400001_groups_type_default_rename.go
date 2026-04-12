@@ -51,8 +51,8 @@ func init() {
 
 		for _, record := range records {
 			value := strings.TrimSpace(record.GetString("type"))
-			if value == "general" {
-				record.Set("type", "")
+			if value == "general" || value == "default" {
+				record.Set("type", "local")
 			} else {
 				if _, ok := allowed[value]; !ok {
 					record.Set("type", "private")

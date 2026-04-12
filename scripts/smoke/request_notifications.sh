@@ -24,7 +24,7 @@ if [[ -f "${ENV_FILE}" ]]; then
   done < "${ENV_FILE}"
 fi
 
-BASE_URL="${BASE_URL:-${BASE:-http://127.0.0.1:9090}}"
+BASE_URL="${BASE_URL:-${BASE:-http://localhost:9090}}"
 ADMIN_TOKEN="${ADMIN_TOKEN:-}"
 MEMBER_TOKEN="${MEMBER_TOKEN:-}"
 GUARDIAN_TOKEN="${GUARDIAN_TOKEN:-}"

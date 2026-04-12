@@ -19,7 +19,10 @@
       if (membersCount !== null) meta.push(`${membersCount} members`);
       if (requestsCount !== null && requestsCount > 0) meta.push(`${requestsCount} pending`);
       const href = `/me/group/?id=${encodeURIComponent(item.id)}`;
-      return window.huuperListPage.renderListItemLink(href, item.name || item.id, meta.join(" • "));
+      const sideHTML = window.huuperGroupMeta && window.huuperGroupMeta.assistantMissing(item)
+        ? window.huuperGroupMeta.assistantWarningBadge()
+        : "";
+      return window.huuperListPage.renderListItemLink(href, item.name || item.id, meta.join(" • "), { sideHTML });
     },
   });
 })();

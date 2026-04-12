@@ -12,7 +12,7 @@ if [[ -f "${ENV_FILE}" ]]; then
   set +a
 fi
 
-BASE_URL="${BASE_URL:-${BASE:-http://127.0.0.1:9090}}"
+BASE_URL="${BASE_URL:-${BASE:-http://localhost:9090}}"
 USER_EMAIL="${USER_EMAIL:-${MEMBER_EMAIL:-}}"
 USER_PASSWORD="${USER_PASSWORD:-${MEMBER_PASSWORD:-}}"
 

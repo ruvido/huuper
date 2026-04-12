@@ -6,9 +6,10 @@ import (
 )
 
 type EmailTemplate struct {
-	Kind    string
-	Subject string
-	Body    string
+	Kind         string
+	Subject      string
+	Body         string
+	TelegramBody string
 }
 
 func emailLayout(preheader string, title string, intro string, rows [][2]string) string {

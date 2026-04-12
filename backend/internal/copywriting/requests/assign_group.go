@@ -1,5 +1,7 @@
 package requests
 
+import "strings"
+
 var assignGroupTemplate = EmailTemplate{
 	Kind:    "requests.assign_group",
 	Subject: "{{full_name}} for {{group_name}}",
@@ -15,4 +17,12 @@ var assignGroupTemplate = EmailTemplate{
 			row("Motivation", "{{motivation}}"),
 		},
 	),
+	TelegramBody: strings.TrimSpace(`
+New request!
+
+{{full_name}} has been assigned to the group.
+Review it and assign a guardian.
+
+Open request: {{request_url}}
+`),
 }

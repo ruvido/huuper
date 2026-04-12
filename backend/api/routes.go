@@ -41,6 +41,7 @@ func RegisterRoutes(app *pocketbase.PocketBase, se *core.ServeEvent) {
 		Summary:              adminroutes.SummaryHandler(app),
 		GroupsList:           adminroutes.GroupsListHandler(app),
 		GroupGet:             adminroutes.GroupGetHandler(app),
+		GroupAssistant:       adminroutes.GroupAssistantHandler(app),
 		EventsList:           adminroutes.EventsListHandler(app),
 		RequestsList:         meroutes.ListRequestsHandler(app),
 		RequestGet:           meroutes.GetRequestHandler(app),

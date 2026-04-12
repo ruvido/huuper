@@ -13,7 +13,10 @@
     renderItem: (item) => {
       const meta = window.huuperListPage.text(item.type);
       const href = `/admin/group/?id=${encodeURIComponent(item.id)}`;
-      return window.huuperListPage.renderListItemLink(href, item.name || item.id, meta);
+      const sideHTML = window.huuperGroupMeta && window.huuperGroupMeta.assistantMissing(item)
+        ? window.huuperGroupMeta.assistantWarningBadge()
+        : "";
+      return window.huuperListPage.renderListItemLink(href, item.name || item.id, meta, { sideHTML });
     },
   });
 })();

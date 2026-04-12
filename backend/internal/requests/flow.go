@@ -106,15 +106,16 @@ var flowActionSpecs = map[string]flowActionSpec{
 		IsDone: func(record *core.Record, _ map[string]any) bool {
 			return strings.TrimSpace(record.GetString("group")) != ""
 		},
-		Apply: func(app core.App, _ *core.Record, record *core.Record, _ map[string]any, payload ActionPayload, step FlowStep) error {
+		Apply: func(app core.App, actor *core.Record, record *core.Record, data map[string]any, payload ActionPayload, step FlowStep) error {
 			pb, ok := app.(*pocketbase.PocketBase)
 			if !ok {
 				return fmt.Errorf("invalid app")
 			}
-			return applyGroupAssignment(pb, record, strings.TrimSpace(payload.GroupID), step.Filter)
+			return applyGroupAssignment(pb, record, data, actor, strings.TrimSpace(payload.GroupID), step.Filter)
 		},
-		Reset: func(record *core.Record, _ map[string]any) {
+		Reset: func(record *core.Record, data map[string]any) {
 			record.Set("group", "")
+			delete(data, "assign_group")
 		},
 	},
 	FlowActionAssignGuardian: {

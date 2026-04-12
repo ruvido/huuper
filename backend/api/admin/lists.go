@@ -22,6 +22,7 @@ func GroupsListHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) er
 				"name":        record.GetString("name"),
 				"type":        record.GetString("type"),
 				"description": record.GetString("description"),
+				"assistant":   record.GetString("assistant"),
 			})
 		}
 

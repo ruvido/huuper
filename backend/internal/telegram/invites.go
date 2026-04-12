@@ -23,9 +23,9 @@ func DefaultGroupInvite(app *pocketbase.PocketBase, actor *core.Record) (string,
 	}
 	log.Printf("[default-invite] user=%s request started", strings.TrimSpace(actor.Id))
 
-	group, err := app.FindFirstRecordByFilter("groups", "type = 'default'", map[string]any{})
+	group, err := app.FindFirstRecordByFilter("groups", "type = 'local'", map[string]any{})
 	if err != nil || group == nil {
-		return "", "", apis.NewNotFoundError("default_group_not_found", err)
+		return "", "", apis.NewNotFoundError("local_group_not_found", err)
 	}
 
 	telegramData := backendinternal.ParseJSONMap(group.Get("telegram"))

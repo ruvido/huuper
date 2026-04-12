@@ -62,6 +62,10 @@ func TestResetStepsAfterActionClearsDownstreamState(t *testing.T) {
 	record.Set("group", "group-1")
 	record.Set("guardian", "guardian-1")
 	data := map[string]any{
+		"assign_group": map[string]any{
+			"assigned_at": "2026-04-09T09:30:00Z",
+			"assigned_by": "Admin",
+		},
 		"guardian": map[string]any{
 			"name":        "Guardian",
 			"assigned_at": "2026-04-09T10:00:00Z",
@@ -75,6 +79,13 @@ func TestResetStepsAfterActionClearsDownstreamState(t *testing.T) {
 
 	if got := record.GetString("guardian"); got != "" {
 		t.Fatalf("expected guardian to be reset, got %q", got)
+	}
+	assignGroup, ok := data["assign_group"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected assign_group payload to remain")
+	}
+	if assignedAt, _ := assignGroup["assigned_at"].(string); assignedAt == "" {
+		t.Fatalf("expected assign_group assigned_at to remain")
 	}
 	if _, ok := data["guardian"]; ok {
 		t.Fatalf("expected guardian payload to be removed")

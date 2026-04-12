@@ -31,6 +31,7 @@ type GroupListItem struct {
 	Name          string `json:"name"`
 	Type          string `json:"type"`
 	Description   string `json:"description"`
+	Assistant     string `json:"assistant,omitempty"`
 	MembersCount  int    `json:"members_count"`
 	RequestsCount *int   `json:"requests_count,omitempty"`
 }
