@@ -101,26 +101,21 @@ window.huuperRequestAssignmentSheet = (() => {
         footerAction: {
           label: actionLabel,
           disabled: true,
-          onSelect: async (button) => {
+          onSelect: async () => {
             if (!selectedID) {
               return;
             }
-            button.disabled = true;
             const body = { action };
             if (mode === "guardian") {
               body.guardian = selectedID;
             } else {
               body.group = selectedID;
             }
-            try {
-              await window.huuperRequestActions.submitAndRedirect({
-                actionURL: config.actionURL(config.requestID),
-                body,
-                redirectURL: config.requestsURL,
-              });
-            } catch (_) {
-              button.disabled = false;
-            }
+            await window.huuperRequestActions.submitAndRedirect({
+              actionURL: config.actionURL(config.requestID),
+              body,
+              redirectURL: config.requestsURL,
+            });
           },
         },
         onOpen: (root) => {

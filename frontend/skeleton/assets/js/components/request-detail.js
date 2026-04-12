@@ -179,10 +179,11 @@ window.huuperRequestDetail = (() => {
     const flowTitle = text(flow.title);
     const mentoringNoteHTML = text(payload.mentoring_notes_html);
     const mentoringNoteText = text(payload.mentoring_notes || data.mentoring_notes);
+    const assignmentGroupData = data.assign_group && typeof data.assign_group === "object" ? data.assign_group : {};
     const guardianData = data.guardian && typeof data.guardian === "object" ? data.guardian : {};
     const groupName = titleCase(payload.group_name);
-    const groupAssignedAt = text(data.group_assigned_at);
-    const groupAssignedBy = text(data.group_assigned_by);
+    const groupAssignedAt = text(assignmentGroupData.assigned_at);
+    const groupAssignedBy = text(assignmentGroupData.assigned_by);
     const stepCompleted = (action) => {
       switch (action) {
         case "assign_group":
@@ -207,34 +208,42 @@ window.huuperRequestDetail = (() => {
       switch (action) {
         case "assign_group":
           {
+            const completed = groupAssignedAt !== "" || text(data.group) !== "";
+            const renderedGroupName = groupName || text(payload.group_name);
             return {
-              completed: groupAssignedAt !== "" || text(data.group) !== "",
+              completed,
               current: isCurrent,
               date: groupAssignedAt,
               subtitle: "",
-              signaturePrefix: groupAssignedBy ? "Assigned" : "",
+              signaturePrefix: completed && groupAssignedBy ? "Completed" : (groupAssignedBy ? "Assigned" : ""),
               signatureWho: groupAssignedBy,
               signatureAt: groupAssignedAt,
-              flowNoteHTML: isCurrent ? flowNote.html : "",
-              flowNoteText: isCurrent ? flowNote.text : "",
+              flowNoteHTML: completed ? "" : flowNote.html,
+              flowNoteText: completed ? "" : flowNote.text,
               variantClass: "request-process-step-group",
-              valueHTML: groupName ? `<span class="request-process-value-inline"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-return-right request-process-value-icon" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M1.5 1.5A.5.5 0 0 0 1 2v4.8a2.5 2.5 0 0 0 2.5 2.5h9.793l-3.347 3.346a.5.5 0 0 0 .708.708l4.2-4.2a.5.5 0 0 0 0-.708l-4-4a.5.5 0 0 0-.708.708L13.293 8.3H3.5A1.5 1.5 0 0 1 2 6.8V2a.5.5 0 0 0-.5-.5"></path></svg><strong class="request-process-value-text">${escapeHTML(groupName)}</strong></span>` : "",
+              valueHTML: "",
+              noteHTML: completed && renderedGroupName ? `<p><strong>${escapeHTML(renderedGroupName)}</strong></p>` : "",
+              noteText: "",
             };
           }
         case "assign_guardian":
           {
             const guardianName = titleCase(guardianData.name);
+            const completed = text(guardianData.assigned_at) !== "";
+            const renderedGuardianName = guardianName || titleCase(payload.guardian_name);
             return {
-              completed: text(guardianData.assigned_at) !== "",
+              completed,
               current: isCurrent,
               date: guardianData.assigned_at,
               subtitle: "",
-              signaturePrefix: text(guardianData.assigned_by) ? "Assigned" : "",
+              signaturePrefix: completed && text(guardianData.assigned_by) ? "Completed" : (text(guardianData.assigned_by) ? "Assigned" : ""),
               signatureWho: guardianData.assigned_by || payload.guardian_name,
               signatureAt: guardianData.assigned_at,
-              flowNoteHTML: isCurrent ? flowNote.html : "",
-              flowNoteText: isCurrent ? flowNote.text : "",
-              valueHTML: guardianName ? `<span class="request-process-value-inline"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-return-right request-process-value-icon" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M1.5 1.5A.5.5 0 0 0 1 2v4.8a2.5 2.5 0 0 0 2.5 2.5h9.793l-3.347 3.346a.5.5 0 0 0 .708.708l4.2-4.2a.5.5 0 0 0 0-.708l-4-4a.5.5 0 0 0-.708.708L13.293 8.3H3.5A1.5 1.5 0 0 1 2 6.8V2a.5.5 0 0 0-.5-.5"></path></svg><strong class="request-process-value-text">${escapeHTML(guardianName)}</strong></span>` : "",
+              flowNoteHTML: completed ? "" : flowNote.html,
+              flowNoteText: completed ? "" : flowNote.text,
+              valueHTML: "",
+              noteHTML: completed && renderedGuardianName ? `<p><strong>${escapeHTML(renderedGuardianName)}</strong></p>` : "",
+              noteText: "",
             };
           }
         case "mentoring":
@@ -325,7 +334,8 @@ window.huuperRequestDetail = (() => {
     const summaryNode = document.querySelector("#request-summary");
     const workflowNode = document.querySelector("#request-workflow");
     const topbarMetaNode = document.querySelector("#request-topbar-meta");
-    if (!statusNode || !summaryNode || !workflowNode || !window.huuperAuth || !window.huuperListPage || !window.huuperRequestItem || !window.huuperActionSheet || !window.huuperRequestActions) {
+    const rejectButtonNode = document.querySelector("[data-request-reject]");
+    if (!statusNode || !summaryNode || !workflowNode || !window.huuperAuth || !window.huuperListPage || !window.huuperRequestItem || !window.huuperActionSheet || !window.huuperRequestActions || !window.huuperRequestNoteSheet) {
       return;
     }
 
@@ -335,12 +345,34 @@ window.huuperRequestDetail = (() => {
       window.huuperListPage.setStatus(statusNode, "Missing request.");
       return;
     }
+
+    if (rejectButtonNode) {
+      rejectButtonNode.addEventListener("click", () => {
+        window.huuperRequestNoteSheet.open({
+          title: "Are you sure you want to reject candidate?",
+          submitLabel: "Reject",
+          submitTone: "danger",
+          emptyStatus: "Write reason.",
+          statusNode,
+          onSubmit: async (reason) => {
+            await window.huuperRequestActions.submitAndRedirect({
+              actionURL: config.actionURL(id),
+              body: {
+                action: "reject",
+                reason,
+              },
+              redirectURL: config.requestsURL,
+            });
+          },
+        });
+      });
+    }
+
     function renderWorkflow(payload) {
       const workflow = payload && typeof payload.workflow === "object" ? payload.workflow : {};
       const canTakeAction = workflow.can_take_pending_action === true;
-      const canReject = workflow.can_reject === true;
       const processApproval = renderProcessApproval(payload);
-      if (!canTakeAction && !canReject && !processApproval) {
+      if (!canTakeAction && !processApproval) {
         workflowNode.hidden = true;
         workflowNode.innerHTML = "";
         return;
@@ -357,20 +389,16 @@ window.huuperRequestDetail = (() => {
         const actionLabel = text(workflow.pending_action_label) || actionText(action);
         actions.push(`<button id="request-action" class="primary" type="button">${window.huuperListPage.escapeHTML(actionLabel)}</button>`);
       }
-      const hasReject = canReject;
-      if (actions.length === 0 && !hasReject && !processApproval) {
+      if (actions.length === 0 && !processApproval) {
         workflowNode.hidden = true;
         workflowNode.innerHTML = "";
         return;
       }
-      if (actions.length > 0 || hasReject) {
+      if (actions.length > 0) {
         parts.push(`<div class="request-bottom-actions">`);
         parts.push(`<div class="action-row request-bottom-actions-row">`);
         if (actions.length > 0) {
           parts.push(actions.join(""));
-        }
-        if (hasReject) {
-          parts.push(`<button id="request-reject" class="request-reject-button" type="button">Reject</button>`);
         }
         parts.push(`</div>`);
         parts.push(`</div>`);
@@ -380,57 +408,6 @@ window.huuperRequestDetail = (() => {
       workflowNode.hidden = false;
 
       const button = workflowNode.querySelector("#request-action");
-      const rejectButton = workflowNode.querySelector("#request-reject");
-
-      if (rejectButton) {
-        rejectButton.addEventListener("click", () => {
-          window.huuperActionSheet.open({
-            contentHTML: `
-              <label class="form-field request-reject-field">
-                <span>Reason</span>
-                <textarea id="request-reject-reason" placeholder="Write a reason"></textarea>
-              </label>
-            `,
-            footerAction: {
-              label: "Reject",
-              tone: "danger",
-              onSelect: async (sheetButton) => {
-                const reasonNode = document.querySelector("#request-reject-reason");
-                const fieldNode = document.querySelector(".request-reject-field");
-                const reason = text(reasonNode && reasonNode.value);
-                if (!reason) {
-                  if (fieldNode) {
-                    fieldNode.classList.add("request-reject-field-error");
-                  }
-                  if (reasonNode) {
-                    reasonNode.focus();
-                  }
-                  window.huuperListPage.setStatus(statusNode, "Write a reason.");
-                  return;
-                }
-                if (fieldNode) {
-                  fieldNode.classList.remove("request-reject-field-error");
-                }
-                try {
-                  sheetButton.disabled = true;
-                  window.huuperActionSheet.close();
-                  await window.huuperRequestActions.submitAndRedirect({
-                    actionURL: config.actionURL(id),
-                    body: {
-                      action: "reject",
-                      reason,
-                    },
-                    redirectURL: config.requestsURL,
-                  });
-                } catch (_) {
-                  sheetButton.disabled = false;
-                  window.huuperListPage.setStatus(statusNode, "Reject unavailable.");
-                }
-              },
-            },
-          });
-        });
-      }
 
       if (button) {
         button.addEventListener("click", async () => {
@@ -449,47 +426,20 @@ window.huuperRequestDetail = (() => {
           }
 
           if (requiredField === "mentoring_notes") {
-            window.huuperActionSheet.open({
+            window.huuperRequestNoteSheet.open({
               title: "Mentoring notes",
-              contentHTML: `
-                <div class="request-mentoring-notes-field">
-                  <textarea id="request-mentoring-notes" placeholder="Write"></textarea>
-                </div>
-              `,
-              footerAction: {
-                label: "Submit",
-                onSelect: async (sheetButton) => {
-                  const notesNode = document.querySelector("#request-mentoring-notes");
-                  const mentoringNotes = text(notesNode && notesNode.value);
-                  if (!mentoringNotes) {
-                    if (notesNode) {
-                      notesNode.focus();
-                    }
-                    window.huuperListPage.setStatus(statusNode, "Write notes.");
-                    return;
-                  }
-                  try {
-                    sheetButton.disabled = true;
-                    window.huuperActionSheet.close();
-                    await window.huuperRequestActions.submitAndRedirect({
-                      actionURL: config.actionURL(id),
-                      body: {
-                        action,
-                        mentoring_notes: mentoringNotes,
-                      },
-                      redirectURL: config.requestsURL,
-                    });
-                  } catch (_) {
-                    sheetButton.disabled = false;
-                    window.huuperListPage.setStatus(statusNode, "Action unavailable.");
-                  }
-                },
-              },
-              onOpen: () => {
-                const notesNode = document.querySelector("#request-mentoring-notes");
-                if (notesNode) {
-                  notesNode.focus();
-                }
+              submitLabel: "Submit",
+              emptyStatus: "Write notes.",
+              statusNode,
+              onSubmit: async (mentoringNotes) => {
+                await window.huuperRequestActions.submitAndRedirect({
+                  actionURL: config.actionURL(id),
+                  body: {
+                    action,
+                    mentoring_notes: mentoringNotes,
+                  },
+                  redirectURL: config.requestsURL,
+                });
               },
             });
             return;
@@ -497,19 +447,15 @@ window.huuperRequestDetail = (() => {
 
           try {
             const body = { action };
-            button.disabled = true;
             window.huuperListPage.setStatus(statusNode, "");
             await window.huuperRequestActions.submitAndRedirect({
               actionURL: config.actionURL(id),
               body,
+              button,
               redirectURL: config.requestsURL,
             });
           } catch (error) {
-            if (error && error.message === "missing_mentoring_notes") {
-              window.huuperListPage.setStatus(statusNode, "Write notes.");
-            } else {
-              window.huuperListPage.setStatus(statusNode, "Action unavailable.");
-            }
+            window.huuperListPage.setStatus(statusNode, "Action unavailable.");
             button.disabled = false;
           }
         });

@@ -8,7 +8,9 @@
     <span></span>
   {{ end }}
   <div class="top-bar-title">{{ .Title }}</div>
-  {{ if .ProfileHref }}
+  {{ if .RightActionTrash }}
+    <button class="topbar-action topbar-action-danger" type="button" aria-label="Reject candidate" data-request-reject>{{ template "icon-trash-fill" . }}</button>
+  {{ else if .ProfileHref }}
     <a class="topbar-profile" href="{{ .ProfileHref }}" aria-label="Profile" data-topbar-profile>{{ template "icon-profile" . }}</a>
   {{ else if .MetaID }}
     <span class="topbar-meta{{ if .MetaClass }} {{ .MetaClass }}{{ end }}" id="{{ .MetaID }}" hidden></span>

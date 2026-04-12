@@ -15,8 +15,6 @@
     requestsURL: "/me/requests/",
     roles: ["assistant", "guardian"],
     itemHref: (id) => `/me/request/?id=${encodeURIComponent(id)}`,
-    assignGroupHref: (id) => `/me/request/assign-group/?id=${encodeURIComponent(id)}`,
-    assignGuardianHref: (id) => `/me/request/assign-guardian/?id=${encodeURIComponent(id)}`,
     detailURL: (id) => `/api/me/requests/${encodeURIComponent(id)}`,
     actionURL: (id) => `/api/me/requests/${encodeURIComponent(id)}/actions`,
     errorMessage: "Requests unavailable.",

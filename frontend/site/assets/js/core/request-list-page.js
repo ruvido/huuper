@@ -3,31 +3,6 @@ window.huuperRequestListPage = (() => {
     return window.huuperListPage.text(value);
   }
 
-  function bindActions(node, config) {
-    if (!window.huuperRequestAssignmentSheet) {
-      return;
-    }
-
-    node.querySelectorAll(".request-item-action").forEach((button) => {
-      if (button.dataset.bound === "true") {
-        return;
-      }
-      button.dataset.bound = "true";
-      button.addEventListener("click", () => {
-        const requestID = text(button.getAttribute("data-request-id"));
-        if (!requestID) {
-          return;
-        }
-        window.huuperRequestAssignmentSheet.open({
-          requestID,
-          requestsURL: config.requestsURL,
-          detailURL: config.detailURL,
-          actionURL: config.actionURL,
-        });
-      });
-    });
-  }
-
   function renderEmptyState(label) {
     return `
       <section class="empty-state empty-state-icon-only" aria-label="${label}">
@@ -62,7 +37,7 @@ window.huuperRequestListPage = (() => {
       return;
     }
 
-    let activeTab = "all";
+    let activeTab = "urgent";
     let allItems = [];
 
     function urgentItems(items) {
@@ -99,14 +74,10 @@ window.huuperRequestListPage = (() => {
       }
 
       window.huuperListPage.renderList(listNode, visibleItems, (item) => {
-        return window.huuperRequestItem.renderListItem(item, config.itemHref(item.id), {
-          assignGroupURL: config.assignGroupHref,
-          assignGuardianURL: config.assignGuardianHref,
-        });
+        return window.huuperRequestItem.renderListItem(item, config.itemHref(item.id));
       });
       listNode.hidden = false;
       statusNode.hidden = true;
-      bindActions(listNode, config);
     }
 
     allTabNode.addEventListener("click", () => {

@@ -83,11 +83,20 @@ window.huuperActionSheet = (() => {
       button.type = "button";
       button.className = `action-sheet-action${action && action.tone ? ` action-sheet-action-${action.tone}` : ""}`;
       button.textContent = action && action.label ? action.label : "Action";
-      button.addEventListener("click", () => {
-        if (action && typeof action.onSelect === "function") {
-          action.onSelect();
+      button.addEventListener("click", async () => {
+        const previousDisabled = button.disabled;
+        button.disabled = true;
+        button.classList.add("request-action-loading");
+        try {
+          const result = action && typeof action.onSelect === "function" ? action.onSelect(button) : null;
+          if (result && typeof result.then === "function") {
+            await result;
+          }
+          close();
+        } catch (_) {
+          button.disabled = previousDisabled;
+          button.classList.remove("request-action-loading");
         }
-        close();
       });
       actionsNode.appendChild(button);
     });
@@ -99,9 +108,18 @@ window.huuperActionSheet = (() => {
       button.className = `action-sheet-footer-button${footerAction.tone ? ` action-sheet-footer-button-${footerAction.tone}` : ""}`;
       button.textContent = footerAction.label ? footerAction.label : "Confirm";
       button.disabled = footerAction.disabled === true;
-      button.addEventListener("click", () => {
-        if (typeof footerAction.onSelect === "function") {
-          footerAction.onSelect(button);
+      button.addEventListener("click", async () => {
+        const previousDisabled = button.disabled;
+        button.disabled = true;
+        button.classList.add("request-action-loading");
+        try {
+          const result = typeof footerAction.onSelect === "function" ? footerAction.onSelect(button) : null;
+          if (result && typeof result.then === "function") {
+            await result;
+          }
+        } catch (_) {
+          button.disabled = previousDisabled;
+          button.classList.remove("request-action-loading");
         }
       });
       footerNode.appendChild(button);

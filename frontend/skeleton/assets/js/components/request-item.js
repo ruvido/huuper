@@ -207,21 +207,6 @@ window.huuperRequestItem = (() => {
     `;
   }
 
-  function actionHref(item, options = {}) {
-    const workflow = item && typeof item.workflow === "object" ? item.workflow : {};
-    const action = text(workflow.pending_action);
-    if (workflow.can_take_pending_action !== true) {
-      return "";
-    }
-    if (action === "set_group" && typeof options.assignGroupURL === "function") {
-      return options.assignGroupURL(item.id);
-    }
-    if (action === "set_guardian" && typeof options.assignGuardianURL === "function") {
-      return options.assignGuardianURL(item.id);
-    }
-    return "";
-  }
-
   function requestMeta(item) {
     const parts = [];
     const data = item && typeof item.data === "object" ? item.data : {};
@@ -246,21 +231,18 @@ window.huuperRequestItem = (() => {
     const meta = requestMeta(item);
     const workflow = item && typeof item.workflow === "object" ? item.workflow : {};
     const status = text(workflow.pending_action_label) || statusText(item.status_label || item.status);
-    const nextHref = actionHref(item, options);
     const side = status
-      ? (nextHref
-          ? `<button type="button" class="list-item-side request-item-action" data-request-id="${escapeHTML(item.id)}" data-action-href="${escapeHTML(nextHref)}"><span class="list-item-side-title request-item-status">${escapeHTML(status)}</span></button>`
-          : `<span class="list-item-side"><span class="list-item-side-title request-item-status">${escapeHTML(status)}</span></span>`)
+      ? `<span class="list-item-side"><span class="list-item-side-title request-item-status">${escapeHTML(status)}</span></span>`
       : "";
 
     return `
-      <article class="list-item request-item">
-        <a href="${escapeHTML(href)}" class="list-item-copy request-item-copy">
+      <a href="${escapeHTML(href)}" class="list-item request-item">
+        <span class="list-item-copy request-item-copy">
           <strong>${safeTitle}</strong>
           ${meta ? `<span class="list-item-meta request-item-meta">${escapeHTML(meta)}</span>` : ""}
-        </a>
+        </span>
         ${side}
-      </article>
+      </a>
     `;
   }
 

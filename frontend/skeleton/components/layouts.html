@@ -120,7 +120,7 @@
       <section class="app-shell">
         {{ $profileHref := .ProfileHref }}
         {{ if eq .TopbarVariantClass "top-bar-detail-page" }}{{ $profileHref = "" }}{{ end }}
-        {{ template "topbar" (dict "BackHref" .BackHref "BackHistory" .BackHistory "Title" .TopbarTitle "ProfileHref" $profileHref "MetaID" .TopbarMetaID "VariantClass" .TopbarVariantClass "MetaClass" .TopbarMetaClass) }}
+        {{ template "topbar" (dict "BackHref" .BackHref "BackHistory" .BackHistory "Title" .TopbarTitle "ProfileHref" $profileHref "MetaID" .TopbarMetaID "VariantClass" .TopbarVariantClass "MetaClass" .TopbarMetaClass "RightActionTrash" .RightActionTrash) }}
         {{ template "content" . }}
       </section>
     </main>
