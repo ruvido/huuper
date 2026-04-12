@@ -43,6 +43,7 @@ Linee guida minime per contribuire al progetto in modo coerente, semplice e mant
 - `frontend/skeleton` e' la source of truth editabile.
 - `frontend/site` e' output generato e servito da PocketBase.
 - Non modificare manualmente `frontend/site`.
+- Il frontend v2 ha watch e live reload attivi: dopo le modifiche a `frontend/skeleton`, l'output si rigenera automaticamente. Non ripetere istruzioni su rebuild manuale salvo blocco esplicito.
 - L'archivio del vecchio frontend Svelte vive in `archive/frontend-svelte/` e non fa parte del path attivo.
 - Usare CSS semantico e componenti/template chiari.
 - Il primo obiettivo frontend v2 e' wireframing funzionale, non design finale.

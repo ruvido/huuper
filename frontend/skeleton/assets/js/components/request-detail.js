@@ -148,7 +148,6 @@ window.huuperRequestDetail = (() => {
                     ${date ? `<p class="request-process-date">${escapeHTML(date)}</p>` : ""}
                     ${valueHTML ? `<div class="request-process-value">${valueHTML}</div>` : value ? `<div class="request-process-value">${escapeHTML(value)}</div>` : ""}
                     ${subtitle ? `<p class="request-process-note request-process-subtitle">${escapeHTML(subtitle)}</p>` : ""}
-                    ${(completed && signature && options.showSignature !== false) ? `<p class="request-process-signature">${escapeHTML(signature)}</p>` : ""}
                   </div>
                 ` : ""}
               </div>
@@ -156,6 +155,7 @@ window.huuperRequestDetail = (() => {
           </div>
           ${flowNoteHTML ? `<div class="request-process-flow-note">${flowNoteHTML}</div>` : flowNoteText ? `<p class="request-process-flow-note">${escapeHTML(flowNoteText)}</p>` : ""}
           ${note ? `<div class="request-process-note">${note}</div>` : ""}
+          ${(completed && signature && options.showSignature !== false) ? `<p class="request-process-signature">${escapeHTML(signature)}</p>` : ""}
         </div>
       </article>
     `;
@@ -352,9 +352,6 @@ window.huuperRequestDetail = (() => {
       if (processApproval) {
         parts.push(processApproval);
       }
-      if (canTakeAction && requiredField === "mentoring_notes") {
-        parts.push(`<label class="form-field"><span>Mentoring notes</span><textarea id="request-mentoring-notes"></textarea></label>`);
-      }
       const actions = [];
       if (canTakeAction && action) {
         const actionLabel = text(workflow.pending_action_label) || actionText(action);
@@ -451,16 +448,55 @@ window.huuperRequestDetail = (() => {
             return;
           }
 
-          const body = { action };
           if (requiredField === "mentoring_notes") {
-            body.mentoring_notes = text(workflowNode.querySelector("#request-mentoring-notes").value);
-            if (!body.mentoring_notes) {
-              window.huuperListPage.setStatus(statusNode, "Write notes.");
-              return;
-            }
+            window.huuperActionSheet.open({
+              title: "Mentoring notes",
+              contentHTML: `
+                <div class="request-mentoring-notes-field">
+                  <textarea id="request-mentoring-notes" placeholder="Write"></textarea>
+                </div>
+              `,
+              footerAction: {
+                label: "Submit",
+                onSelect: async (sheetButton) => {
+                  const notesNode = document.querySelector("#request-mentoring-notes");
+                  const mentoringNotes = text(notesNode && notesNode.value);
+                  if (!mentoringNotes) {
+                    if (notesNode) {
+                      notesNode.focus();
+                    }
+                    window.huuperListPage.setStatus(statusNode, "Write notes.");
+                    return;
+                  }
+                  try {
+                    sheetButton.disabled = true;
+                    window.huuperActionSheet.close();
+                    await window.huuperRequestActions.submitAndRedirect({
+                      actionURL: config.actionURL(id),
+                      body: {
+                        action,
+                        mentoring_notes: mentoringNotes,
+                      },
+                      redirectURL: config.requestsURL,
+                    });
+                  } catch (_) {
+                    sheetButton.disabled = false;
+                    window.huuperListPage.setStatus(statusNode, "Action unavailable.");
+                  }
+                },
+              },
+              onOpen: () => {
+                const notesNode = document.querySelector("#request-mentoring-notes");
+                if (notesNode) {
+                  notesNode.focus();
+                }
+              },
+            });
+            return;
           }
 
           try {
+            const body = { action };
             button.disabled = true;
             window.huuperListPage.setStatus(statusNode, "");
             await window.huuperRequestActions.submitAndRedirect({
