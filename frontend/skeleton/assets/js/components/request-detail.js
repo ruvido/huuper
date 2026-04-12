@@ -51,6 +51,22 @@ window.huuperRequestDetail = (() => {
     }).format(parsed);
   }
 
+  function titleCase(value) {
+    const raw = text(value);
+    if (!raw) {
+      return "";
+    }
+    return raw
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((token) => token
+        .split("-")
+        .map((part) => part ? `${part.charAt(0).toUpperCase()}${part.slice(1)}` : part)
+        .join("-"))
+      .join(" ");
+  }
+
   function processSignature(prefix, who, at) {
     const cleanPrefix = text(prefix);
     const cleanWho = text(who);
@@ -94,6 +110,7 @@ window.huuperRequestDetail = (() => {
     const title = text(options.title);
     const info = text(options.info);
     const date = dateOnly(options.date);
+    const valueHTML = typeof options.valueHTML === "string" ? options.valueHTML : "";
     const value = text(options.valueText);
     const subtitle = text(options.subtitle);
     const signature = processSignature(options.signaturePrefix, options.signatureWho, options.signatureAt);
@@ -103,6 +120,9 @@ window.huuperRequestDetail = (() => {
     const completed = options.completed === true;
     const current = options.current === true;
     const classes = ["request-process-step"];
+    if (options.variantClass) {
+      classes.push(text(options.variantClass));
+    }
     if (completed) {
       classes.push("request-process-step-done");
     } else if (current) {
@@ -112,7 +132,9 @@ window.huuperRequestDetail = (() => {
     }
     return `
       <article class="${classes.join(" ")}">
+        <span class="request-process-rail request-process-rail-top" aria-hidden="true"></span>
         <span class="request-process-marker" aria-hidden="true"></span>
+        <span class="request-process-rail request-process-rail-bottom" aria-hidden="true"></span>
         <div class="request-process-content">
           <div class="request-process-head">
             ${title ? `
@@ -124,7 +146,7 @@ window.huuperRequestDetail = (() => {
                 ${(value || date || subtitle || (completed && signature && options.showSignature !== false)) ? `
                   <div class="request-process-meta">
                     ${date ? `<p class="request-process-date">${escapeHTML(date)}</p>` : ""}
-                    ${value ? `<p class="request-process-value">${escapeHTML(value)}</p>` : ""}
+                    ${valueHTML ? `<div class="request-process-value">${valueHTML}</div>` : value ? `<div class="request-process-value">${escapeHTML(value)}</div>` : ""}
                     ${subtitle ? `<p class="request-process-note request-process-subtitle">${escapeHTML(subtitle)}</p>` : ""}
                     ${(completed && signature && options.showSignature !== false) ? `<p class="request-process-signature">${escapeHTML(signature)}</p>` : ""}
                   </div>
@@ -158,7 +180,7 @@ window.huuperRequestDetail = (() => {
     const mentoringNoteHTML = text(payload.mentoring_notes_html);
     const mentoringNoteText = text(payload.mentoring_notes || data.mentoring_notes);
     const guardianData = data.guardian && typeof data.guardian === "object" ? data.guardian : {};
-    const groupName = text(payload.group_name);
+    const groupName = titleCase(payload.group_name);
     const groupAssignedAt = text(data.group_assigned_at);
     const groupAssignedBy = text(data.group_assigned_by);
     const stepCompleted = (action) => {
@@ -181,7 +203,6 @@ window.huuperRequestDetail = (() => {
     const normalizedCurrentIndex = currentIndex < 0 ? flowSteps.length : currentIndex;
     const stepStateForAction = (action, step, index) => {
       const isCurrent = index === normalizedCurrentIndex;
-      const isDone = index < normalizedCurrentIndex;
       const flowNote = flowNoteForStep(step);
       switch (action) {
         case "assign_group":
@@ -196,11 +217,13 @@ window.huuperRequestDetail = (() => {
               signatureAt: groupAssignedAt,
               flowNoteHTML: isCurrent ? flowNote.html : "",
               flowNoteText: isCurrent ? flowNote.text : "",
-              valueText: groupName,
+              variantClass: "request-process-step-group",
+              valueHTML: groupName ? `<span class="request-process-value-inline"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-return-right request-process-value-icon" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M1.5 1.5A.5.5 0 0 0 1 2v4.8a2.5 2.5 0 0 0 2.5 2.5h9.793l-3.347 3.346a.5.5 0 0 0 .708.708l4.2-4.2a.5.5 0 0 0 0-.708l-4-4a.5.5 0 0 0-.708.708L13.293 8.3H3.5A1.5 1.5 0 0 1 2 6.8V2a.5.5 0 0 0-.5-.5"></path></svg><strong class="request-process-value-text">${escapeHTML(groupName)}</strong></span>` : "",
             };
           }
         case "assign_guardian":
           {
+            const guardianName = titleCase(guardianData.name);
             return {
               completed: text(guardianData.assigned_at) !== "",
               current: isCurrent,
@@ -211,7 +234,7 @@ window.huuperRequestDetail = (() => {
               signatureAt: guardianData.assigned_at,
               flowNoteHTML: isCurrent ? flowNote.html : "",
               flowNoteText: isCurrent ? flowNote.text : "",
-              valueText: text(guardianData.name),
+              valueHTML: guardianName ? `<span class="request-process-value-inline"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-return-right request-process-value-icon" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M1.5 1.5A.5.5 0 0 0 1 2v4.8a2.5 2.5 0 0 0 2.5 2.5h9.793l-3.347 3.346a.5.5 0 0 0 .708.708l4.2-4.2a.5.5 0 0 0 0-.708l-4-4a.5.5 0 0 0-.708.708L13.293 8.3H3.5A1.5 1.5 0 0 1 2 6.8V2a.5.5 0 0 0-.5-.5"></path></svg><strong class="request-process-value-text">${escapeHTML(guardianName)}</strong></span>` : "",
             };
           }
         case "mentoring":
@@ -284,6 +307,7 @@ window.huuperRequestDetail = (() => {
         signatureAt: state.signatureAt,
         noteHTML: state.noteHTML,
         noteText: state.noteText,
+        valueHTML: state.valueHTML,
         valueText: state.valueText,
       });
     }).filter(Boolean).join("");

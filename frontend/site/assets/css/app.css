@@ -1712,6 +1712,11 @@ body:has(.top-bar-detail-page) .bottom-nav {
   text-transform: uppercase;
 }
 
+.request-process-title {
+  color: var(--accent);
+  margin-bottom: var(--space-5);
+}
+
 .request-note-body {
   margin: 0;
 }
@@ -1750,6 +1755,7 @@ body:has(.top-bar-detail-page) .bottom-nav {
   bottom: 4px;
   width: 4px;
   background: var(--request-line);
+  z-index: 0;
 }
 
 .request-process {
@@ -1765,24 +1771,6 @@ body:has(.top-bar-detail-page) .bottom-nav {
   gap: var(--detail-gap);
   align-items: flex-start;
   padding-left: 0;
-}
-
-.request-process-step:not(:last-child)::before {
-  content: "";
-  position: absolute;
-  left: 9px;
-  top: 24px;
-  bottom: calc((var(--space-5) + var(--space-3)) * -1);
-  width: 4px;
-  background: var(--request-line);
-}
-
-.request-process-step-done:not(:last-child)::before {
-  background: var(--accent);
-}
-
-.request-process-step-current:not(:last-child)::before {
-  background: var(--request-line);
 }
 
 .request-process-step-todo .request-process-label,
@@ -1813,6 +1801,29 @@ body:has(.top-bar-detail-page) .bottom-nav {
   padding-bottom: var(--space-3);
 }
 
+.request-process-rail {
+  position: absolute;
+  left: 9px;
+  width: 4px;
+  background: var(--request-line);
+  z-index: 1;
+}
+
+.request-process-rail-top {
+  top: calc(var(--space-3) * -1);
+  height: calc(var(--space-3) + 11px);
+}
+
+.request-process-rail-bottom {
+  top: 11px;
+  bottom: calc(var(--space-3) * -1);
+}
+
+.request-process-step-done .request-process-rail,
+.request-process-step-current .request-process-rail {
+  background: var(--accent);
+}
+
 .request-process-marker {
   flex: 0 0 auto;
   position: relative;
@@ -1823,6 +1834,7 @@ body:has(.top-bar-detail-page) .bottom-nav {
   margin-top: 2px;
   border-radius: 999px;
   background: var(--request-line);
+  z-index: 2;
 }
 
 .request-process-step-todo .request-process-marker {
@@ -1830,10 +1842,6 @@ body:has(.top-bar-detail-page) .bottom-nav {
 }
 
 .request-process-step-current .request-process-marker {
-  background: var(--accent);
-}
-
-.request-process-step-current:not(:last-child)::before {
   background: var(--accent);
 }
 
@@ -1900,6 +1908,23 @@ body:has(.top-bar-detail-page) .bottom-nav {
   color: var(--text);
   font-size: var(--type-body-size);
   line-height: 1.5;
+}
+
+.request-process-value-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.request-process-value-icon {
+  flex: 0 0 auto;
+  display: block;
+  color: var(--accent);
+}
+
+.request-process-value-text {
+  min-width: 0;
 }
 
 .request-process-meta {
