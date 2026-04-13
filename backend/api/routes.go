@@ -22,6 +22,7 @@ func RegisterRoutes(app *pocketbase.PocketBase, se *core.ServeEvent) {
 		Settings:           meroutes.SettingsHandler(app),
 		GroupsList:         meroutes.GroupsListHandler(app),
 		GroupGet:           meroutes.GroupGetHandler(app),
+		GroupAssistant:     meroutes.GroupAssistantHandler(app),
 		UserGet:            meroutes.UserGetHandler(app),
 		EventGet:           meroutes.EventGetHandler(app),
 		EventStatus:        meroutes.EventStatusHandler(app),

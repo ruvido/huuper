@@ -82,7 +82,7 @@
     <main class="app">
       <section class="app-shell">
         {{ if or .BackHref .BackHistory .TopbarTitle }}
-        {{ template "topbar" (dict "BackHref" .BackHref "BackHistory" .BackHistory "Title" .TopbarTitle "ProfileHref" "" "MetaID" .TopbarMetaID "VariantClass" .TopbarVariantClass "MetaClass" .TopbarMetaClass) }}
+        {{ template "topbar" (dict "BackHref" .BackHref "BackHistory" .BackHistory "Title" .TopbarTitle "ProfileHref" "" "MetaID" .TopbarMetaID "VariantClass" .TopbarVariantClass "MetaClass" .TopbarMetaClass "RightActionShuffle" .RightActionShuffle) }}
         {{ end }}
         {{ template "content" . }}
       </section>
@@ -101,7 +101,7 @@
       <section class="app-shell">
         {{ $profileHref := .ProfileHref }}
         {{ if eq .TopbarVariantClass "top-bar-detail-page" }}{{ $profileHref = "" }}{{ end }}
-        {{ template "topbar" (dict "BackHref" .BackHref "BackHistory" .BackHistory "Title" .TopbarTitle "ProfileHref" $profileHref "MetaID" .TopbarMetaID "VariantClass" .TopbarVariantClass "MetaClass" .TopbarMetaClass) }}
+        {{ template "topbar" (dict "BackHref" .BackHref "BackHistory" .BackHistory "Title" .TopbarTitle "ProfileHref" $profileHref "MetaID" .TopbarMetaID "VariantClass" .TopbarVariantClass "MetaClass" .TopbarMetaClass "RightActionShuffle" .RightActionShuffle) }}
         {{ template "content" . }}
       </section>
     </main>
@@ -120,7 +120,7 @@
       <section class="app-shell">
         {{ $profileHref := .ProfileHref }}
         {{ if eq .TopbarVariantClass "top-bar-detail-page" }}{{ $profileHref = "" }}{{ end }}
-        {{ template "topbar" (dict "BackHref" .BackHref "BackHistory" .BackHistory "Title" .TopbarTitle "ProfileHref" $profileHref "MetaID" .TopbarMetaID "VariantClass" .TopbarVariantClass "MetaClass" .TopbarMetaClass "RightActionTrash" .RightActionTrash) }}
+        {{ template "topbar" (dict "BackHref" .BackHref "BackHistory" .BackHistory "Title" .TopbarTitle "ProfileHref" $profileHref "MetaID" .TopbarMetaID "VariantClass" .TopbarVariantClass "MetaClass" .TopbarMetaClass "RightActionTrash" .RightActionTrash "RightActionShuffle" .RightActionShuffle) }}
         {{ template "content" . }}
       </section>
     </main>

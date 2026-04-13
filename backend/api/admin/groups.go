@@ -7,6 +7,7 @@ import (
 	meapi "members/backend/api/me"
 	"members/backend/bot"
 	backendinternal "members/backend/internal"
+	groupinternal "members/backend/internal/groups"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
@@ -38,15 +39,6 @@ func GroupAssistantHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent
 		}
 
 		groupID := strings.TrimSpace(e.Request.PathValue("id"))
-		if groupID == "" {
-			return apis.NewBadRequestError("invalid_group", nil)
-		}
-
-		group, err := app.FindRecordById("groups", groupID)
-		if err != nil || group == nil {
-			return apis.NewNotFoundError("group_not_found", err)
-		}
-
 		var payload struct {
 			Assistant string `json:"assistant"`
 		}
@@ -54,33 +46,14 @@ func GroupAssistantHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent
 			return apis.NewBadRequestError("invalid_payload", err)
 		}
 
-		assistantID := strings.TrimSpace(payload.Assistant)
-		if assistantID == "" {
-			return apis.NewBadRequestError("invalid_assistant", nil)
-		}
-
-		assistant, err := app.FindRecordById("users", assistantID)
-		if err != nil || assistant == nil {
-			return apis.NewNotFoundError("assistant_not_found", err)
-		}
-
-		ok, err := backendinternal.IsMemberOfGroup(app, assistantID, groupID)
-		if err != nil {
-			return apis.NewBadRequestError("failed_group_membership_check", err)
-		}
-		if !ok {
-			return apis.NewBadRequestError("assistant_must_be_group_member", nil)
-		}
-
-		group.Set("assistant", assistantID)
-		if err := app.Save(group); err != nil {
-			return apis.NewBadRequestError("failed_update_group", err)
+		if err := groupinternal.UpdateAssistant(app, groupID, payload.Assistant); err != nil {
+			return err
 		}
 
 		return e.JSON(http.StatusOK, map[string]any{
 			"ok":        true,
 			"group_id":  groupID,
-			"assistant": assistantID,
+			"assistant": strings.TrimSpace(payload.Assistant),
 		})
 	}
 }

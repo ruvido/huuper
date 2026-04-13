@@ -75,13 +75,10 @@ window.huuperListItem = (() => {
   function renderMedia(item, label, options = {}) {
     const url = avatarURL(item);
     const classes = ["list-item-media"];
-    if (options.guardian) {
-      classes.push("list-item-media-guardian");
-    }
 
     const fallback = `<span class="list-item-media-text"${url ? ' hidden' : ""}>${escapeHTML(initials(label))}</span>`;
     if (!url) {
-      return `<span class="${classes.join(" ")}" aria-hidden="true"><span class="list-item-media-face">${fallback}</span>${options.guardian ? '<span class="list-item-media-dot"></span>' : ""}</span>`;
+      return `<span class="${classes.join(" ")}" aria-hidden="true"><span class="list-item-media-face">${fallback}</span></span>`;
     }
 
     return `
@@ -95,7 +92,6 @@ window.huuperListItem = (() => {
           />
           ${fallback}
         </span>
-        ${options.guardian ? '<span class="list-item-media-dot"></span>' : ""}
       </span>
     `;
   }
@@ -217,7 +213,7 @@ window.huuperListItem = (() => {
       metaText: subtitle(item),
       side: trailing(item),
       linkable: false,
-      media: renderMedia(item, name, { guardian: item.is_guardian }),
+      media: renderMedia(item, name),
     });
   }
 
@@ -250,7 +246,7 @@ window.huuperListItem = (() => {
       metaText: subtitle(item),
       side: trailing(item),
       linkable: false,
-      media: renderMedia(item, name, { guardian: item.is_guardian }),
+      media: renderMedia(item, name),
     });
   }
 

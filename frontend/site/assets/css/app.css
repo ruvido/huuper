@@ -38,6 +38,8 @@
   --button-secondary-text: rgba(244, 240, 227, 0.9);
   --topbar-height: 66px;
   --topbar-side-size: 44px;
+  --topbar-action-icon-size: 20px;
+  --topbar-action-icon-size-accent: 22px;
   --topbar-gap: var(--space-3);
   --topbar-title-size: 1rem;
   --topbar-title-letter-spacing: -0.03em;
@@ -77,6 +79,7 @@
   --request-space-xl: 32px;
   --user-summary-avatar-space: calc(var(--space-6) * 2);
   --detail-gap: 12px;
+  --user-section-gap: var(--detail-gap);
 }
 
 * {
@@ -259,10 +262,19 @@ body:has(.top-bar-detail-page) .bottom-nav {
   line-height: 1;
 }
 
+.topbar-action-accent {
+  color: var(--accent);
+}
+
 .topbar-action svg {
-  width: 20px;
-  height: 20px;
+  width: var(--topbar-action-icon-size);
+  height: var(--topbar-action-icon-size);
   fill: currentColor;
+}
+
+.topbar-action-accent svg {
+  width: var(--topbar-action-icon-size-accent);
+  height: var(--topbar-action-icon-size-accent);
 }
 
 .top-bar-detail-page {
@@ -861,7 +873,7 @@ body:has(.top-bar-detail-page) .bottom-nav {
 .list-card-default > a,
 .list-card-default > article,
 .list-card-default > button {
-  padding: 18px 0;
+  padding: var(--user-section-gap) 0;
   border: 0;
   border-bottom: 1px solid rgba(242, 204, 13, 0.08);
   border-radius: 0;
@@ -926,10 +938,6 @@ body:has(.top-bar-detail-page) .bottom-nav {
   overflow: hidden;
 }
 
-.list-item-media-guardian {
-  background: #d7d2b9;
-}
-
 .list-item-media-text {
   display: flex;
   align-items: center;
@@ -956,18 +964,6 @@ body:has(.top-bar-detail-page) .bottom-nav {
   border-radius: 999px;
   object-fit: cover;
 }
-
-.list-item-media-dot {
-  position: absolute;
-  right: 1px;
-  bottom: 1px;
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(34, 31, 16, 0.98);
-  border-radius: 999px;
-  background: var(--accent);
-}
-
 
 .list-item-copy {
   display: grid;
@@ -1569,7 +1565,7 @@ body.request-page .request-workflow-card .action-row .primary.request-action-loa
 
 .user-page-content {
   display: grid;
-  gap: 24px;
+  gap: var(--user-section-gap);
   padding-inline: 24px;
   padding-bottom: 24px;
 }
@@ -1696,6 +1692,10 @@ body.request-page .request-workflow-card .action-row .primary.request-action-loa
   letter-spacing: var(--type-label-letter-spacing);
   line-height: 1.2;
   text-transform: uppercase;
+}
+
+.section-divider {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .request-detail-description {
@@ -2107,8 +2107,9 @@ body.request-page .request-workflow-card .action-row .primary.request-action-loa
   color: inherit;
 }
 
+#user-guardian-label,
 #user-groups-label {
-  margin: 0 0 var(--detail-gap);
+  margin: 0;
 }
 
 .request-timeline-list {

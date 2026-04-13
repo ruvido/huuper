@@ -41,13 +41,20 @@
   <p id="user-status" class="meta-text"></p>
   <div class="user-page-content">
     <section id="user-summary" class="user-page-summary" hidden></section>
+    {{ template "section-divider" . }}
+    <p id="user-guardian-label" class="request-detail-term" hidden>Guardian of</p>
     <section id="user-requests" class="list-card list-card-default" hidden></section>
     {{ if .ShowGroups }}
+    {{ template "section-divider" . }}
     <p id="user-groups-label" class="request-detail-term" hidden>Member of</p>
     <section id="user-groups" class="list-card list-card-default" hidden></section>
     {{ end }}
   </div>
 </section>
+{{ end }}
+
+{{ define "section-divider" }}
+<div class="section-divider" aria-hidden="true" hidden></div>
 {{ end }}
 
 {{ define "group-detail-content" }}

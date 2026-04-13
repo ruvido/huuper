@@ -10,6 +10,8 @@
   <div class="top-bar-title">{{ .Title }}</div>
   {{ if .RightActionTrash }}
     <button class="topbar-action topbar-action-danger" type="button" aria-label="Reject candidate" data-request-reject>{{ template "icon-trash-fill" . }}</button>
+  {{ else if .RightActionShuffle }}
+    <button class="topbar-action topbar-action-accent" type="button" aria-label="Change assistant" data-group-assistant-action hidden>{{ template "icon-shuffle" . }}</button>
   {{ else if .ProfileHref }}
     <a class="topbar-profile" href="{{ .ProfileHref }}" aria-label="Profile" data-topbar-profile>{{ template "icon-profile" . }}</a>
   {{ else if .MetaID }}

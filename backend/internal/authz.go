@@ -173,7 +173,17 @@ func VisibleRequestForActor(app *pocketbase.PocketBase, actor *core.Record, requ
 		return nil, apis.NewBadRequestError("failed_groups_lookup", err)
 	}
 	if !CanViewRequest(actor, record, assistantGroups) {
-		return nil, apis.NewForbiddenError("forbidden_request", nil)
+		groupID := strings.TrimSpace(record.GetString("group"))
+		if groupID == "" {
+			return nil, apis.NewForbiddenError("forbidden_request", nil)
+		}
+		ok, err := IsMemberOfGroup(app, actor.Id, groupID)
+		if err != nil {
+			return nil, apis.NewBadRequestError("failed_group_access_check", err)
+		}
+		if !ok {
+			return nil, apis.NewForbiddenError("forbidden_request", nil)
+		}
 	}
 
 	return record, nil

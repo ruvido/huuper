@@ -131,10 +131,7 @@ func GroupGetHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) erro
 			return apis.NewBadRequestError("failed_group_memberships", err)
 		}
 
-		requestsVisible := backendinternal.IsAssistantForGroup(actor, group)
-		if actor.GetBool("admin") {
-			requestsVisible = true
-		}
+		requestsVisible := true
 		requestsCount := 0
 		pendingRequests := []groupinternal.PendingRequestItem{}
 		if requestsVisible {
@@ -194,6 +191,43 @@ func GroupGetHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) erro
 			"assistant":        group.GetString("assistant"),
 			"members":          membersResponse.Items,
 			"guardians":        guardiansResponse.Items,
+		})
+	}
+}
+
+func GroupAssistantHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		actor, err := backendinternal.RequireAuthenticatedActor(e)
+		if err != nil {
+			return err
+		}
+
+		group, err := groupinternal.FindByPathID(app, e)
+		if err != nil {
+			return err
+		}
+		if err := backendinternal.RequireGroupVisibility(app, actor, group); err != nil {
+			return err
+		}
+		if !actor.GetBool("admin") && !backendinternal.IsAssistantForGroup(actor, group) {
+			return apis.NewForbiddenError("Forbidden", nil)
+		}
+
+		var payload struct {
+			Assistant string `json:"assistant"`
+		}
+		if err := e.BindBody(&payload); err != nil {
+			return apis.NewBadRequestError("invalid_payload", err)
+		}
+
+		if err := groupinternal.UpdateAssistant(app, group.Id, payload.Assistant); err != nil {
+			return err
+		}
+
+		return e.JSON(http.StatusOK, map[string]any{
+			"ok":        true,
+			"group_id":  group.Id,
+			"assistant": strings.TrimSpace(payload.Assistant),
 		})
 	}
 }
