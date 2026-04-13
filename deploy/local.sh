@@ -27,4 +27,4 @@ fi
 
 echo "🚀 Starting PocketBase server..."
 pushd "${REPO_ROOT}" >/dev/null
-go run ./backend serve --http=127.0.0.1:9090 --dir=./data --frontend-dev
+go run ./backend serve --http=127.0.0.1:9090 --dir=./data --frontend-dev --disable-telegram-bot

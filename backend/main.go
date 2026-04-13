@@ -28,6 +28,7 @@ func main() {
 	var skeletonDir string
 	var publicDir string
 	var frontendDev bool
+	var disableTelegramBot bool
 
 	app.RootCmd.PersistentFlags().StringVar(
 		&skeletonDir,
@@ -46,6 +47,12 @@ func main() {
 		"frontend-dev",
 		false,
 		"build frontend from skeleton and enable live reload on changes",
+	)
+	app.RootCmd.PersistentFlags().BoolVar(
+		&disableTelegramBot,
+		"disable-telegram-bot",
+		false,
+		"skip starting the Telegram bot",
 	)
 	hooks.RegisterSettingsValidation(app)
 	hooks.RegisterGroupsValidation(app)
@@ -112,9 +119,11 @@ func main() {
 			}
 		}
 
-		// Start Telegram bot
-		if err := bot.StartTelegramBot(app); err != nil {
-			log.Printf("Failed to start Telegram bot: %v", err)
+		// Start Telegram bot unless explicitly disabled.
+		if !disableTelegramBot {
+			if err := bot.StartTelegramBot(app); err != nil {
+				log.Printf("Failed to start Telegram bot: %v", err)
+			}
 		}
 
 		api.RegisterRoutes(app, se)

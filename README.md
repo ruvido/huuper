@@ -43,6 +43,7 @@ go run ./backend serve --http=127.0.0.1:8000 --dir=./data --frontend-dev
 
 The app will be available at `http://127.0.0.1:8000`
 The frontend is rebuilt from `frontend/skeleton` to `frontend/site` and hot-reloaded in dev mode.
+If you want to skip the Telegram bot locally or in deploy scripts, pass `--disable-telegram-bot`.
 
 ### Building for Production
 

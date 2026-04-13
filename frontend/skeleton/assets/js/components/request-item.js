@@ -158,11 +158,15 @@ window.huuperRequestItem = (() => {
       return "";
     }
     const diffMs = Date.now() - parsed.getTime();
-    const diffDays = Math.floor(diffMs / 86400000);
-    if (diffDays <= 0) {
+    if (diffMs <= 0) {
       return "";
     }
-    return `${diffDays}d`;
+    const diffDays = Math.floor(diffMs / 86400000);
+    if (diffDays < 1) {
+      const diffHours = Math.max(1, Math.floor(diffMs / 3600000));
+      return diffHours === 1 ? "1 hour ago" : `${diffHours} hours ago`;
+    }
+    return diffDays === 1 ? "1 day ago" : `${diffDays} days ago`;
   }
 
   function renderDetail(item, options = {}) {
@@ -170,6 +174,7 @@ window.huuperRequestItem = (() => {
     const fullName = text(data.full_name || item.full_name || item.email || item.id);
     const age = ageText(data.birth_year);
     const location = text(data.region);
+    const ageLabel = requestAgeDays(item.created || data.created);
     const meta = age && location
       ? `${escapeHTML(age)} <span class="request-meta-dot" aria-hidden="true"></span> ${escapeHTML(location)}`
       : age
@@ -196,7 +201,7 @@ window.huuperRequestItem = (() => {
       <article class="request-sheet">
         <header class="request-sheet-header">
           <div class="request-identity">
-            <span class="request-candidate-label">Candidate</span>
+            ${ageLabel ? `<span class="request-candidate-label">${escapeHTML(ageLabel)}</span>` : ""}
             <h1 class="request-title">${escapeHTML(fullName)}</h1>
             ${meta ? `<p class="request-subtitle">${meta}</p>` : ""}
           </div>
@@ -250,6 +255,7 @@ window.huuperRequestItem = (() => {
     actionText,
     renderDetail,
     renderListItem,
+    requestAgeDays,
     statusText,
   };
 })();

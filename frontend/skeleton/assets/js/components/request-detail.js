@@ -8,19 +8,7 @@ window.huuperRequestDetail = (() => {
   }
 
   function requestAgeDaysLabel(value) {
-    const raw = text(value);
-    if (!raw) {
-      return "";
-    }
-    const parsed = new Date(raw);
-    if (Number.isNaN(parsed.getTime())) {
-      return "";
-    }
-    const diffDays = Math.floor((Date.now() - parsed.getTime()) / 86400000);
-    if (diffDays <= 0) {
-      return "";
-    }
-    return `${diffDays} days ago`;
+    return window.huuperRequestItem.requestAgeDays(value);
   }
 
   function actionText(value) {

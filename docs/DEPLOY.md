@@ -39,6 +39,8 @@ What it does:
 5. Runs `docker compose up -d --build --force-recreate`.
 6. Waits for `/api/health` success.
 
+The local deploy helper `deploy/local.sh` starts PocketBase with `--disable-telegram-bot` by default, so the Telegram bot stays off in local deploy runs unless you override the flag manually.
+
 ## Required on VPS
 
 Create `.env` locally in project root before deploy.
