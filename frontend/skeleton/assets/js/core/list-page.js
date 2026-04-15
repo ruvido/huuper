@@ -88,6 +88,7 @@ window.huuperListPage = (() => {
     text,
     dateTime,
     escapeHTML,
+    initials,
     queryParam,
     renderList,
     renderListItemLink,

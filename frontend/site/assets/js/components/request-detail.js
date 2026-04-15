@@ -101,8 +101,11 @@ window.huuperRequestDetail = (() => {
     const valueHTML = typeof options.valueHTML === "string" ? options.valueHTML : "";
     const value = text(options.valueText);
     const subtitle = text(options.subtitle);
+    const subtitleClass = text(options.subtitleClass);
     const signature = processSignature(options.signaturePrefix, options.signatureWho, options.signatureAt);
     const note = processNote(options.noteHTML, options.noteText);
+    const noteClass = text(options.noteClass);
+    const noteBodyClass = text(options.noteBodyClass) || "request-process-note-body";
     const flowNoteHTML = text(options.flowNoteHTML);
     const flowNoteText = text(options.flowNoteText);
     const completed = options.completed === true;
@@ -135,14 +138,14 @@ window.huuperRequestDetail = (() => {
                   <div class="request-process-meta">
                     ${date ? `<p class="request-process-date">${escapeHTML(date)}</p>` : ""}
                     ${valueHTML ? `<div class="request-process-value">${valueHTML}</div>` : value ? `<div class="request-process-value">${escapeHTML(value)}</div>` : ""}
-                    ${subtitle ? `<p class="request-process-note request-process-subtitle">${escapeHTML(subtitle)}</p>` : ""}
+                    ${subtitle ? `<p class="request-process-subtitle${subtitleClass ? ` ${subtitleClass}` : ""}">${escapeHTML(subtitle)}</p>` : ""}
                   </div>
                 ` : ""}
               </div>
             ` : ""}
           </div>
           ${flowNoteHTML ? `<div class="request-process-flow-note">${flowNoteHTML}</div>` : flowNoteText ? `<p class="request-process-flow-note">${escapeHTML(flowNoteText)}</p>` : ""}
-          ${note ? `<div class="request-process-note">${note}</div>` : ""}
+          ${note ? `<div class="request-process-note${noteClass ? ` ${noteClass}` : ""}"><div class="${noteBodyClass}">${note}</div></div>` : ""}
           ${(completed && signature && options.showSignature !== false) ? `<p class="request-process-signature">${escapeHTML(signature)}</p>` : ""}
         </div>
       </article>
@@ -210,6 +213,8 @@ window.huuperRequestDetail = (() => {
               flowNoteText: completed ? "" : flowNote.text,
               variantClass: "request-process-step-group",
               valueHTML: "",
+              noteClass: "request-process-note-content",
+              noteBodyClass: "request-process-note-content-body",
               noteHTML: completed && renderedGroupName ? `<p><strong>${escapeHTML(renderedGroupName)}</strong></p>` : "",
               noteText: "",
             };
@@ -230,6 +235,8 @@ window.huuperRequestDetail = (() => {
               flowNoteHTML: completed ? "" : flowNote.html,
               flowNoteText: completed ? "" : flowNote.text,
               valueHTML: "",
+              noteClass: "request-process-note-content",
+              noteBodyClass: "request-process-note-content-body",
               noteHTML: completed && renderedGuardianName ? `<p><strong>${escapeHTML(renderedGuardianName)}</strong></p>` : "",
               noteText: "",
             };
@@ -244,6 +251,7 @@ window.huuperRequestDetail = (() => {
             signatureAt: data.mentoring_done_at,
             flowNoteHTML: mentoringNoteHTML ? "" : undefined,
             flowNoteText: mentoringNoteHTML ? "" : undefined,
+            noteBodyClass: "request-process-note-content-body",
             noteHTML: mentoringNoteHTML ? mentoringNoteHTML : "",
             noteText: "",
           };
@@ -253,6 +261,7 @@ window.huuperRequestDetail = (() => {
             current: isCurrent,
             date: data.group_approved_at,
             subtitle: text(data.group_approved_at) !== "" ? "Approved" : "",
+            subtitleClass: "request-process-subtitle-content",
             signaturePrefix: "Completed",
             signatureWho: data.group_approved_by,
             signatureAt: data.group_approved_at,
@@ -266,6 +275,7 @@ window.huuperRequestDetail = (() => {
             current: isCurrent,
             date: data.admin_approved_at,
             subtitle: text(data.admin_approved_at) !== "" ? "Approved" : "",
+            subtitleClass: "request-process-subtitle-content",
             signaturePrefix: "Completed",
             signatureWho: data.admin_approved_by,
             signatureAt: data.admin_approved_at,

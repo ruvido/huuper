@@ -1,8 +1,9 @@
 {{ define "content" }}
 <section class="panel">
-  <form id="password-reset-form">
+  <form id="password-reset-form" novalidate>
+    <h2 class="public-request-title">Password reset</h2>
     <div class="view-stack">
-      {{ template "field" (dict "Label" "Email" "ID" "password-reset-email" "Name" "email" "Type" "email" "Placeholder" "name@domain.com" "Required" true "Autocomplete" "email") }}
+      {{ template "field" (dict "Label" "Email" "HideLabel" true "ID" "password-reset-email" "ErrorID" "password-reset-email-error" "Name" "email" "Type" "email" "Placeholder" "name@domain.com" "Required" true "Autocomplete" "email") }}
     </div>
     <p id="password-reset-status" class="meta-text" hidden></p>
     <div class="action-row">
@@ -12,4 +13,4 @@
   </form>
 </section>
 {{ end }}
-{{ define "page" }}{{ template "layout-public" (dict "Title" "Huuper / Password reset" "TopbarTitle" "Password reset" "BackHref" "/" "Scripts" (list "/assets/js/public/password-reset.js")) }}{{ end }}
+{{ define "page" }}{{ template "layout-public" (dict "Title" "Huuper / Password reset" "TopbarTitle" "Password reset" "BackHref" "/" "Scripts" (list "/assets/js/core/public-fields.js" "/assets/js/public/password-reset.js")) }}{{ end }}

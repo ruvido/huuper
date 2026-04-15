@@ -16,7 +16,9 @@ func RegisterUsersNormalization(app *pocketbase.PocketBase) {
 		if err := normalizeUserEmailAndValidateUnique(e.App, e.Record); err != nil {
 			return err
 		}
-		normalizeUserProfileData(e.Record)
+		if err := normalizeUserProfileData(e.Record); err != nil {
+			return err
+		}
 		return e.Next()
 	})
 }
@@ -53,22 +55,33 @@ func normalizeUserEmailAndValidateUnique(app core.App, record *core.Record) erro
 	return nil
 }
 
-func normalizeUserProfileData(record *core.Record) {
+func normalizeUserProfileData(record *core.Record) error {
 	if record == nil {
-		return
+		return nil
 	}
 
 	data := backendinternal.ParseJSONMap(record.Get("data"))
+	if mobile, ok := data["mobile"].(string); ok {
+		normalized, err := backendinternal.NormalizePhone(mobile)
+		if err != nil {
+			return apis.NewBadRequestError("invalid_mobile", err)
+		}
+		data["mobile"] = normalized
+	}
+
 	value, ok := data["full_name"].(string)
 	if !ok {
-		return
+		record.Set("data", data)
+		return nil
 	}
 
 	normalized := backendinternal.NormalizePersonName(value)
 	if normalized == "" {
-		return
+		record.Set("data", data)
+		return nil
 	}
 
 	data["full_name"] = normalized
 	record.Set("data", data)
+	return nil
 }

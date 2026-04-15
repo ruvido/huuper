@@ -5,6 +5,10 @@ import (
 	"log"
 	"strings"
 
+	backendinternal "members/backend/internal"
+	groupinternal "members/backend/internal/groups"
+	tginternal "members/backend/internal/telegram"
+
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
@@ -68,6 +72,9 @@ func StartTelegramBot(pbApp *pocketbase.PocketBase) error {
 	}
 
 	log.Printf("Telegram bot authorized: @%s", bot.Self.UserName)
+	tginternal.SetBotProvider(func() *tgbotapi.BotAPI {
+		return bot
+	})
 
 	// Start listening for updates
 	go listenForUpdates()
@@ -90,7 +97,7 @@ func StopTelegramBot() {
 func listenForUpdates() {
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
-	u.AllowedUpdates = []string{"message", "my_chat_member", "chat_member"}
+	u.AllowedUpdates = []string{"message", "my_chat_member", "chat_member", "chat_join_request"}
 
 	updates := bot.GetUpdatesChan(u)
 
@@ -104,6 +111,11 @@ func listenForUpdates() {
 		// Handle user added/removed from groups
 		if update.ChatMember != nil {
 			handleUserChatMemberUpdate(update.ChatMember)
+			continue
+		}
+
+		if update.ChatJoinRequest != nil {
+			handleChatJoinRequest(update.ChatJoinRequest)
 			continue
 		}
 
@@ -269,6 +281,136 @@ func handleStartCommand(message *tgbotapi.Message, token string) {
 	bot.Send(reply)
 
 	log.Printf("Successfully connected user %s with Telegram %s", email, username)
+}
+
+func handleChatJoinRequest(request *tgbotapi.ChatJoinRequest) {
+	if request == nil || request.InviteLink == nil {
+		return
+	}
+
+	inviteLink := strings.TrimSpace(request.InviteLink.InviteLink)
+	if inviteLink == "" {
+		return
+	}
+
+	tokenRecord, user, err := tginternal.ConsumeMemberInvite(app, inviteLink)
+	if err != nil {
+		log.Printf("Failed to resolve invite link %q: %v", inviteLink, err)
+		notifyJoinFailure("resolve invite link", request, inviteLink, nil, err)
+		declineChatJoinRequest(request)
+		return
+	}
+
+	telegramData := backendinternal.ParseJSONMap(user.Get("telegram"))
+	telegramData["id"] = request.From.ID
+	if username := strings.TrimSpace(request.From.UserName); username != "" {
+		telegramData["username"] = username
+	}
+	if firstName := strings.TrimSpace(request.From.FirstName); firstName != "" {
+		telegramData["first_name"] = firstName
+	}
+	if lastName := strings.TrimSpace(request.From.LastName); lastName != "" {
+		telegramData["last_name"] = lastName
+	}
+	telegramData["invite_link"] = inviteLink
+	user.Set("telegram", telegramData)
+	if err := app.Save(user); err != nil {
+		log.Printf("Failed to save Telegram data for user %s: %v", user.Id, err)
+		notifyJoinFailure("save Telegram data", request, inviteLink, user, err)
+		declineChatJoinRequest(request)
+		return
+	}
+
+	if _, err := bot.Request(tgbotapi.ApproveChatJoinRequestConfig{
+		ChatConfig: tgbotapi.ChatConfig{ChatID: request.Chat.ID},
+		UserID:     request.From.ID,
+	}); err != nil {
+		log.Printf("Failed to approve chat join request for user %d in chat %d: %v", request.From.ID, request.Chat.ID, err)
+		notifyJoinFailure("approve chat join request", request, inviteLink, user, err)
+		declineChatJoinRequest(request)
+		return
+	}
+
+	if _, err := bot.Request(tgbotapi.RevokeChatInviteLinkConfig{
+		ChatConfig: tgbotapi.ChatConfig{ChatID: request.Chat.ID},
+		InviteLink: inviteLink,
+	}); err != nil {
+		log.Printf("Failed to revoke invite link %q for chat %d: %v", inviteLink, request.Chat.ID, err)
+	}
+
+	if err := app.Delete(tokenRecord); err != nil {
+		log.Printf("Failed to delete invite token %q: %v", inviteLink, err)
+	}
+
+	syncUserGroupRecord(user, request.Chat.ID, "member")
+	log.Printf("Approved chat join request for user %s via invite %q in chat %d", user.GetString("email"), inviteLink, request.Chat.ID)
+}
+
+func notifyJoinFailure(stage string, request *tgbotapi.ChatJoinRequest, inviteLink string, user *core.Record, cause error) {
+	if app == nil {
+		return
+	}
+
+	from := request.From
+
+	userEmail := ""
+	userName := ""
+	telegramUsername := strings.TrimSpace(from.UserName)
+	if user != nil {
+		userEmail = strings.TrimSpace(user.GetString("email"))
+		userData := backendinternal.ParseJSONMap(user.Get("data"))
+		userName = strings.TrimSpace(backendinternal.AnyToString(userData["full_name"]))
+	}
+	if userName == "" {
+		userName = strings.TrimSpace(strings.TrimSpace(from.FirstName + " " + from.LastName))
+	}
+	subjectTarget := userEmail
+	if subjectTarget == "" {
+		subjectTarget = telegramUsername
+	}
+	if subjectTarget == "" {
+		subjectTarget = fmt.Sprintf("telegram:%d", from.ID)
+	}
+
+	subject := "Telegram invite process failed"
+	if subjectTarget != "" {
+		subject = "Telegram invite process failed for " + subjectTarget
+	}
+
+	body := strings.Join([]string{
+		"Telegram invite process failed.",
+		"",
+		"Stage: " + strings.TrimSpace(stage),
+		"Reason: " + strings.TrimSpace(cause.Error()),
+		"User: " + strings.TrimSpace(userName),
+		"Email: " + strings.TrimSpace(userEmail),
+		"Telegram username: " + strings.TrimSpace(telegramUsername),
+		fmt.Sprintf("Telegram ID: %d", from.ID),
+		fmt.Sprintf("Chat ID: %d", request.Chat.ID),
+		"Chat title: " + strings.TrimSpace(request.Chat.Title),
+		"Invite link: " + strings.TrimSpace(inviteLink),
+	}, "\n")
+
+	if !backendinternal.SendAdminFailureEmail(app, subject, body) {
+		log.Printf("Failed to send admin failure email for telegram invite process (%s) user=%s cause=%v", stage, userEmail, cause)
+	}
+}
+
+func declineChatJoinRequest(request *tgbotapi.ChatJoinRequest) {
+	if request == nil {
+		return
+	}
+	if bot == nil {
+		return
+	}
+
+	_, err := bot.Request(tgbotapi.DeclineChatJoinRequest{
+		ChatConfig: tgbotapi.ChatConfig{ChatID: request.Chat.ID},
+		UserID:     request.From.ID,
+	})
+	if err != nil {
+		log.Printf("Failed to decline chat join request for user %d in chat %d: %v", request.From.ID, request.Chat.ID, err)
+	}
 }
 
 func handleChatMemberUpdate(update *tgbotapi.ChatMemberUpdated) {
@@ -449,31 +591,7 @@ func syncUserGroupRecord(user *core.Record, chatID int64, status string) {
 		log.Printf("Group with chat_id %d not found in DB", chatID)
 		return
 	}
-
-	existingRecord, _ := app.FindFirstRecordByFilter(
-		"user_groups",
-		"user = {:user} && group = {:group}",
-		map[string]any{
-			"user":  user.Id,
-			"group": group.Id,
-		},
-	)
-
-	if existingRecord != nil {
-		return
-	}
-
-	userGroupsCollection, err := app.FindCollectionByNameOrId("user_groups")
-	if err != nil {
-		log.Printf("Failed to find user_groups collection: %v", err)
-		return
-	}
-
-	userGroupRecord := core.NewRecord(userGroupsCollection)
-	userGroupRecord.Set("user", user.Id)
-	userGroupRecord.Set("group", group.Id)
-
-	if err := app.Save(userGroupRecord); err != nil {
+	if err := groupinternal.EnsureMembership(app, user.Id, group.Id); err != nil {
 		log.Printf("Failed to create user_groups record: %v", err)
 	} else {
 		log.Printf("✓ Added user %s to group '%s'", user.GetString("email"), group.GetString("name"))

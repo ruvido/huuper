@@ -19,13 +19,14 @@ import (
 )
 
 const (
-	templateKindNewRequest      = "requests.new_request"
-	templateKindAssignGroup     = "requests.assign_group"
-	templateKindAssignGuardian  = "requests.assign_guardian"
-	templateKindMentoring       = "requests.mentoring"
-	templateKindGroupApproved   = "requests.group_approved"
-	templateKindAdminApproved   = "requests.admin_approved"
-	templateKindUnknownTemplate = ""
+	templateKindNewRequest       = "requests.new_request"
+	templateKindRequestSubmitted = "requests.request_submitted"
+	templateKindAssignGroup      = "requests.assign_group"
+	templateKindAssignGuardian   = "requests.assign_guardian"
+	templateKindMentoring        = "requests.mentoring"
+	templateKindGroupApproved    = "requests.group_approved"
+	templateKindAdminApproved    = "requests.admin_approved"
+	templateKindUnknownTemplate  = ""
 )
 
 type NotificationTemplate struct {
@@ -55,7 +56,31 @@ func NotifyNewRequest(app *pocketbase.PocketBase, record *core.Record, data map[
 	}
 
 	values := requestNotificationValues(app, record, data, nil, "", "", nil, nil, nil)
-	sendNotificationEmail(app, []mail.Address{recipient}, template, values)
+	_, _ = sendNotificationEmail(app, []mail.Address{recipient}, template, values)
+}
+
+func NotifyRequestSubmitted(app *pocketbase.PocketBase, record *core.Record, data map[string]any) {
+	if record == nil {
+		return
+	}
+
+	template, found, err := loadNotificationTemplate(app, templateKindRequestSubmitted)
+	if err != nil {
+		app.Logger().Warn("Failed to load request template", "kind", templateKindRequestSubmitted, "error", err)
+		return
+	}
+	if !found {
+		return
+	}
+
+	recipient, ok := backendinternal.ParseAddress(strings.TrimSpace(record.GetString("email")))
+	if !ok {
+		app.Logger().Warn("Missing request candidate email", "kind", templateKindRequestSubmitted, "request", record.Id)
+		return
+	}
+
+	values := requestNotificationValues(app, record, data, nil, "", "", nil, nil, nil)
+	_, _ = sendNotificationEmail(app, []mail.Address{recipient}, template, values)
 }
 
 func NotifyRequestStep(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any, step FlowStep) {
@@ -81,7 +106,7 @@ func NotifyRequestStep(app *pocketbase.PocketBase, actor *core.Record, record *c
 		if !ok {
 			app.Logger().Warn("Missing request notification recipient", "kind", templateKind, "email_to", step.EmailTo, "request", record.Id)
 		} else {
-			sendNotificationEmail(app, []mail.Address{recipient}, template, values)
+			_, _ = sendNotificationEmail(app, []mail.Address{recipient}, template, values)
 		}
 	}
 
@@ -167,17 +192,18 @@ func mergeNotificationTemplate(defaultTemplate NotificationTemplate, template No
 	return template
 }
 
-func sendNotificationEmail(app *pocketbase.PocketBase, recipients []mail.Address, template NotificationTemplate, values map[string]string) {
+func sendNotificationEmail(app *pocketbase.PocketBase, recipients []mail.Address, template NotificationTemplate, values map[string]string) (int, int) {
 	subject := strings.TrimSpace(backendinternal.RenderTemplate(template.Email.Subject, values))
 	body := strings.TrimSpace(backendinternal.RenderTemplate(template.Email.Body, values))
 	if subject == "" || body == "" {
 		app.Logger().Warn("Skipping request email notification with empty content", "subject", subject)
-		return
+		return 0, len(recipients)
 	}
 	sent, failed := backendinternal.SendPlainEmailToRecipients(app, recipients, subject, body, backendinternal.EmailSenderKeyGeneral)
 	if failed > 0 {
 		app.Logger().Warn("Failed to send request email notification", "subject", subject, "sent", sent, "failed", failed)
 	}
+	return sent, failed
 }
 
 func sendNotificationTelegram(app *pocketbase.PocketBase, group *core.Record, template NotificationTemplate, values map[string]string, kind string, requestID string) {
@@ -225,6 +251,7 @@ func requestNotificationValues(app *pocketbase.PocketBase, record *core.Record, 
 		"guardian_name":   "",
 		"guardian_email":  "",
 		"request_url":     "",
+		"onboarding_url":  "",
 		"data":            renderNotificationData(BuildUserData(data)),
 	}
 
@@ -234,6 +261,9 @@ func requestNotificationValues(app *pocketbase.PocketBase, record *core.Record, 
 		values["full_name"] = strings.TrimSpace(DisplayName(data, record.GetString("email"), record.Id))
 		values["name"] = values["full_name"]
 		values["request_url"] = "https://branco.realmen.it/me/request/?id=" + url.QueryEscape(record.Id)
+	}
+	if onboardingURL, ok := data["onboarding_url"].(string); ok {
+		values["onboarding_url"] = strings.TrimSpace(onboardingURL)
 	}
 	if mobile, ok := data["mobile"].(string); ok {
 		values["mobile"] = strings.TrimSpace(mobile)

@@ -442,6 +442,19 @@ func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 			if err := backendrequests.ApplySetAdminApprovedAction(app, actor, record, data, payload); err != nil {
 				return err
 			}
+			flow, err := backendrequests.LoadFlowForRequest(app, data)
+			if err != nil {
+				return apis.NewBadRequestError("invalid_requests_flow_settings", err)
+			}
+			if backendrequests.EffectiveStepIndex(record, data, flow) >= len(flow.Steps) {
+				userID, err := backendrequests.ApplyPromoteAction(app, actor, record, data)
+				if err != nil {
+					notifyPromoteFailure(app, record, "auto-promote after admin approval", err)
+					return err
+				}
+				deleteRequest = true
+				promotedUserID = userID
+			}
 		case backendrequests.ActionReject:
 			if err := backendrequests.ApplyRejectAction(actor, record, data, strings.TrimSpace(payload.Reason)); err != nil {
 				return err
@@ -449,6 +462,7 @@ func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		case backendrequests.ActionPromote:
 			userID, err := backendrequests.ApplyPromoteAction(app, actor, record, data)
 			if err != nil {
+				notifyPromoteFailure(app, record, "manual promote", err)
 				return err
 			}
 			deleteRequest = true
@@ -505,5 +519,41 @@ func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 			"status":   state.Status,
 			"rejected": record.GetBool("rejected"),
 		})
+	}
+}
+
+func notifyPromoteFailure(app *pocketbase.PocketBase, record *core.Record, stage string, cause error) {
+	if app == nil || record == nil || cause == nil {
+		return
+	}
+
+	data := backendinternal.ParseJSONMap(record.Get("data"))
+	fullName := strings.TrimSpace(backendinternal.AnyToString(data["full_name"]))
+	email := strings.TrimSpace(record.GetString("email"))
+	if fullName == "" {
+		fullName = email
+	}
+	if fullName == "" {
+		fullName = strings.TrimSpace(record.Id)
+	}
+
+	subject := "Request promote failed"
+	if email != "" {
+		subject += " for " + email
+	}
+
+	body := strings.Join([]string{
+		"Request promote failed.",
+		"",
+		"Stage: " + strings.TrimSpace(stage),
+		"Reason: " + strings.TrimSpace(cause.Error()),
+		"User: " + fullName,
+		"Email: " + email,
+		"Request ID: " + strings.TrimSpace(record.Id),
+		"Group ID: " + strings.TrimSpace(record.GetString("group")),
+	}, "\n")
+
+	if !backendinternal.SendAdminFailureEmail(app, subject, body) {
+		app.Logger().Warn("Failed to send promote failure email", "request", record.Id, "stage", stage, "error", cause)
 	}
 }

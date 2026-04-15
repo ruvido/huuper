@@ -55,7 +55,7 @@ window.huuperAuth = (() => {
   }
 
   function redirectToLogin(next = "") {
-    const target = new URL("/login/", window.location.origin);
+    const target = new URL("/", window.location.origin);
     const normalizedNext = normalizeRedirectTarget(next) || normalizeRedirectTarget(currentPath());
     if (normalizedNext) {
       target.searchParams.set("next", normalizedNext);

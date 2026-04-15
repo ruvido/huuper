@@ -17,6 +17,10 @@ func emailLayout(preheader string, title string, intro string, rows [][2]string)
 }
 
 func emailLayoutWithCTA(preheader string, title string, intro string, rows [][2]string, ctaLabel string) string {
+	return emailLayoutWithCTAURL(preheader, title, intro, rows, ctaLabel, "https://branco.realmen.it")
+}
+
+func emailLayoutWithCTAURL(preheader string, title string, intro string, rows [][2]string, ctaLabel string, ctaURL string) string {
 	var b strings.Builder
 	b.WriteString("html:")
 	b.WriteString(`<div style="margin:0;padding:24px 0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#111827;">`)
@@ -44,7 +48,7 @@ func emailLayoutWithCTA(preheader string, title string, intro string, rows [][2]
 		b.WriteString(`</table></td></tr>`)
 	}
 	b.WriteString(`<tr><td style="padding:24px 32px 32px 32px;">`)
-	b.WriteString(`<a href="https://branco.realmen.it" style="display:inline-block;padding:12px 18px;background:#111827;color:#ffffff;text-decoration:none;border-radius:10px;font-size:15px;line-height:20px;font-weight:600;">` + escape(ctaLabel) + `</a>`)
+	b.WriteString(`<a href="` + escape(ctaURL) + `" style="display:inline-block;padding:12px 18px;background:#111827;color:#ffffff;text-decoration:none;border-radius:10px;font-size:15px;line-height:20px;font-weight:600;">` + escape(ctaLabel) + `</a>`)
 	b.WriteString(`</td></tr>`)
 	b.WriteString(`</table></td></tr></table></div>`)
 	return b.String()
@@ -74,6 +78,8 @@ func ByKind(kind string) (EmailTemplate, bool) {
 	switch kind {
 	case newRequestTemplate.Kind:
 		return newRequestTemplate, true
+	case requestSubmittedTemplate.Kind:
+		return requestSubmittedTemplate, true
 	case assignGroupTemplate.Kind:
 		return assignGroupTemplate, true
 	case assignGuardianTemplate.Kind:

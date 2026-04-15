@@ -2,12 +2,13 @@ package requests
 
 var adminApprovedTemplate = EmailTemplate{
 	Kind:    "requests.admin_approved",
-	Subject: "Your request has been approved",
-	Body: emailLayoutWithCTA(
+	Subject: "Set your password",
+	Body: emailLayoutWithCTAURL(
 		"Your request has been approved",
 		titleFor("{{full_name}}"),
-		`Your request for <strong>{{group_name}}</strong> has been approved. Complete your registration by clicking the button below.`,
+		`Your request for <strong>{{group_name}}</strong> has been approved. Set your password to continue.`,
 		nil,
-		"Start",
+		"Set password",
+		"{{onboarding_url}}",
 	),
 }

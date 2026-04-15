@@ -1,23 +1,33 @@
 (() => {
+  const publicFields = window.huuperPublicFields;
   const form = document.querySelector("#password-reset-form");
   const emailField = document.querySelector("#password-reset-email");
+  const emailErrorNode = document.querySelector("#password-reset-email-error");
   const statusNode = document.querySelector("#password-reset-status");
 
-  if (!form || !emailField || !statusNode) {
+  if (!form || !emailField || !emailErrorNode || !statusNode || !publicFields) {
     return;
   }
+
+  emailField.addEventListener("input", () => {
+    emailErrorNode.hidden = true;
+    emailErrorNode.textContent = "";
+  });
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     statusNode.hidden = true;
     statusNode.textContent = "";
+    emailErrorNode.hidden = true;
+    emailErrorNode.textContent = "";
 
-    const email = emailField.value.trim().toLowerCase();
-    if (!email) {
-      statusNode.textContent = "Email is required.";
-      statusNode.hidden = false;
+    const fieldAdvance = publicFields.validateFieldOnAdvance({ key: "email", type: "email" }, emailField.value);
+    if (fieldAdvance.error) {
+      emailErrorNode.textContent = fieldAdvance.error;
+      emailErrorNode.hidden = false;
       return;
     }
+    const email = fieldAdvance.normalized || emailField.value.trim().toLowerCase();
 
     try {
       const response = await fetch("/api/collections/users/request-password-reset", {

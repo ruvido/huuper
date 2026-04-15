@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	backendinternal "members/backend/internal"
+	copywritingui "members/backend/internal/copywriting"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
@@ -120,7 +121,7 @@ func BuildWorkflowState(app *pocketbase.PocketBase, actor *core.Record, record *
 	}
 	if hasNext {
 		state.CurrentAction = ActionForFlowAction(nextStep.Action)
-		state.CurrentActionLabel = nextStep.Label
+		state.CurrentActionLabel = copywritingui.RequestButtonLabel(nextStep.Cta, nextStep.Label)
 	}
 	if state.CurrentActionLabel == "" {
 		state.CurrentActionLabel = strings.ReplaceAll(NormalizeStatus(status), "_", " ")

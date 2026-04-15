@@ -94,6 +94,8 @@ The request pipeline is configured in PocketBase through `settings.requests_flow
 
 - The configured step actions are `assign_group`, `assign_guardian`, `mentoring`, `group_approved`, `admin_approved`.
 - The runtime API exposes explicit action names: `set_group`, `set_guardian`, `set_mentoring_done`, `set_group_approved`, `set_admin_approved`.
+- The last `admin_approved` step can declare `cta`; otherwise the UI uses `label`, then `Submit`.
+- Completing the final `admin_approved` step promotes the request automatically into a user and adds the onboarding link to the final candidate notification.
 - Each request stores a snapshot of the active flow when it is created, so later settings changes do not rewrite requests already in progress.
 - Notification routing and content are also driven by the same flow configuration plus PocketBase templates.
 

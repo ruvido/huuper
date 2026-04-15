@@ -24,51 +24,41 @@ func init() {
 		}
 
 		onboardingConfig := map[string]any{
+			"start_page": map[string]any{
+				"title":  "Benvenuto in realmen",
+				"text":   "Ti faremo alcune domande per completare il tuo profilo.\nSei pronto?",
+				"button": "INIZIA",
+			},
 			"steps": []map[string]any{
 				{
-					"id":     "start",
-					"title":  "Benvenuto in realmen",
-					"type":   "start",
-					"text":   "Per iniziare a usare i gruppi<br />completa il tuo profilo",
-					"button": "INIZIA",
+					"field": "work",
+					"title": "In che campo lavori?",
 				},
 				{
-					"id":    "why",
-					"title": "Perché vuoi unirti?",
-					"type":  "textarea",
-					"field": "why",
-					"label": "Raccontaci perché vuoi far parte della community",
+					"field": "skills",
+					"title": "Le tue skill",
+					"label": "Nel lavoro o tempo libero, cosa sai fare con le mani?",
 				},
 				{
-					"id":      "hobbies",
-					"title":   "I tuoi interessi",
-					"type":    "select",
-					"field":   "hobbies",
-					"label":   "Seleziona i tuoi interessi",
-					"min":     1,
-					"options": []string{
-						"Musica",
-						"Sport",
-						"Tecnologia",
-						"Arte",
-						"Viaggi",
-						"Lettura",
-					},
+					"field": "interests",
+					"title": "I tuoi interessi",
+					"label": "Cosa ti appassiona? Quali sono i tuoi hobby?",
 				},
 				{
-					"id":    "avatar",
-					"title": "Foto profilo",
-					"type":  "file",
+					"field": "sports",
+					"title": "I tuoi sport",
+					"label": "Dove ti piace metterti alla prova?",
+				},
+				{
 					"field": "avatar",
-					"label": "Carica la tua foto profilo",
+					"title": "La tua foto!",
+					"label": "Fatti vedere, così possiamo riconoscerti!",
 				},
-				{
-					"id":     "confirmation",
-					"type":   "confirmation",
-					"title":  "Tutto pronto!",
-					"text":   "Hai completato il tuo profilo.\n\nClicca il pulsante per inviare la tua richiesta di iscrizione.",
-					"button": "Iscriviti!",
-				},
+			},
+			"confirmation": map[string]any{
+				"title":  "Tutto pronto!",
+				"text":   "Hai completato il tuo profilo.\n\nClicca il pulsante per finalizzare l'accesso.",
+				"button": "Completa",
 			},
 		}
 

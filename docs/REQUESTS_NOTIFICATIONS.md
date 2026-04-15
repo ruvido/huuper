@@ -22,6 +22,7 @@ Each flow step supports:
 - `role`
 - `action`
 - `label`
+- `cta`
 - `notes`
 - `filter`
 - `email_to`
@@ -74,6 +75,9 @@ They submit the explicit action for the current step:
 - `set_mentoring_done`
 - `set_group_approved`
 - `set_admin_approved`
+
+`set_admin_approved` is the final UI step and automatically promotes the request into a user when it completes the last configured step.
+When that final step promotes the request, the backend generates an onboarding link and exposes it to the final candidate notification as `onboarding_url`.
 
 Additional actions outside the normal intermediate flow:
 
@@ -165,6 +169,7 @@ Available placeholders include:
 - `assistant_name`
 - `assistant_email`
 - `guardian_name`
+- `onboarding_url`
 - `guardian_email`
 - `mentoring_notes`
 - `data`

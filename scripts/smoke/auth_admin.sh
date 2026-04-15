@@ -31,6 +31,6 @@ response="$(curl -sS -X POST "$BASE_URL/api/collections/users/auth-with-password
 
 token="$(printf '%s' "$response" | jq -r '.token // empty')"
 
-[ -n "$token" ] || { echo "Token admin non trovato"; exit 1; }
+[ -n "$token" ] || { echo "Token admin non trovato"; echo "$response" | jq . 2>/dev/null || echo "$response"; exit 1; }
 
 echo "$token"

@@ -83,6 +83,7 @@ func defaultRequestsFlowSettingsData() map[string]any {
 				"role":             "admin",
 				"action":           "admin_approved",
 				"label":            "In verifica",
+				"cta":              "Accetta",
 				"notes":            "In attesa di approvazione finale.",
 				"email_to":         "candidate",
 				"telegram_message": true,

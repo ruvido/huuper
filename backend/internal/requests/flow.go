@@ -48,6 +48,7 @@ type FlowStep struct {
 	Role            string `json:"role"`
 	Action          string `json:"action"`
 	Label           string `json:"label"`
+	Cta             string `json:"cta,omitempty"`
 	Notes           string `json:"notes,omitempty"`
 	Filter          string `json:"filter,omitempty"`
 	EmailTo         string `json:"email_to,omitempty"`
@@ -238,6 +239,7 @@ func ParseFlowConfig(data map[string]any) (FlowConfig, error) {
 		}
 
 		label := strings.TrimSpace(backendinternal.AnyToString(entry["label"]))
+		cta := strings.TrimSpace(backendinternal.AnyToString(entry["cta"]))
 		notes := strings.TrimSpace(backendinternal.AnyToString(entry["notes"]))
 		filter := strings.TrimSpace(backendinternal.AnyToString(entry["filter"]))
 		emailTo := strings.TrimSpace(backendinternal.AnyToString(entry["email_to"]))
@@ -264,6 +266,7 @@ func ParseFlowConfig(data map[string]any) (FlowConfig, error) {
 			Role:            role,
 			Action:          action,
 			Label:           label,
+			Cta:             cta,
 			Notes:           notes,
 			Filter:          filter,
 			EmailTo:         emailTo,

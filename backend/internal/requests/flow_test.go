@@ -131,6 +131,36 @@ func TestBuildWorkflowPayloadUsesExplicitPendingFields(t *testing.T) {
 	}
 }
 
+func TestBuildWorkflowStateUsesCtaLabelFallback(t *testing.T) {
+	record := testRequestRecord()
+	record.Set("data", map[string]any{})
+
+	flow := FlowConfig{
+		Version: 1,
+		Steps: []FlowStep{
+			{Role: RoleAdmin, Action: FlowActionAdminApproved, Label: "In verifica", Cta: "Accetta"},
+		},
+	}
+
+	collection := core.NewBaseCollection("users")
+	collection.Fields.Add(
+		&core.TextField{Name: "email"},
+		&core.BoolField{Name: "admin"},
+		&core.JSONField{Name: "data"},
+	)
+	admin := core.NewRecord(collection)
+	admin.Set("id", "admin-1")
+	admin.Set("admin", true)
+
+	state, err := BuildWorkflowState(nil, admin, record, map[string]any{}, false, flow)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if state.CurrentActionLabel != "Accetta" {
+		t.Fatalf("expected cta label to win, got %q", state.CurrentActionLabel)
+	}
+}
+
 func TestRecordMatchesStatusUsesDerivedWorkflowStatus(t *testing.T) {
 	record := testRequestRecord()
 	record.Set("group", "group-1")

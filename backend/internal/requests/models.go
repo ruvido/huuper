@@ -12,6 +12,7 @@ type ProfileFieldConfig struct {
 	Key      string   `json:"key"`
 	Type     string   `json:"type"`
 	Required bool     `json:"required"`
+	Unique   *bool    `json:"unique,omitempty"`
 	Options  []string `json:"options"`
 	Min      int      `json:"min"`
 	Max      int      `json:"max"`
@@ -19,6 +20,25 @@ type ProfileFieldConfig struct {
 
 type ProfileSchemaConfig struct {
 	Fields []ProfileFieldConfig `json:"fields"`
+}
+
+type OnboardingPageConfig struct {
+	Title  string `json:"title"`
+	Text   string `json:"text"`
+	Button string `json:"button"`
+}
+
+type OnboardingStepConfig struct {
+	Field string `json:"field"`
+	Title string `json:"title"`
+	Label string `json:"label,omitempty"`
+	Unique *bool  `json:"unique,omitempty"`
+}
+
+type OnboardingSettingsConfig struct {
+	StartPage    *OnboardingPageConfig  `json:"start_page,omitempty"`
+	Steps        []OnboardingStepConfig `json:"steps"`
+	Confirmation *OnboardingPageConfig  `json:"confirmation,omitempty"`
 }
 
 type ActionPayload struct {

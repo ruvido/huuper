@@ -18,11 +18,12 @@ var assignGroupTemplate = EmailTemplate{
 		},
 	),
 	TelegramBody: strings.TrimSpace(`
-New request!
+New request for {{group_name}}!
 
 {{full_name}} has been assigned to the group.
-Review it and assign a guardian.
+View the request: {{request_url}}
 
-Open request: {{request_url}}
+Reply to this message to volunteer as guardian.
+{{assistant_name}}: please review the request and assign a guardian.
 `),
 }

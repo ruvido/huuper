@@ -1,0 +1,2 @@
+{{ define "content" }}{{ template "public-onboarding-shell" . }}{{ end }}
+{{ define "page" }}{{ template "layout-public" (dict "Title" "Huuper / Onboarding" "TopbarTitle" "" "BackHref" "" "BodyClass" "onboarding-page" "Scripts" (list "/assets/js/core/auth.js" "/assets/js/core/public-fields.js" "/assets/js/public/common.js" "/assets/js/public/onboarding-component.js" "/assets/vendor/cropperjs/cropper.min.js" "/assets/js/public/avatar-cropper.js" "/assets/js/public/onboarding.js")) }}{{ end }}

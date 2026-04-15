@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	backendrequests "members/backend/internal/requests"
+	backendsettings "members/backend/internal/settings"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
@@ -20,8 +21,11 @@ func SubmitRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		if err != nil {
 			return apis.NewBadRequestError("invalid_profile_schema", err)
 		}
-		flow, err := backendrequests.LoadFlowSettings(app)
+		flowData, err := backendsettings.FindSettingData(app, "requests_flow")
 		if err != nil {
+			return apis.NewBadRequestError("invalid_requests_flow_settings", err)
+		}
+		if _, err := backendrequests.ParseFlowConfig(flowData); err != nil {
 			return apis.NewBadRequestError("invalid_requests_flow_settings", err)
 		}
 
@@ -46,7 +50,7 @@ func SubmitRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 
 		record := core.NewRecord(requestsCollection)
 		record.Set("email", email)
-		data = backendrequests.SetRequestFlowSnapshot(data, flow)
+		data = backendrequests.SetRequestFlowSnapshotData(data, flowData)
 		record.Set("data", data)
 		record.Set("rejected", false)
 		if err := app.Save(record); err != nil {
@@ -54,6 +58,7 @@ func SubmitRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		}
 
 		backendrequests.NotifyNewRequest(app, record, data)
+		backendrequests.NotifyRequestSubmitted(app, record, data)
 
 		return e.JSON(http.StatusCreated, map[string]any{
 			"id":       record.Id,

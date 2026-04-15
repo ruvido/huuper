@@ -5,6 +5,7 @@ import (
 	"time"
 
 	backendinternal "members/backend/internal"
+	tginternal "members/backend/internal/telegram"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
@@ -192,7 +193,80 @@ func ApplyPromoteAction(app *pocketbase.PocketBase, actor *core.Record, record *
 		return "", apis.NewBadRequestError("failed_to_create_user", err)
 	}
 
+	targetGroupIDs, err := promoteTargetGroupIDs(app, record)
+	if err != nil {
+		_ = app.Delete(user)
+		return "", err
+	}
+
+	createdInviteGroupIDs := make([]string, 0, len(targetGroupIDs))
+	for _, groupID := range targetGroupIDs {
+		group, err := app.FindRecordById("groups", groupID)
+		if err != nil || group == nil {
+			rollbackPromotedUser(app, user.Id, createdInviteGroupIDs)
+			return "", apis.NewBadRequestError("invalid_group", err)
+		}
+		if _, err := tginternal.TelegramChatIDForGroup(group); err != nil {
+			continue
+		}
+		if _, err := tginternal.GenerateGroupInvite(app, user, group); err != nil {
+			rollbackPromotedUser(app, user.Id, createdInviteGroupIDs)
+			return "", err
+		}
+		createdInviteGroupIDs = append(createdInviteGroupIDs, groupID)
+	}
+
+	onboardingToken, err := GenerateOnboardingToken(app, user.Id)
+	if err != nil {
+		rollbackPromotedUser(app, user.Id, createdInviteGroupIDs)
+		return "", apis.NewBadRequestError("failed_to_create_onboarding_token", err)
+	}
+	data["onboarding_url"] = BuildOnboardingURL(app, onboardingToken)
+
 	return user.Id, nil
+}
+
+func promoteTargetGroupIDs(app *pocketbase.PocketBase, record *core.Record) ([]string, error) {
+	groupIDs := []string{}
+
+	requestGroupID := strings.TrimSpace(record.GetString("group"))
+	if requestGroupID == "" {
+		return nil, apis.NewBadRequestError("missing_group_assignment", nil)
+	}
+	groupIDs = append(groupIDs, requestGroupID)
+
+	defaultGroup, err := app.FindFirstRecordByFilter(
+		"groups",
+		"type = 'default'",
+		map[string]any{},
+	)
+	if err == nil && defaultGroup != nil && strings.TrimSpace(defaultGroup.Id) != requestGroupID {
+		groupIDs = append(groupIDs, defaultGroup.Id)
+	}
+
+	return groupIDs, nil
+}
+
+func rollbackPromotedUser(app *pocketbase.PocketBase, userID string, inviteGroupIDs []string) {
+	for _, groupID := range inviteGroupIDs {
+		group, err := app.FindRecordById("groups", strings.TrimSpace(groupID))
+		if err != nil || group == nil {
+			_ = tginternal.DeleteInviteToken(app, userID, groupID)
+			continue
+		}
+		chatID, err := tginternal.TelegramChatIDForGroup(group)
+		if err == nil {
+			link, linkErr := tginternal.InviteLinkForUserGroup(app, userID, groupID)
+			if linkErr == nil {
+				_ = tginternal.RevokeInviteLink(chatID, link)
+			}
+		}
+		_ = tginternal.DeleteInviteToken(app, userID, groupID)
+	}
+	user, err := app.FindRecordById("users", userID)
+	if err == nil && user != nil {
+		_ = app.Delete(user)
+	}
 }
 
 func applyGroupAssignment(app *pocketbase.PocketBase, record *core.Record, data map[string]any, actor *core.Record, groupID string, filter string) error {

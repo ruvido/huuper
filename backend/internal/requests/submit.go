@@ -3,8 +3,11 @@ package requests
 import (
 	"fmt"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	backendinternal "members/backend/internal"
+	copywritingrequests "members/backend/internal/copywriting/requests"
 )
 
 func ValidateAndBuildData(input map[string]any, signup SignupSettingsConfig, profile ProfileSchemaConfig) (map[string]any, string, error) {
@@ -63,6 +66,14 @@ func ValidateAndBuildData(input map[string]any, signup SignupSettingsConfig, pro
 		}
 	}
 
+	if fullName, ok := out["full_name"].(string); ok {
+		normalized, err := normalizeFullName(fullName)
+		if err != nil {
+			return nil, "", err
+		}
+		out["full_name"] = normalized
+	}
+
 	email, ok := out["email"].(string)
 	if !ok || strings.TrimSpace(email) == "" {
 		return nil, "", fmt.Errorf("missing required field: email")
@@ -97,8 +108,39 @@ func normalizeRequestFieldValue(field ProfileFieldConfig, value any) (any, error
 	switch fieldType {
 	case "select":
 		return normalizeSelectFieldValue(field, value)
-	case "textarea", "text", "phone", "email", "":
-		return normalizeStringFieldValue(value)
+	case "phone":
+		raw, err := normalizeStringFieldValue(value)
+		if err != nil {
+			return "", err
+		}
+		normalized, err := backendinternal.NormalizePhone(raw)
+		if err != nil {
+			return "", fmt.Errorf(copywritingrequests.PhoneInvalidMessage)
+		}
+		return normalized, nil
+	case "email":
+		raw, err := normalizeStringFieldValue(value)
+		if err != nil {
+			return "", err
+		}
+		normalized, err := backendinternal.NormalizeEmail(raw)
+		if err != nil {
+			return "", fmt.Errorf(copywritingrequests.EmailInvalidMessage)
+		}
+		return normalized, nil
+	case "textarea", "text", "":
+		raw, err := normalizeStringFieldValue(value)
+		if err != nil {
+			return "", err
+		}
+		if strings.EqualFold(strings.TrimSpace(field.Key), "mobile") {
+			normalized, err := backendinternal.NormalizePhone(raw)
+			if err != nil {
+				return "", fmt.Errorf(copywritingrequests.PhoneInvalidMessage)
+			}
+			return normalized, nil
+		}
+		return raw, nil
 	default:
 		return normalizeStringFieldValue(value)
 	}
@@ -167,6 +209,39 @@ func normalizeSelectOptionValues(field ProfileFieldConfig, values []string) ([]s
 		return nil, fmt.Errorf("expected at most %d options", field.Max)
 	}
 	return normalized, nil
+}
+
+func normalizeFullName(value string) (string, error) {
+	trimmed := strings.TrimSpace(value)
+	parts := strings.Fields(trimmed)
+	if len(parts) < 2 {
+		return "", fmt.Errorf(copywritingrequests.FullNameRequiredMessage)
+	}
+	normalized := make([]string, 0, len(parts))
+	for _, part := range parts {
+		normalized = append(normalized, capitalizeWord(part))
+	}
+	return strings.Join(normalized, " "), nil
+}
+
+func capitalizeWord(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return ""
+	}
+
+	first, size := utf8.DecodeRuneInString(trimmed)
+	if first == utf8.RuneError {
+		return trimmed
+	}
+
+	var b strings.Builder
+	b.Grow(len(trimmed))
+	b.WriteRune(unicode.ToUpper(first))
+	for _, r := range trimmed[size:] {
+		b.WriteRune(unicode.ToLower(r))
+	}
+	return b.String()
 }
 
 func normalizeSelectOptionValue(field ProfileFieldConfig, value string) (string, error) {

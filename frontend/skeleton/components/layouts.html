@@ -3,8 +3,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{{ .Title }}</title>
-  <link rel="icon" href="{{ asset "/assets/favicon/favicon.ico" }}" sizes="any" />
-  <link rel="apple-touch-icon" href="{{ asset "/assets/favicon/apple-touch-icon.png" }}" />
+  <link rel="icon" type="image/png" href="{{ asset "/assets/favicon/realmen-logo.png" }}" />
+  <link rel="shortcut icon" href="{{ asset "/assets/images/favicon/favicon.ico" }}" sizes="any" />
+  <link rel="apple-touch-icon" href="{{ asset "/assets/images/favicon/apple-touch-icon.png" }}" />
   <script src="{{ asset "/copy/brand.js" }}"></script>
   <link rel="stylesheet" href="{{ asset "/assets/css/app.css" }}" />
   <script src="{{ asset "/assets/js/core/topbar.js" }}" defer></script>
@@ -59,7 +60,7 @@
     }
 
     if (!auth || !auth.token) {
-      const target = new URL("/login/", window.location.origin);
+      const target = new URL("/", window.location.origin);
       target.searchParams.set("next", currentPath);
       window.location.replace(target.pathname + target.search + target.hash);
       return;
@@ -74,16 +75,19 @@
 </script>
 {{ end }}
 
+{{ define "public-entry-topbar" }}{{ end }}
+
 {{ define "layout-public" }}
 <!doctype html>
 <html lang="en">
   {{ template "head" . }}
-  <body{{- if .BodyData }}{{- range $key, $value := .BodyData }} data-{{ $key }}="{{ $value }}"{{- end }}{{- end }}>
+  <body class="public-page{{- if .BodyClass }} {{ .BodyClass }}{{- end }}"{{- if .BodyData }}{{- range $key, $value := .BodyData }} data-{{ $key }}="{{ $value }}"{{- end }}{{- end }}>
     <main class="app">
       <section class="app-shell">
         {{ if or .BackHref .BackHistory .TopbarTitle }}
         {{ template "topbar" (dict "BackHref" .BackHref "BackHistory" .BackHistory "Title" .TopbarTitle "ProfileHref" "" "MetaID" .TopbarMetaID "VariantClass" .TopbarVariantClass "MetaClass" .TopbarMetaClass "RightActionShuffle" .RightActionShuffle) }}
         {{ end }}
+        {{ template "public-entry-topbar" . }}
         {{ template "content" . }}
       </section>
     </main>

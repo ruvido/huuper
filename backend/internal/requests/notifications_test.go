@@ -23,6 +23,25 @@ func TestDefaultNotificationTemplateIncludesAssignGroupTelegramCopy(t *testing.T
 	}
 }
 
+func TestDefaultNotificationTemplateIncludesRequestSubmittedCopy(t *testing.T) {
+	template, found, err := defaultNotificationTemplate(templateKindRequestSubmitted)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !found {
+		t.Fatalf("expected default template to be found")
+	}
+	if got := strings.TrimSpace(template.Email.Subject); got == "" {
+		t.Fatalf("expected subject to be populated")
+	}
+	if got := strings.TrimSpace(template.Email.Body); got == "" {
+		t.Fatalf("expected body to be populated")
+	}
+	if !strings.Contains(template.Email.Body, "{{full_name}}") {
+		t.Fatalf("expected full_name placeholder in body, got %q", template.Email.Body)
+	}
+}
+
 func TestMergeNotificationTemplateUsesDefaultTelegramBody(t *testing.T) {
 	defaultTemplate := NotificationTemplate{}
 	defaultTemplate.Email.Subject = "Default subject"

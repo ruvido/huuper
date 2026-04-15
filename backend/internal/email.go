@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	EmailSenderKeyGeneral = "general"
-	EmailSenderKeyEvents  = "events"
+	EmailSenderKeyGeneral  = "general"
+	EmailSenderKeyEvents   = "events"
+	EmailRecipientKeyAdmin = "admin"
 )
 
 func ParseAddress(raw string) (mail.Address, bool) {
@@ -139,4 +140,30 @@ func SenderFromEmailSettings(app *pocketbase.PocketBase, preferredKey string) (m
 		parsed.Name = app.Settings().Meta.SenderName
 	}
 	return parsed, true
+}
+
+func RecipientFromEmailSettings(app *pocketbase.PocketBase, key string) (mail.Address, bool) {
+	raw := ""
+	if settingsData, err := FindSettingData(app, "email"); err == nil {
+		if value, ok := settingsData[key].(string); ok {
+			raw = strings.TrimSpace(value)
+		}
+	}
+	if raw == "" {
+		return mail.Address{}, false
+	}
+	return ParseAddress(raw)
+}
+
+func AdminRecipientFromEmailSettings(app *pocketbase.PocketBase) (mail.Address, bool) {
+	return RecipientFromEmailSettings(app, EmailRecipientKeyAdmin)
+}
+
+func SendAdminFailureEmail(app *pocketbase.PocketBase, subject string, body string) bool {
+	recipient, ok := AdminRecipientFromEmailSettings(app)
+	if !ok {
+		return false
+	}
+	sent, _ := SendPlainEmailToRecipients(app, []mail.Address{recipient}, subject, body, EmailSenderKeyGeneral)
+	return sent > 0
 }

@@ -1,0 +1,30 @@
+{{ define "public-onboarding-shell" }}
+<section class="public-entry public-entry-onboarding">
+  <div class="onboarding-layout">
+    <header class="onboarding-topbar" id="public-request-topbar" hidden>
+      <div class="onboarding-topbar-row">
+        <button class="onboarding-topbar-button onboarding-topbar-back" id="public-request-back" type="button" hidden>Back</button>
+        <button class="onboarding-topbar-button onboarding-topbar-next primary" id="public-request-submit" type="submit" form="public-request-form">Next</button>
+      </div>
+      <div class="onboarding-topbar-meta">
+        <p id="public-request-progress" class="onboarding-topbar-step section-label" hidden></p>
+        <button id="public-request-field-error" class="onboarding-topbar-error meta-text is-error" type="button" hidden></button>
+      </div>
+    </header>
+
+    <form id="public-request-form" class="onboarding-form" hidden novalidate>
+      <div class="onboarding-body">
+        <div class="onboarding-stage">
+          <div id="public-request-fields" class="public-request-step"></div>
+        </div>
+        <p id="public-request-status" class="meta-text" hidden></p>
+        <div class="action-row onboarding-actions" id="public-request-actions">
+          <button class="primary" id="public-request-start" type="button">Continue</button>
+        </div>
+      </div>
+    </form>
+
+    <p id="public-request-loading" class="meta-text">Loading link...</p>
+  </div>
+</section>
+{{ end }}

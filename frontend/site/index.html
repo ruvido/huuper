@@ -6,78 +6,107 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Huuper</title>
-  <link rel="icon" href="/assets/favicon/favicon.ico?v=1776076277" sizes="any" />
-  <link rel="apple-touch-icon" href="/assets/favicon/apple-touch-icon.png?v=1776076277" />
-  <script src="/copy/brand.js?v=1776076277"></script>
-  <link rel="stylesheet" href="/assets/css/app.css?v=1776076277" />
-  <script src="/assets/js/core/topbar.js?v=1776076277" defer></script>
-  <script src="/assets/js/core/auth.js?v=1776076277" defer></script>
-  <script src="/assets/js/public/entry.js?v=1776076277" defer></script>
+  <link rel="icon" type="image/png" href="/assets/favicon/realmen-logo.png?v=1776250076" />
+  <link rel="shortcut icon" href="/assets/images/favicon/favicon.ico?v=1776250076" sizes="any" />
+  <link rel="apple-touch-icon" href="/assets/images/favicon/apple-touch-icon.png?v=1776250076" />
+  <script src="/copy/brand.js?v=1776250076"></script>
+  <link rel="stylesheet" href="/assets/css/app.css?v=1776250076" />
+  <script src="/assets/js/core/topbar.js?v=1776250076" defer></script>
+  <script src="/assets/js/core/auth.js?v=1776250076" defer></script>
+  <script src="/assets/js/core/public-fields.js?v=1776250076" defer></script>
+  <script src="/assets/js/public/common.js?v=1776250076" defer></script>
+  <script src="/assets/js/public/login.js?v=1776250076" defer></script>
+  <script src="/assets/js/public/request.js?v=1776250076" defer></script>
 </head>
 
-  <body data-publicdefaultmode="login">
+  <body class="public-page" data-publicdefaultmode="login">
     <main class="app">
       <section class="app-shell">
         
         
+        
 <section class="public-entry">
-  <div class="section-tabs public-entry-tabs" id="public-entry-tabs" role="tablist" aria-label="Public access">
-    <button class="section-tab public-entry-tab" type="button" data-public-mode="request" role="tab" aria-selected="false">
-      <span class="section-tab-text">Request</span>
-    </button>
-    <button class="section-tab public-entry-tab" type="button" data-public-mode="login" role="tab" aria-selected="false">
-      <span class="section-tab-text">Login</span>
-    </button>
+  <div class="public-entry-layout">
+    <section class="public-entry-pane" data-public-pane="request">
+      <form id="public-request-form" class="public-entry-request-form" novalidate>
+        <div class="public-request-header">
+          <div class="onboarding-topbar" id="public-request-topbar" hidden>
+            <div class="onboarding-topbar-row">
+              <button class="onboarding-topbar-button onboarding-topbar-back" id="public-request-back" type="button" hidden>Back</button>
+              <button class="onboarding-topbar-button onboarding-topbar-next primary" id="public-request-submit" type="submit">Next</button>
+            </div>
+            <div class="onboarding-topbar-meta">
+              <p id="public-request-progress" class="onboarding-topbar-step section-label" hidden></p>
+            </div>
+          </div>
+        </div>
+        <div class="public-request-stepper">
+          <div id="public-request-fields" class="public-request-step"></div>
+        </div>
+        <p id="public-request-status" class="meta-text" hidden></p>
+        <div class="action-row" id="public-request-actions">
+          <button class="primary" id="public-request-start" type="button">Next</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="public-entry-pane" data-public-pane="login" hidden>
+      <form id="login-form" class="public-entry-login-form" novalidate>
+        <div class="public-entry-login-brand" aria-hidden="true">
+          <img
+            src="/assets/images/optimized/logo-il-branco-256.webp?v=1776250076"
+            srcset="/assets/images/optimized/logo-il-branco-128.webp?v=1776250076 128w, /assets/images/optimized/logo-il-branco-256.webp?v=1776250076 256w, /assets/images/optimized/logo-il-branco-512.webp?v=1776250076 512w"
+            sizes="256px"
+            width="256"
+            height="256"
+            alt=""
+            loading="eager"
+            decoding="async"
+          />
+        </div>
+        <h2 class="public-request-title">Login</h2>
+        <div class="view-stack">
+          
+<div class="form-field">
+  <label class="form-field-label" for="login-email">
+    <input
+      id="login-email"
+      type="email"
+      name="email" aria-label="Email" placeholder="name@domain.com" required autocomplete="username"
+    />
+  </label>
+  <div class="form-field-status-slot">
+    <p id="login-email-error" class="form-field-status meta-text is-error" hidden></p>
   </div>
+</div>
 
-  <section class="public-entry-pane" data-public-pane="request">
-    <form id="public-request-form">
-      <div class="public-request-topbar" id="public-request-topbar" hidden>
-        <button id="public-request-back" type="button" hidden>Back</button>
-        <button class="primary" id="public-request-submit" type="submit">Next</button>
-      </div>
-      <p id="public-request-progress" class="section-label" hidden></p>
-      <div class="public-request-stepper">
-        <div id="public-request-fields" class="public-request-step"></div>
-      </div>
-      <p id="public-request-status" class="meta-text" hidden></p>
-      <div class="action-row" id="public-request-actions">
-        <button class="primary" id="public-request-start" type="button">Next</button>
-      </div>
-    </form>
-  </section>
+          
+<div class="form-field">
+  <label class="form-field-label" for="login-password">
+    <input
+      id="login-password"
+      type="password"
+      name="password" aria-label="Password" placeholder="password" required autocomplete="current-password"
+    />
+  </label>
+  <div class="form-field-status-slot">
+    <p id="login-password-error" class="form-field-status meta-text is-error" hidden></p>
+  </div>
+</div>
 
-  <section class="public-entry-pane" data-public-pane="login" hidden>
-    <form id="login-form">
-      <div class="view-stack">
-        
-<label class="form-field">
-  <span>Email</span>
-  <input
-    id="login-email"
-    type="email"
-    name="email" placeholder="name@domain.com" required autocomplete="username"
-  />
-</label>
-
-        
-<label class="form-field">
-  <span>Password</span>
-  <input
-    id="login-password"
-    type="password"
-    name="password" placeholder="password" required autocomplete="current-password"
-  />
-</label>
-
-      </div>
-      <p id="login-error" class="meta-text" hidden></p>
-      <div class="action-row">
-        <button class="primary" type="submit">Login</button>
-        <a href="/password-reset/">Password reset</a>
-      </div>
-    </form>
-  </section>
+        </div>
+        <p id="login-error" class="meta-text" hidden></p>
+        <div class="action-row">
+          <a href="/signup/" id="public-login-request-link">Sign Up</a>
+          <button class="primary" type="submit">Login</button>
+        </div>
+        <p class="public-entry-login-copy meta-text">
+          If you forgot your password,
+          <a href="/password-reset/">click here</a>
+        </p>
+      </form>
+    </section>
+  </div>
 </section>
 
       </section>

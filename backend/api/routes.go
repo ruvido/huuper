@@ -12,10 +12,14 @@ import (
 
 func RegisterRoutes(app *pocketbase.PocketBase, se *core.ServeEvent) {
 	publicroutes.Register(se, publicroutes.Handlers{
-		Settings:       publicroutes.SettingsHandler(app),
-		EventsAccept:   publicroutes.AcceptEventHandler(app),
-		EventsRegister: publicroutes.RegisterEventHandler(app),
-		RequestsCreate: publicroutes.SubmitRequestHandler(app),
+		Settings:           publicroutes.SettingsHandler(app),
+		EventsAccept:       publicroutes.AcceptEventHandler(app),
+		EventsRegister:     publicroutes.RegisterEventHandler(app),
+		RequestsCreate:     publicroutes.SubmitRequestHandler(app),
+		OnboardingGet:      publicroutes.OnboardingGetHandler(app),
+		OnboardingComplete: publicroutes.OnboardingCompleteHandler(app),
+		OnboardingProfile:  publicroutes.OnboardingProfileHandler(app),
+		OnboardingFinalize: publicroutes.OnboardingFinalizeHandler(app),
 	})
 
 	meroutes.Register(se, meroutes.Handlers{

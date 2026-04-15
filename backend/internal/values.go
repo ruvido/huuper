@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/mail"
 	"strconv"
 	"strings"
@@ -76,7 +77,63 @@ func NormalizeEmail(raw string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("missing email")
 	}
+	parts := strings.Split(normalized, "@")
+	if len(parts) != 2 {
+		return "", fmt.Errorf("missing email")
+	}
+	domain := strings.TrimSpace(parts[1])
+	if domain == "" || !strings.Contains(domain, ".") {
+		return "", fmt.Errorf("invalid email")
+	}
 	return normalized, nil
+}
+
+func NormalizePhone(raw string) (string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "", fmt.Errorf("missing phone")
+	}
+
+	compact := strings.Join(strings.Fields(trimmed), "")
+	if !strings.HasPrefix(compact, "+") {
+		return "", fmt.Errorf("missing phone prefix")
+	}
+
+	digits := strings.TrimPrefix(compact, "+")
+	if digits == "" {
+		return "", fmt.Errorf("missing phone digits")
+	}
+	for _, r := range digits {
+		if !unicode.IsDigit(r) {
+			return "", fmt.Errorf("invalid phone")
+		}
+	}
+
+	if len(digits) < 9 {
+		return "", fmt.Errorf("invalid phone")
+	}
+
+	return "+" + digits[:2] + " " + digits[2:], nil
+}
+
+func DeepCopyJSONMap(value map[string]any) map[string]any {
+	if value == nil {
+		return map[string]any{}
+	}
+
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return maps.Clone(value)
+	}
+
+	var out map[string]any
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return maps.Clone(value)
+	}
+	if out == nil {
+		return map[string]any{}
+	}
+	return out
 }
 
 func RandomToken() string {
