@@ -1,6 +1,7 @@
 package requests
 
 import (
+	"log"
 	"strings"
 	"time"
 
@@ -199,22 +200,19 @@ func ApplyPromoteAction(app *pocketbase.PocketBase, actor *core.Record, record *
 		return "", err
 	}
 
-	createdInviteGroupIDs := make([]string, 0, len(targetGroupIDs))
-	for _, groupID := range targetGroupIDs {
-		group, err := app.FindRecordById("groups", groupID)
-		if err != nil || group == nil {
-			rollbackPromotedUser(app, user.Id, createdInviteGroupIDs)
-			return "", apis.NewBadRequestError("invalid_group", err)
-		}
-		if _, err := tginternal.TelegramChatIDForGroup(group); err != nil {
-			continue
-		}
-		if _, err := tginternal.GenerateGroupInvite(app, user, group); err != nil {
-			rollbackPromotedUser(app, user.Id, createdInviteGroupIDs)
-			return "", err
-		}
-		createdInviteGroupIDs = append(createdInviteGroupIDs, groupID)
-	}
+	createdInviteGroupIDs := generatePromoteInvites(
+		user.Id,
+		targetGroupIDs,
+		func(id string) (*core.Record, error) { return app.FindRecordById("groups", id) },
+		func(group *core.Record) bool {
+			_, err := tginternal.TelegramChatIDForGroup(group)
+			return err == nil
+		},
+		func(group *core.Record) error {
+			_, err := tginternal.GenerateGroupInvite(app, user, group)
+			return err
+		},
+	)
 
 	onboardingToken, err := GenerateOnboardingToken(app, user.Id)
 	if err != nil {
@@ -224,6 +222,37 @@ func ApplyPromoteAction(app *pocketbase.PocketBase, actor *core.Record, record *
 	data["onboarding_url"] = BuildOnboardingURL(app, onboardingToken)
 
 	return user.Id, nil
+}
+
+// generatePromoteInvites tries to generate a telegram invite link for every
+// target group. Invite generation is best-effort: if a group cannot be
+// resolved, has no telegram chat_id, or the telegram API returns an error,
+// the loop logs the incident and moves on. This prevents a misconfigured
+// chat from blocking the whole admin promote flow.
+func generatePromoteInvites(
+	userID string,
+	targetGroupIDs []string,
+	loadGroup func(id string) (*core.Record, error),
+	hasChatID func(group *core.Record) bool,
+	generateInvite func(group *core.Record) error,
+) []string {
+	created := make([]string, 0, len(targetGroupIDs))
+	for _, groupID := range targetGroupIDs {
+		group, err := loadGroup(groupID)
+		if err != nil || group == nil {
+			log.Printf("[promote] user=%s group=%s load failed (non-blocking): %v", userID, groupID, err)
+			continue
+		}
+		if !hasChatID(group) {
+			continue
+		}
+		if err := generateInvite(group); err != nil {
+			log.Printf("[promote] user=%s group=%s invite generation failed (non-blocking): %v", userID, groupID, err)
+			continue
+		}
+		created = append(created, groupID)
+	}
+	return created
 }
 
 func promoteTargetGroupIDs(app *pocketbase.PocketBase, record *core.Record) ([]string, error) {

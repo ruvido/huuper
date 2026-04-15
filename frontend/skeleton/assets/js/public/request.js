@@ -123,6 +123,10 @@
 
   function syncStepToUrl() {
     const url = new URL(window.location.href);
+    if (isConfirmationScreen() || isSuccessScreen()) {
+      window.history.replaceState({}, "", "/");
+      return;
+    }
     const step = currentStepNumber();
     if (step === null) {
       url.searchParams.delete("step");

@@ -1,6 +1,8 @@
 package groups
 
 import (
+	"database/sql"
+	"errors"
 	"strings"
 
 	"github.com/pocketbase/pocketbase"
@@ -22,7 +24,7 @@ func EnsureMembership(app *pocketbase.PocketBase, userID string, groupID string)
 			"group": groupID,
 		},
 	)
-	if err != nil {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
 	if existing != nil {

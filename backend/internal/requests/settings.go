@@ -269,6 +269,14 @@ func BuildUserData(data map[string]any) map[string]any {
 	return out
 }
 
+func MergeUserData(base map[string]any, updates map[string]any) map[string]any {
+	out := BuildUserData(base)
+	for key, value := range BuildUserData(updates) {
+		out[key] = value
+	}
+	return out
+}
+
 func FlowStepAt(flow FlowConfig, stepIndex int) (FlowStep, bool) {
 	if stepIndex < 0 || stepIndex >= len(flow.Steps) {
 		return FlowStep{}, false

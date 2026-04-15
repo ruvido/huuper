@@ -123,7 +123,8 @@ func OnboardingProfileHandler(app *pocketbase.PocketBase) func(e *core.RequestEv
 			user.Set("avatar", file)
 		}
 
-		user.Set("data", data)
+		existingData := backendinternal.ParseJSONMap(user.Get("data"))
+		user.Set("data", backendrequests.MergeUserData(existingData, data))
 		if err := app.Save(user); err != nil {
 			return apis.NewBadRequestError(fmt.Sprintf("Failed to save onboarding profile: %s", err.Error()), err)
 		}
@@ -197,7 +198,8 @@ func OnboardingFinalizeHandler(app *pocketbase.PocketBase) func(e *core.RequestE
 			)
 		}
 
-		user.Set("data", data)
+		existingData := backendinternal.ParseJSONMap(user.Get("data"))
+		user.Set("data", backendrequests.MergeUserData(existingData, data))
 		if err := app.Save(user); err != nil {
 			app.Logger().Error(
 				"[onboarding.finalize] save failed",

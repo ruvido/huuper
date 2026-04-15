@@ -6,6 +6,7 @@ VPS_HOST="${VPS_HOST:-fiber}"
 VPS_PATH="${VPS_PATH:-/home/ruvido/apps/huuper}"
 SERVICE_NAME="${SERVICE_NAME:-huuper}"
 DOCKER_COMPOSE_CMD="${DOCKER_COMPOSE_CMD:-docker compose}"
+DEPLOY_COMPOSE_FILE="${DEPLOY_COMPOSE_FILE:-docker-compose.yml}"
 BIN_NAME="${BIN_NAME:-huuper}"
 APP_HOST_PORT="${APP_HOST_PORT:-8090}"
 TARGET_GOOS="${TARGET_GOOS:-linux}"
@@ -21,6 +22,11 @@ ssh "$VPS_HOST" "mkdir -p '$VPS_PATH/releases/$RELEASE_ID' '$VPS_PATH/deploy' '$
 
 if [ ! -f "$ROOT_DIR/.env" ]; then
   echo "missing .env in project root" >&2
+  exit 1
+fi
+
+if [ ! -f "$ROOT_DIR/deploy/$DEPLOY_COMPOSE_FILE" ]; then
+  echo "missing deploy/$DEPLOY_COMPOSE_FILE in project root" >&2
   exit 1
 fi
 
@@ -48,7 +54,7 @@ rsync -avz --progress --delete \
 
 echo "rsync: deploy config -> $VPS_HOST:$VPS_PATH/deploy/"
 rsync -avz --progress --delete \
-  "$ROOT_DIR/deploy/docker-compose.yml" \
+  "$ROOT_DIR/deploy/$DEPLOY_COMPOSE_FILE" \
   "$ROOT_DIR/deploy/Dockerfile" \
   "$VPS_HOST:$VPS_PATH/deploy/"
 
@@ -70,16 +76,16 @@ echo "docker: remove stale container name if present"
 ssh "$VPS_HOST" "docker rm -f '$SERVICE_NAME' >/dev/null 2>&1 || true"
 
 echo "docker: up -d --build --force-recreate"
-ssh "$VPS_HOST" "cd '$VPS_PATH/deploy' && $DOCKER_COMPOSE_CMD -f docker-compose.yml up -d --build --force-recreate $SERVICE_NAME"
+ssh "$VPS_HOST" "cd '$VPS_PATH/deploy' && $DOCKER_COMPOSE_CMD -f '$DEPLOY_COMPOSE_FILE' up -d --build --force-recreate $SERVICE_NAME"
 
 echo "health: wait for container"
-ssh "$VPS_HOST" "cd '$VPS_PATH/deploy' && $DOCKER_COMPOSE_CMD -f docker-compose.yml ps --status running --services | grep -qx '$SERVICE_NAME'"
+ssh "$VPS_HOST" "cd '$VPS_PATH/deploy' && $DOCKER_COMPOSE_CMD -f '$DEPLOY_COMPOSE_FILE' ps --status running --services | grep -qx '$SERVICE_NAME'"
 
 echo "health: wait for http :$APP_HOST_PORT"
 if ! ssh "$VPS_HOST" "for i in \$(seq 1 30); do if curl -fsS 'http://127.0.0.1:$APP_HOST_PORT/api/health' >/dev/null; then exit 0; fi; sleep 1; done; exit 1"; then
   echo "healthcheck failed, dumping remote status/logs"
-  ssh "$VPS_HOST" "cd '$VPS_PATH/deploy' && $DOCKER_COMPOSE_CMD -f docker-compose.yml ps"
-  ssh "$VPS_HOST" "cd '$VPS_PATH/deploy' && $DOCKER_COMPOSE_CMD -f docker-compose.yml logs --tail=200 '$SERVICE_NAME'"
+  ssh "$VPS_HOST" "cd '$VPS_PATH/deploy' && $DOCKER_COMPOSE_CMD -f '$DEPLOY_COMPOSE_FILE' ps"
+  ssh "$VPS_HOST" "cd '$VPS_PATH/deploy' && $DOCKER_COMPOSE_CMD -f '$DEPLOY_COMPOSE_FILE' logs --tail=200 '$SERVICE_NAME'"
   exit 1
 fi
 
