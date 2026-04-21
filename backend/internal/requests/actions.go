@@ -69,6 +69,22 @@ func ApplySetMentoringAction(app *pocketbase.PocketBase, actor *core.Record, rec
 	return applyExpectedStepAction(app, actor, record, data, payload, FlowActionMentoring)
 }
 
+// ApplyAddMentoringNoteAction appends a note to data.mentoring.notes[] without
+// advancing the flow. Only allowed while the current step is mentoring, and
+// only for actors that could also close the step.
+func ApplyAddMentoringNoteAction(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any, payload ActionPayload) error {
+	if _, _, err := expectedCurrentStep(app, actor, record, data, FlowActionMentoring); err != nil {
+		return err
+	}
+	note := strings.TrimSpace(payload.MentoringNotes)
+	if note == "" {
+		return apis.NewBadRequestError("missing_mentoring_notes", nil)
+	}
+	appendMentoringNote(data, note, actor)
+	record.Set("data", data)
+	return nil
+}
+
 func ApplySetGroupApprovedAction(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any, payload ActionPayload) error {
 	return applyExpectedStepAction(app, actor, record, data, payload, FlowActionGroupApproved)
 }
@@ -301,15 +317,23 @@ func rollbackPromotedUser(app *pocketbase.PocketBase, userID string, inviteGroup
 	for _, groupID := range inviteGroupIDs {
 		group, err := app.FindRecordById("groups", strings.TrimSpace(groupID))
 		if err != nil || group == nil {
+			log.Printf("[rollback] user=%s group=%s group lookup failed: %v — deleting token anyway", userID, groupID, err)
 			_ = tginternal.DeleteInviteToken(app, userID, groupID)
 			continue
 		}
 		chatID, err := tginternal.TelegramChatIDForGroup(group)
-		if err == nil {
-			link, linkErr := tginternal.InviteLinkForUserGroup(app, userID, groupID)
-			if linkErr == nil {
-				_ = tginternal.RevokeInviteLink(chatID, link)
-			}
+		if err != nil {
+			log.Printf("[rollback] user=%s group=%s missing chat_id: %v — leaving token in place for operator review", userID, groupID, err)
+			continue
+		}
+		link, linkErr := tginternal.InviteLinkForUserGroup(app, userID, groupID)
+		if linkErr != nil || strings.TrimSpace(link) == "" {
+			log.Printf("[rollback] user=%s group=%s cannot resolve invite link (err=%v link_empty=%v) — leaving token in place for operator review", userID, groupID, linkErr, strings.TrimSpace(link) == "")
+			continue
+		}
+		if err := tginternal.RevokeInviteLink(chatID, link); err != nil {
+			log.Printf("[rollback] user=%s group=%s revoke failed: %v — leaving token in place for operator review", userID, groupID, err)
+			continue
 		}
 		_ = tginternal.DeleteInviteToken(app, userID, groupID)
 	}

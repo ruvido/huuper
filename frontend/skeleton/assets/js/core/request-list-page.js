@@ -1,8 +1,4 @@
 window.huuperRequestListPage = (() => {
-  function text(value) {
-    return window.huuperListPage.text(value);
-  }
-
   function renderEmptyState(label) {
     return `
       <section class="empty-state empty-state-icon-only" aria-label="${label}">
@@ -43,9 +39,7 @@ window.huuperRequestListPage = (() => {
     function urgentItems(items) {
       return items.filter((item) => {
         const workflow = item && typeof item.workflow === "object" ? item.workflow : {};
-        const nextRole = text(workflow.pending_role);
-        const allowedRoles = Array.isArray(config.roles) ? config.roles : [];
-        return workflow.can_take_pending_action === true && allowedRoles.includes(nextRole);
+        return workflow.actor_is_assigned === true;
       });
     }
 

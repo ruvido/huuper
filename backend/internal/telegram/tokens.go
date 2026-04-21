@@ -117,11 +117,11 @@ func cleanupExpiredTokens(app *pocketbase.PocketBase) {
 	cutoff := time.Now().Add(-7 * 24 * time.Hour)
 	records, err := app.FindRecordsByFilter(
 		"tokens",
-		"created < {:cutoff}",
+		"created < {:cutoff} && service = {:service}",
 		"-created",
 		0,
 		0,
-		map[string]any{"cutoff": cutoff},
+		map[string]any{"cutoff": cutoff, "service": "telegram"},
 	)
 	if err != nil {
 		return

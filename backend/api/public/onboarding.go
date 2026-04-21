@@ -2,9 +2,11 @@ package public
 
 import (
 	"encoding/json"
-	"fmt"
+	"mime/multipart"
 	"net/http"
+	"path/filepath"
 	"strings"
+	"time"
 
 	backendinternal "members/backend/internal"
 	backendrequests "members/backend/internal/requests"
@@ -14,6 +16,41 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tools/filesystem"
 )
+
+var allowedAvatarExts = map[string]bool{
+	".jpg":  true,
+	".jpeg": true,
+	".png":  true,
+	".webp": true,
+	".gif":  true,
+	".heic": true,
+	".heif": true,
+}
+
+var allowedAvatarMimes = map[string]bool{
+	"image/jpeg": true,
+	"image/jpg":  true,
+	"image/png":  true,
+	"image/webp": true,
+	"image/gif":  true,
+	"image/heic": true,
+	"image/heif": true,
+}
+
+func validateAvatarUpload(fh *multipart.FileHeader) error {
+	if fh == nil {
+		return apis.NewBadRequestError("invalid_avatar", nil)
+	}
+	ext := strings.ToLower(filepath.Ext(fh.Filename))
+	if !allowedAvatarExts[ext] {
+		return apis.NewBadRequestError("invalid_avatar_type", nil)
+	}
+	contentType := strings.ToLower(strings.TrimSpace(fh.Header.Get("Content-Type")))
+	if contentType != "" && !allowedAvatarMimes[contentType] {
+		return apis.NewBadRequestError("invalid_avatar_type", nil)
+	}
+	return nil
+}
 
 func OnboardingGetHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
@@ -56,6 +93,11 @@ func OnboardingCompleteHandler(app *pocketbase.PocketBase) func(e *core.RequestE
 			return err
 		}
 
+		userData := backendinternal.ParseJSONMap(user.Get("data"))
+		if _, ok := userData["onboarding_password_set_at"]; ok {
+			return apis.NewBadRequestError("password_already_set", nil)
+		}
+
 		var payload struct {
 			Password        string `json:"password"`
 			PasswordConfirm string `json:"password_confirm"`
@@ -83,8 +125,11 @@ func OnboardingCompleteHandler(app *pocketbase.PocketBase) func(e *core.RequestE
 
 		user.Set("password", password)
 		user.Set("passwordConfirm", passwordConfirm)
+		userData["onboarding_password_set_at"] = time.Now().UTC().Format(time.RFC3339)
+		user.Set("data", userData)
 		if err := app.Save(user); err != nil {
-			return apis.NewBadRequestError(fmt.Sprintf("Failed to set password: %s", err.Error()), err)
+			app.Logger().Error("[onboarding.complete] save failed", "user_id", user.Id, "error", err)
+			return apis.NewBadRequestError("failed_to_set_password", err)
 		}
 
 		return e.JSON(http.StatusOK, map[string]any{
@@ -116,6 +161,9 @@ func OnboardingProfileHandler(app *pocketbase.PocketBase) func(e *core.RequestEv
 		}
 
 		if _, fh, err := e.Request.FormFile("avatar"); err == nil && fh != nil {
+			if err := validateAvatarUpload(fh); err != nil {
+				return err
+			}
 			file, err := filesystem.NewFileFromMultipart(fh)
 			if err != nil {
 				return apis.NewBadRequestError("invalid_avatar", err)
@@ -126,7 +174,8 @@ func OnboardingProfileHandler(app *pocketbase.PocketBase) func(e *core.RequestEv
 		existingData := backendinternal.ParseJSONMap(user.Get("data"))
 		user.Set("data", backendrequests.MergeUserData(existingData, data))
 		if err := app.Save(user); err != nil {
-			return apis.NewBadRequestError(fmt.Sprintf("Failed to save onboarding profile: %s", err.Error()), err)
+			app.Logger().Error("[onboarding.profile] save failed", "user_id", user.Id, "error", err)
+			return apis.NewBadRequestError("failed_to_save_profile", err)
 		}
 
 		return e.JSON(http.StatusOK, map[string]any{
@@ -178,6 +227,16 @@ func OnboardingFinalizeHandler(app *pocketbase.PocketBase) func(e *core.RequestE
 		if _, fh, err := e.Request.FormFile("avatar"); err == nil && fh != nil {
 			avatarPresent = true
 			avatarName = fh.Filename
+			if err := validateAvatarUpload(fh); err != nil {
+				app.Logger().Warn(
+					"[onboarding.finalize] rejected avatar upload",
+					"token", token,
+					"user_id", user.Id,
+					"filename", fh.Filename,
+					"content_type", fh.Header.Get("Content-Type"),
+				)
+				return err
+			}
 			file, err := filesystem.NewFileFromMultipart(fh)
 			if err != nil {
 				app.Logger().Error(
@@ -209,7 +268,7 @@ func OnboardingFinalizeHandler(app *pocketbase.PocketBase) func(e *core.RequestE
 				"avatar_name", avatarName,
 				"error", err,
 			)
-			return apis.NewBadRequestError(fmt.Sprintf("Failed to save onboarding profile: %s", err.Error()), err)
+			return apis.NewBadRequestError("failed_to_save_profile", err)
 		}
 
 		app.Logger().Info(

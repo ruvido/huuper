@@ -224,6 +224,10 @@ func NormalizeSubmitInput(raw map[string]any) map[string]any {
 }
 
 func EnsureSubmitEmailAvailable(app *pocketbase.PocketBase, email string) error {
+	return EnsureSubmitEmailAvailableTx(app, email)
+}
+
+func EnsureSubmitEmailAvailableTx(app core.App, email string) error {
 	existingUser, err := app.FindFirstRecordByFilter(
 		"users",
 		"email = {:email}",
@@ -243,6 +247,14 @@ func EnsureSubmitEmailAvailable(app *pocketbase.PocketBase, email string) error 
 	}
 
 	return nil
+}
+
+func IsDuplicateEmailError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "unique") && strings.Contains(msg, "email")
 }
 
 func FindSettingData(app core.App, name string) (map[string]any, error) {

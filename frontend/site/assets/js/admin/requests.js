@@ -13,7 +13,6 @@
     listSelector: "#admin-requests-list",
     loadURL: "/api/admin/requests",
     requestsURL: "/admin/requests/",
-    roles: ["admin"],
     itemHref: (id) => `/admin/request/?id=${encodeURIComponent(id)}`,
     detailURL: (id) => `/api/admin/requests/${encodeURIComponent(id)}`,
     actionURL: (id) => `/api/admin/requests/${encodeURIComponent(id)}/actions`,

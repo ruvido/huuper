@@ -50,7 +50,10 @@ func TestEffectiveStepIndexTracksSatisfiedSteps(t *testing.T) {
 	}
 
 	record.Set("guardian", "guardian-1")
-	data["mentoring_done_at"] = "2026-04-09T10:00:00Z"
+	data["mentoring"] = map[string]any{
+		"notes":   []any{map[string]any{"text": "done", "at": "2026-04-09T10:00:00Z"}},
+		"done_at": "2026-04-09T10:00:00Z",
+	}
 	data["group_approved_at"] = "2026-04-09T11:00:00Z"
 	if got := EffectiveStepIndex(record, data, flow); got != 4 {
 		t.Fatalf("expected step index 4 after four completed steps, got %d", got)
@@ -70,8 +73,10 @@ func TestResetStepsAfterActionClearsDownstreamState(t *testing.T) {
 			"name":        "Guardian",
 			"assigned_at": "2026-04-09T10:00:00Z",
 		},
-		"mentoring_notes":   "done",
-		"mentoring_done_at": "2026-04-09T10:30:00Z",
+		"mentoring": map[string]any{
+			"notes":   []any{map[string]any{"text": "done", "at": "2026-04-09T10:30:00Z"}},
+			"done_at": "2026-04-09T10:30:00Z",
+		},
 		"group_approved_at": "2026-04-09T11:00:00Z",
 	}
 
@@ -90,7 +95,7 @@ func TestResetStepsAfterActionClearsDownstreamState(t *testing.T) {
 	if _, ok := data["guardian"]; ok {
 		t.Fatalf("expected guardian payload to be removed")
 	}
-	if _, ok := data["mentoring_done_at"]; ok {
+	if _, ok := data["mentoring"]; ok {
 		t.Fatalf("expected mentoring state to be removed")
 	}
 	if _, ok := data["group_approved_at"]; ok {
@@ -169,7 +174,10 @@ func TestRecordMatchesStatusUsesDerivedWorkflowStatus(t *testing.T) {
 			"name":        "Guardian",
 			"assigned_at": "2026-04-09T10:00:00Z",
 		},
-		"mentoring_done_at": "2026-04-09T10:30:00Z",
+		"mentoring": map[string]any{
+			"notes":   []any{map[string]any{"text": "done", "at": "2026-04-09T10:30:00Z"}},
+			"done_at": "2026-04-09T10:30:00Z",
+		},
 	}
 	record.Set("guardian", "guardian-1")
 	record.Set("data", SetRequestFlowSnapshot(data, testFlow()))
@@ -238,6 +246,9 @@ func TestBuildWorkflowStateAllowsAssignedGuardianOnly(t *testing.T) {
 	if !state.CanTakeAction {
 		t.Fatalf("expected assigned guardian to be allowed to take action")
 	}
+	if !state.ActorIsAssigned {
+		t.Fatalf("expected assigned guardian to be flagged as ActorIsAssigned")
+	}
 	if state.RequiredField != "mentoring_notes" {
 		t.Fatalf("expected mentoring_notes required field, got %q", state.RequiredField)
 	}
@@ -251,6 +262,77 @@ func TestBuildWorkflowStateAllowsAssignedGuardianOnly(t *testing.T) {
 	}
 	if state.CanTakeAction {
 		t.Fatalf("expected unrelated guardian to be blocked")
+	}
+	if state.ActorIsAssigned {
+		t.Fatalf("expected unrelated guardian to not be flagged as ActorIsAssigned")
+	}
+}
+
+func TestBuildWorkflowStateAdminNotAssignedToGuardianStep(t *testing.T) {
+	record := testRequestRecord()
+	record.Set("group", "group-1")
+	record.Set("guardian", "guardian-1")
+	data := map[string]any{
+		"guardian": map[string]any{
+			"name":        "Guardian",
+			"assigned_at": "2026-04-09T10:00:00Z",
+		},
+	}
+	record.Set("data", SetRequestFlowSnapshot(data, testFlow()))
+
+	collection := core.NewBaseCollection("users")
+	collection.Fields.Add(
+		&core.TextField{Name: "email"},
+		&core.BoolField{Name: "admin"},
+		&core.JSONField{Name: "data"},
+	)
+	admin := core.NewRecord(collection)
+	admin.Set("id", "admin-1")
+	admin.Set("admin", true)
+
+	state, err := BuildWorkflowState(nil, admin, record, data, false, testFlow())
+	if err != nil {
+		t.Fatalf("unexpected error for admin on guardian step: %v", err)
+	}
+	if !state.CanTakeAction {
+		t.Fatalf("expected admin override to allow action")
+	}
+	if state.ActorIsAssigned {
+		t.Fatalf("expected admin NOT personally assigned as guardian to have ActorIsAssigned=false")
+	}
+}
+
+func TestBuildWorkflowStateAdminAlsoAssignedAsGuardian(t *testing.T) {
+	record := testRequestRecord()
+	record.Set("group", "group-1")
+	record.Set("guardian", "admin-1")
+	data := map[string]any{
+		"guardian": map[string]any{
+			"name":        "Admin",
+			"assigned_at": "2026-04-09T10:00:00Z",
+		},
+	}
+	record.Set("data", SetRequestFlowSnapshot(data, testFlow()))
+
+	collection := core.NewBaseCollection("users")
+	collection.Fields.Add(
+		&core.TextField{Name: "email"},
+		&core.BoolField{Name: "admin"},
+		&core.JSONField{Name: "data"},
+	)
+	admin := core.NewRecord(collection)
+	admin.Set("id", "admin-1")
+	admin.Set("admin", true)
+
+	state, err := BuildWorkflowState(nil, admin, record, data, false, testFlow())
+	if err != nil {
+		t.Fatalf("unexpected error for admin+guardian: %v", err)
+	}
+	if !state.CanTakeAction {
+		t.Fatalf("expected admin+guardian to be allowed to take action")
+	}
+	if !state.ActorIsAssigned {
+		t.Fatalf("expected admin also assigned as guardian to have ActorIsAssigned=true")
 	}
 }
 
@@ -281,6 +363,9 @@ func TestBuildWorkflowStateAllowsAdminOverride(t *testing.T) {
 	}
 	if state.CurrentAction != ActionSetGroup {
 		t.Fatalf("expected current action %q, got %q", ActionSetGroup, state.CurrentAction)
+	}
+	if !state.ActorIsAssigned {
+		t.Fatalf("expected admin on admin-role step to have ActorIsAssigned=true")
 	}
 }
 
@@ -316,5 +401,8 @@ func TestBuildWorkflowStateRejectedRequestDisablesActions(t *testing.T) {
 	}
 	if state.CanReject {
 		t.Fatalf("expected rejected request to block reject action")
+	}
+	if state.ActorIsAssigned {
+		t.Fatalf("expected rejected request to have ActorIsAssigned=false")
 	}
 }

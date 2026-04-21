@@ -94,11 +94,12 @@ type GuardianRequestItem struct {
 }
 
 const (
-	ActionReject          = "reject"
-	ActionPromote         = "promote"
-	ActionSetGroup        = "set_group"
-	ActionSetGuardian     = "set_guardian"
-	ActionSetMentoring    = "set_mentoring_done"
-	ActionSetGroupApprove = "set_group_approved"
-	ActionSetAdminApprove = "set_admin_approved"
+	ActionReject           = "reject"
+	ActionPromote          = "promote"
+	ActionSetGroup         = "set_group"
+	ActionSetGuardian      = "set_guardian"
+	ActionAddMentoringNote = "add_mentoring_note"
+	ActionSetMentoring     = "set_mentoring_done"
+	ActionSetGroupApprove  = "set_group_approved"
+	ActionSetAdminApprove  = "set_admin_approved"
 )

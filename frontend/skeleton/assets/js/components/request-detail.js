@@ -55,9 +55,25 @@ window.huuperRequestDetail = (() => {
       .join(" ");
   }
 
+  function personLabel(value) {
+    const raw = text(value).trim();
+    if (!raw) {
+      return "";
+    }
+    if (!raw.includes("@")) {
+      return raw;
+    }
+    const localPart = raw.split("@")[0].trim();
+    if (!localPart) {
+      return raw;
+    }
+    const spaced = localPart.replace(/[._-]+/g, " ");
+    return titleCase(spaced) || raw;
+  }
+
   function processSignature(prefix, who, at) {
     const cleanPrefix = text(prefix);
-    const cleanWho = text(who);
+    const cleanWho = personLabel(who);
     const parts = [];
     if (cleanPrefix) {
       parts.push(cleanPrefix);
@@ -108,6 +124,9 @@ window.huuperRequestDetail = (() => {
     const noteBodyClass = text(options.noteBodyClass) || "request-process-note-body";
     const flowNoteHTML = text(options.flowNoteHTML);
     const flowNoteText = text(options.flowNoteText);
+    const infoNoteHTML = text(options.infoNoteHTML);
+    const infoNoteText = text(options.infoNoteText);
+    const hasVisibleInfoNoteInTimeline = Boolean(flowNoteHTML || flowNoteText);
     const completed = options.completed === true;
     const current = options.current === true;
     const classes = ["request-process-step"];
@@ -132,7 +151,7 @@ window.huuperRequestDetail = (() => {
               <div class="request-process-label-col">
                 <div class="request-process-label-wrap">
                   <p class="request-detail-term request-process-label">${escapeHTML(title)}</p>
-                  ${info ? `<a class="request-process-info" href="${escapeHTML(info)}" target="_blank" rel="noreferrer" aria-label="${escapeHTML(`${title} info`)}">i</a>` : ""}
+                  ${current && !completed && !hasVisibleInfoNoteInTimeline && (infoNoteHTML || infoNoteText) ? `<button type="button" class="request-process-info" data-info-title="${escapeHTML(title)}"${infoNoteHTML ? ` data-info-html="${escapeHTML(encodeURIComponent(infoNoteHTML))}"` : ""}${infoNoteText ? ` data-info-text="${escapeHTML(encodeURIComponent(infoNoteText))}"` : ""} aria-label="${escapeHTML(`${title} info`)}">i</button>` : ""}
                 </div>
                 ${(value || date || subtitle || (completed && signature && options.showSignature !== false)) ? `
                   <div class="request-process-meta">
@@ -163,13 +182,40 @@ window.huuperRequestDetail = (() => {
     };
   }
 
+  function renderMentoringNotesHTML(mentoringData) {
+    const notes = Array.isArray(mentoringData && mentoringData.notes) ? mentoringData.notes : [];
+    const items = notes.map((note) => {
+      const noteText = text(note && note.text);
+      if (!noteText) {
+        return "";
+      }
+      const who = personLabel(note && note.by);
+      const when = dateOnly(note && note.at);
+      return `
+        <div>
+          <p class="request-notes-meta">
+            ${when ? `<span>${escapeHTML(when)}</span>` : "<span></span>"}
+            ${who ? `<span class="request-notes-author">${escapeHTML(who)}</span>` : ""}
+          </p>
+          <p>${escapeHTML(noteText)}</p>
+        </div>
+      `;
+    }).filter(Boolean).join("");
+    if (!items) {
+      return "";
+    }
+    return `<div class="request-note-list request-notes">${items}</div>`;
+  }
+
   function renderProcessApproval(payload) {
     const data = payload && typeof payload.data === "object" ? payload.data : {};
     const flow = requestFlowFromPayload(payload);
     const flowSteps = Array.isArray(flow.steps) ? flow.steps : [];
     const flowTitle = text(flow.title);
-    const mentoringNoteHTML = text(payload.mentoring_notes_html);
-    const mentoringNoteText = text(payload.mentoring_notes || data.mentoring_notes);
+    const mentoringData = data.mentoring && typeof data.mentoring === "object" ? data.mentoring : {};
+    const mentoringDoneAt = text(mentoringData.done_at);
+    const mentoringDoneBy = text(mentoringData.done_by);
+    const mentoringNotesHTML = renderMentoringNotesHTML(mentoringData);
     const assignmentGroupData = data.assign_group && typeof data.assign_group === "object" ? data.assign_group : {};
     const guardianData = data.guardian && typeof data.guardian === "object" ? data.guardian : {};
     const groupName = titleCase(payload.group_name);
@@ -182,7 +228,7 @@ window.huuperRequestDetail = (() => {
         case "assign_guardian":
           return text(guardianData.assigned_at) !== "";
         case "mentoring":
-          return text(data.mentoring_done_at) !== "";
+          return mentoringDoneAt !== "";
         case "group_approved":
           return text(data.group_approved_at) !== "";
         case "admin_approved":
@@ -221,9 +267,9 @@ window.huuperRequestDetail = (() => {
           }
         case "assign_guardian":
           {
-            const guardianName = titleCase(guardianData.name);
+            const guardianName = personLabel(guardianData.name);
             const completed = text(guardianData.assigned_at) !== "";
-            const renderedGuardianName = guardianName || titleCase(payload.guardian_name);
+            const renderedGuardianName = guardianName || personLabel(payload.guardian_name);
             return {
               completed,
               current: isCurrent,
@@ -243,16 +289,16 @@ window.huuperRequestDetail = (() => {
           }
         case "mentoring":
           return {
-            completed: text(data.mentoring_done_at) !== "",
+            completed: mentoringDoneAt !== "",
             current: isCurrent,
-            date: data.mentoring_done_at,
+            date: mentoringDoneAt,
             signaturePrefix: "Completed",
-            signatureWho: data.mentoring_done_by,
-            signatureAt: data.mentoring_done_at,
-            flowNoteHTML: mentoringNoteHTML ? "" : undefined,
-            flowNoteText: mentoringNoteHTML ? "" : undefined,
+            signatureWho: mentoringDoneBy,
+            signatureAt: mentoringDoneAt,
+            flowNoteHTML: mentoringNotesHTML ? "" : undefined,
+            flowNoteText: mentoringNotesHTML ? "" : undefined,
             noteBodyClass: "request-process-note-content-body",
-            noteHTML: mentoringNoteHTML ? mentoringNoteHTML : "",
+            noteHTML: mentoringNotesHTML,
             noteText: "",
           };
         case "group_approved":
@@ -305,6 +351,8 @@ window.huuperRequestDetail = (() => {
         info: text(step && step.info),
         flowNoteHTML: stepFlowNoteHTML,
         flowNoteText: stepFlowNoteText,
+        infoNoteHTML: text(step && step.notes_html),
+        infoNoteText: text(step && step.notes),
         completed: state.completed === true,
         current: state.current === true,
         date: state.date,
@@ -366,6 +414,23 @@ window.huuperRequestDetail = (() => {
       });
     }
 
+    function applyPayload(payload) {
+      if (topbarMetaNode) {
+        const ageLabel = requestAgeDaysLabel(payload && payload.created);
+        topbarMetaNode.textContent = ageLabel;
+        topbarMetaNode.hidden = !ageLabel;
+      }
+      summaryNode.hidden = false;
+      summaryNode.innerHTML = window.huuperRequestItem.renderDetail(payload);
+      renderWorkflow(payload);
+      window.huuperListPage.setStatus(statusNode, "");
+    }
+
+    async function refreshDetail() {
+      const payload = await window.huuperAuth.apiFetch(config.detailURL(id));
+      applyPayload(payload);
+    }
+
     function renderWorkflow(payload) {
       const workflow = payload && typeof payload.workflow === "object" ? payload.workflow : {};
       const canTakeAction = workflow.can_take_pending_action === true;
@@ -378,13 +443,23 @@ window.huuperRequestDetail = (() => {
 
       const requiredField = workflow.required_field || "";
       const action = text(workflow.pending_action);
+      const payloadData = payload && typeof payload.data === "object" && payload.data ? payload.data : {};
+      const mentoringState = payloadData.mentoring && typeof payloadData.mentoring === "object" ? payloadData.mentoring : {};
+      const mentoringNotesCount = Array.isArray(mentoringState.notes) ? mentoringState.notes.length : 0;
+      const isMentoringStep = requiredField === "mentoring_notes";
+      const canCloseMentoring = !isMentoringStep || mentoringNotesCount > 0;
       const parts = [`<article class="request-workflow-card">`];
       if (processApproval) {
         parts.push(processApproval);
       }
       const actions = [];
-      if (canTakeAction && action) {
-        const actionLabel = text(workflow.pending_action_label) || actionText(action);
+      if (canTakeAction && isMentoringStep) {
+        actions.push(`<button id="request-action-add-note" class="secondary" type="button">+ ADD NOTE</button>`);
+      }
+      if (canTakeAction && action && canCloseMentoring) {
+        const actionLabel = isMentoringStep
+          ? "CLOSE MENTORING"
+          : (text(workflow.pending_action_label) || actionText(action));
         actions.push(`<button id="request-action" class="primary" type="button">${window.huuperListPage.escapeHTML(actionLabel)}</button>`);
       }
       if (actions.length === 0 && !processApproval) {
@@ -405,7 +480,47 @@ window.huuperRequestDetail = (() => {
       workflowNode.innerHTML = parts.join("");
       workflowNode.hidden = false;
 
+      workflowNode.querySelectorAll(".request-process-info").forEach((infoButton) => {
+        infoButton.addEventListener("click", () => {
+          const infoTitle = infoButton.dataset.infoTitle || "";
+          const rawHTML = infoButton.dataset.infoHtml ? decodeURIComponent(infoButton.dataset.infoHtml) : "";
+          const rawText = infoButton.dataset.infoText ? decodeURIComponent(infoButton.dataset.infoText) : "";
+          const contentHTML = rawHTML
+            || (rawText ? `<p>${escapeHTML(rawText).replaceAll("\n", "<br>")}</p>` : "");
+          if (!contentHTML) {
+            return;
+          }
+          window.huuperActionSheet.open({
+            title: infoTitle,
+            contentHTML,
+          });
+        });
+      });
+
       const button = workflowNode.querySelector("#request-action");
+      const addNoteButton = workflowNode.querySelector("#request-action-add-note");
+
+      if (addNoteButton) {
+        addNoteButton.addEventListener("click", () => {
+          window.huuperRequestNoteSheet.open({
+            title: "Add mentoring note",
+            submitLabel: "Add",
+            emptyStatus: "Write a note.",
+            statusNode,
+            onSubmit: async (note) => {
+              await window.huuperAuth.apiFetch(config.actionURL(id), {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  action: "add_mentoring_note",
+                  mentoring_notes: note,
+                }),
+              });
+              await refreshDetail();
+            },
+          });
+        });
+      }
 
       if (button) {
         button.addEventListener("click", async () => {
@@ -419,26 +534,6 @@ window.huuperRequestDetail = (() => {
               requestsURL: config.requestsURL,
               detailURL: config.detailURL,
               actionURL: config.actionURL,
-            });
-            return;
-          }
-
-          if (requiredField === "mentoring_notes") {
-            window.huuperRequestNoteSheet.open({
-              title: "Mentoring notes",
-              submitLabel: "Submit",
-              emptyStatus: "Write notes.",
-              statusNode,
-              onSubmit: async (mentoringNotes) => {
-                await window.huuperRequestActions.submitAndRedirect({
-                  actionURL: config.actionURL(id),
-                  body: {
-                    action,
-                    mentoring_notes: mentoringNotes,
-                  },
-                  redirectURL: config.requestsURL,
-                });
-              },
             });
             return;
           }
@@ -463,17 +558,7 @@ window.huuperRequestDetail = (() => {
       }
     }
 
-    window.huuperAuth.apiFetch(config.detailURL(id)).then((payload) => {
-      if (topbarMetaNode) {
-        const ageLabel = requestAgeDaysLabel(payload && payload.created);
-        topbarMetaNode.textContent = ageLabel;
-        topbarMetaNode.hidden = !ageLabel;
-      }
-      summaryNode.hidden = false;
-      summaryNode.innerHTML = window.huuperRequestItem.renderDetail(payload);
-      renderWorkflow(payload);
-      window.huuperListPage.setStatus(statusNode, "");
-    }).catch(() => {
+    refreshDetail().catch(() => {
       window.huuperListPage.setStatus(statusNode, "Request unavailable.");
     });
   }

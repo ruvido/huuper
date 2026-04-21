@@ -113,6 +113,9 @@ func listRequestItems(app *pocketbase.PocketBase, actor *core.Record, filter str
 	selected := make([]*core.Record, 0, perPage)
 	matched := 0
 
+	const maxScannedRecords = 10000
+	scanned := 0
+
 	for offset := 0; ; offset += batchSize {
 		records, err := app.FindRecordsByFilter("requests", filter, sort, batchSize, offset, params)
 		if err != nil {
@@ -138,10 +141,14 @@ func listRequestItems(app *pocketbase.PocketBase, actor *core.Record, filter str
 				break
 			}
 		}
+		scanned += len(records)
 		if len(selected) >= perPage && matched >= targetCount {
 			break
 		}
 		if len(records) < batchSize {
+			break
+		}
+		if scanned >= maxScannedRecords {
 			break
 		}
 	}
@@ -284,8 +291,7 @@ func requestAssignedAt(data map[string]any) string {
 }
 
 func requestMentoringNotes(data map[string]any) string {
-	value, _ := data["mentoring_notes"].(string)
-	return strings.TrimSpace(value)
+	return backendrequests.MentoringNotesJoined(data)
 }
 
 func requestMentoringNotesHTML(data map[string]any) string {
@@ -429,6 +435,10 @@ func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 			}
 		case backendrequests.ActionSetGuardian:
 			if err := backendrequests.ApplySetGuardianAction(app, actor, record, data, strings.TrimSpace(payload.GuardianID)); err != nil {
+				return err
+			}
+		case backendrequests.ActionAddMentoringNote:
+			if err := backendrequests.ApplyAddMentoringNoteAction(app, actor, record, data, payload); err != nil {
 				return err
 			}
 		case backendrequests.ActionSetMentoring:

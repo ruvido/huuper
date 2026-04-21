@@ -39,22 +39,34 @@ func SubmitRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		if err != nil {
 			return apis.NewBadRequestError("invalid_request_data", err)
 		}
-		if err := backendrequests.EnsureSubmitEmailAvailable(app, email); err != nil {
-			return err
-		}
 
 		requestsCollection, err := app.FindCollectionByNameOrId("requests")
 		if err != nil {
 			return apis.NewNotFoundError("requests_collection_not_found", err)
 		}
 
-		record := core.NewRecord(requestsCollection)
-		record.Set("email", email)
 		data = backendrequests.SetRequestFlowSnapshotData(data, flowData)
-		record.Set("data", data)
-		record.Set("rejected", false)
-		if err := app.Save(record); err != nil {
-			return apis.NewBadRequestError("failed_to_create_request", err)
+
+		var record *core.Record
+		txErr := app.RunInTransaction(func(txApp core.App) error {
+			if err := backendrequests.EnsureSubmitEmailAvailableTx(txApp, email); err != nil {
+				return err
+			}
+			r := core.NewRecord(requestsCollection)
+			r.Set("email", email)
+			r.Set("data", data)
+			r.Set("rejected", false)
+			if err := txApp.Save(r); err != nil {
+				if backendrequests.IsDuplicateEmailError(err) {
+					return apis.NewBadRequestError("email_exists_request", nil)
+				}
+				return apis.NewBadRequestError("failed_to_create_request", err)
+			}
+			record = r
+			return nil
+		})
+		if txErr != nil {
+			return txErr
 		}
 
 		backendrequests.NotifyNewRequest(app, record, data)

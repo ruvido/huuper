@@ -41,21 +41,30 @@ func HasRoleForRequest(app *pocketbase.PocketBase, actor *core.Record, record *c
 	if actor != nil && actor.GetBool("admin") {
 		return true, nil
 	}
+	return IsActorAssignedForRole(app, actor, record, role, requestRoleAdmin, requestRoleGuardian, requestRoleAssistant)
+}
 
+// IsActorAssignedForRole reports whether the actor explicitly matches the
+// request's assignee for the given role. Unlike HasRoleForRequest, it does
+// NOT short-circuit on the admin bit: an admin user is considered assigned
+// only when the role is admin, or when they are the literal guardian /
+// group assistant on the record. This lets callers distinguish "actor can
+// act via admin override" from "actor is personally responsible".
+func IsActorAssignedForRole(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, role string, requestRoleAdmin string, requestRoleGuardian string, requestRoleAssistant string) (bool, error) {
+	if actor == nil || record == nil {
+		return false, nil
+	}
 	switch role {
 	case requestRoleAdmin:
-		return actor != nil && actor.GetBool("admin"), nil
+		return actor.GetBool("admin"), nil
 	case requestRoleGuardian:
-		if actor == nil {
-			return false, nil
-		}
 		return strings.TrimSpace(record.GetString("guardian")) == actor.Id, nil
 	case requestRoleAssistant:
-		if actor == nil {
-			return false, nil
-		}
 		groupID := strings.TrimSpace(record.GetString("group"))
 		if groupID == "" {
+			return false, nil
+		}
+		if app == nil {
 			return false, nil
 		}
 		group, err := app.FindRecordById("groups", groupID)

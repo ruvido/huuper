@@ -191,6 +191,8 @@ window.huuperAvatarCropper = (() => {
 
       modal.confirmButton.disabled = true;
       modal.cancelButton.disabled = true;
+      modal.confirmButton.classList.add("request-action-loading");
+      modal.confirmButton.setAttribute("aria-busy", "true");
       modal.errorNode.hidden = true;
       modal.errorNode.textContent = "";
 
@@ -207,6 +209,8 @@ window.huuperAvatarCropper = (() => {
         modal.errorNode.hidden = false;
         modal.confirmButton.disabled = false;
         modal.cancelButton.disabled = false;
+        modal.confirmButton.classList.remove("request-action-loading");
+        modal.confirmButton.removeAttribute("aria-busy");
       }
     });
 

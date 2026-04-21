@@ -75,6 +75,7 @@ func BuildWorkflowPayload(state WorkflowState, flow FlowConfig) map[string]any {
 		"pending_action_notes":    state.NextStep.Notes,
 		"required_field":          state.RequiredField,
 		"can_take_pending_action": state.CanTakeAction,
+		"actor_is_assigned":       state.ActorIsAssigned,
 		"can_reject":              state.CanReject,
 		"flow_version":            flow.Version,
 	}
@@ -103,6 +104,7 @@ type WorkflowState struct {
 	NextStep           FlowStep
 	RequiredField      string
 	CanTakeAction      bool
+	ActorIsAssigned    bool
 	CanReject          bool
 	CurrentAction      string
 	CurrentActionLabel string
@@ -133,6 +135,11 @@ func BuildWorkflowState(app *pocketbase.PocketBase, actor *core.Record, record *
 			return WorkflowState{}, err
 		}
 		state.CanTakeAction = ok
+		assigned, err := backendinternal.IsActorAssignedForRole(app, actor, record, nextStep.Role, RoleAdmin, RoleGuardian, RoleAssistant)
+		if err != nil {
+			return WorkflowState{}, err
+		}
+		state.ActorIsAssigned = assigned
 	}
 	state.CanReject = actor != nil && actor.GetBool("admin") && !rejected
 	return state, nil

@@ -81,35 +81,47 @@ func DefaultGroupInvite(app *pocketbase.PocketBase, actor *core.Record) (string,
 	return group.Id, link, nil
 }
 
-func ConsumeMemberInvite(app *pocketbase.PocketBase, inviteLink string) (*core.Record, *core.Record, error) {
+func ConsumeMemberInvite(app *pocketbase.PocketBase, inviteLink string) (*core.Record, error) {
 	trimmed := strings.TrimSpace(inviteLink)
 	if trimmed == "" {
-		return nil, nil, apis.NewBadRequestError("missing_invite_link", nil)
+		return nil, apis.NewBadRequestError("missing_invite_link", nil)
 	}
 
-	tokenRecord, err := app.FindFirstRecordByFilter(
-		"tokens",
-		"token = {:token} && service = {:service}",
-		map[string]any{
-			"token":   trimmed,
-			"service": inviteTokenService,
-		},
-	)
-	if err != nil || tokenRecord == nil {
-		return nil, nil, apis.NewBadRequestError("invalid_invite_link", err)
-	}
+	var user *core.Record
+	err := app.RunInTransaction(func(txApp core.App) error {
+		tokenRecord, err := txApp.FindFirstRecordByFilter(
+			"tokens",
+			"token = {:token} && service = {:service}",
+			map[string]any{
+				"token":   trimmed,
+				"service": inviteTokenService,
+			},
+		)
+		if err != nil || tokenRecord == nil {
+			return apis.NewBadRequestError("invalid_invite_link", err)
+		}
 
-	userID := strings.TrimSpace(tokenRecord.GetString("user"))
-	if userID == "" {
-		return nil, nil, apis.NewBadRequestError("invalid_invite_link", nil)
-	}
+		userID := strings.TrimSpace(tokenRecord.GetString("user"))
+		if userID == "" {
+			return apis.NewBadRequestError("invalid_invite_link", nil)
+		}
 
-	user, err := app.FindRecordById("users", userID)
-	if err != nil || user == nil {
-		return nil, nil, apis.NewBadRequestError("invalid_invite_link", err)
-	}
+		resolved, err := txApp.FindRecordById("users", userID)
+		if err != nil || resolved == nil {
+			return apis.NewBadRequestError("invalid_invite_link", err)
+		}
 
-	return tokenRecord, user, nil
+		if err := txApp.Delete(tokenRecord); err != nil {
+			return apis.NewBadRequestError("invalid_invite_link", err)
+		}
+
+		user = resolved
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
 }
 
 func GenerateGroupInvite(app *pocketbase.PocketBase, user *core.Record, group *core.Record) (string, error) {

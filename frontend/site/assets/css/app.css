@@ -1026,6 +1026,10 @@ body:has(.top-bar-detail-page) .bottom-nav {
   min-width: 112px;
 }
 
+.avatar-cropper-footer .primary.request-action-loading {
+  --spinner-color: var(--button-primary-text);
+}
+
 .avatar-cropper-error {
   margin: 0;
   min-height: 1.2em;
@@ -1642,9 +1646,7 @@ body.action-sheet-lock {
   z-index: 70;
   display: grid;
   grid-template-rows: 1fr auto;
-  background: var(--overlay-backdrop-bg);
-  backdrop-filter: blur(var(--overlay-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--overlay-backdrop-blur));
+  background: transparent;
   overscroll-behavior: contain;
 }
 
@@ -1655,7 +1657,9 @@ body.action-sheet-lock {
   padding: 0;
   border: 0;
   appearance: none;
-  background: transparent;
+  background: rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   width: 100%;
   height: 100%;
   cursor: pointer;
@@ -1670,8 +1674,8 @@ body.action-sheet-lock {
   gap: var(--space-3);
   padding: var(--space-3) var(--space-6) calc(var(--space-4) + env(safe-area-inset-bottom));
   border-top: 1px solid var(--line);
-  background: transparent;
-  box-shadow: none;
+  background: var(--bg);
+  box-shadow: 0 -12px 30px rgba(0, 0, 0, 0.32);
   max-height: min(78dvh, 720px);
   animation: action-sheet-slide-up 180ms ease-out;
 }
@@ -2521,11 +2525,15 @@ body.action-sheet-lock {
 }
 
 .request-process-label-wrap {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: var(--space-2);
   min-width: 0;
   min-height: 22px;
+}
+
+.request-process-label-wrap .request-process-info {
+  margin-left: auto;
 }
 
 .request-process-label {
@@ -2572,15 +2580,19 @@ body.action-sheet-lock {
   place-items: center;
   width: 16px;
   height: 16px;
+  padding: 0;
   border-radius: 999px;
   border: 1.5px solid var(--accent);
+  background: transparent;
   color: var(--accent);
+  font-family: inherit;
   font-size: 0.65rem;
   font-weight: 700;
   line-height: 1;
   text-transform: lowercase;
   align-self: center;
   transform: translateY(-1px);
+  cursor: pointer;
 }
 
 .request-process-info:hover {
@@ -2810,43 +2822,69 @@ body.request-page {
 
 .request-notes {
   display: grid;
-  gap: var(--space-2);
+  gap: var(--space-5);
 }
 
 .request-notes > div {
   display: grid;
   gap: var(--space-2);
+  position: relative;
 }
 
-.request-notes > div > :first-child {
-  margin-top: 0;
+.request-notes > div::before {
+  content: "";
+  position: absolute;
+  left: -28px;
+  top: 30px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  z-index: 3;
 }
 
-.request-notes p,
-.request-notes ul,
-.request-notes ol,
-.request-notes h1,
-.request-notes h2,
-.request-notes h3 {
+.request-notes p {
   margin: 0;
 }
 
-.request-notes h1,
-.request-notes h2,
-.request-notes h3 {
-  font-size: var(--font-ui-base);
-  font-weight: 800;
-  letter-spacing: -0.03em;
-}
-
-.request-notes p,
-.request-notes li {
+.request-notes-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
   color: var(--text-muted);
+  font-size: var(--font-ui-xs);
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.2;
 }
 
-.request-notes ul,
-.request-notes ol {
-  padding-left: 18px;
+.request-notes-author {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.request-notes > div > p:last-child {
+  color: var(--text);
+  font-size: var(--type-body-size);
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.request-bottom-actions-row .secondary {
+  border: 0;
+  background:
+    linear-gradient(90deg, var(--accent) 0 8px, transparent 8px 14px) top / 14px 1px repeat-x,
+    linear-gradient(90deg, var(--accent) 0 8px, transparent 8px 14px) bottom / 14px 1px repeat-x,
+    linear-gradient(0deg, var(--accent) 0 8px, transparent 8px 14px) left / 1px 14px repeat-y,
+    linear-gradient(0deg, var(--accent) 0 8px, transparent 8px 14px) right / 1px 14px repeat-y;
+  background-color: transparent;
+  color: var(--accent);
+}
+
+.request-bottom-actions-row .primary,
+.request-bottom-actions-row .secondary {
+  text-transform: uppercase;
 }
 
 .surface-highlight {

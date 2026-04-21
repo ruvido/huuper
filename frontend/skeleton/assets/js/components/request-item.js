@@ -81,6 +81,7 @@ window.huuperRequestItem = (() => {
     const labels = {
       set_group: "Assign group",
       set_guardian: "Assign guardian",
+      add_mentoring_note: "Add mentoring note",
       set_mentoring_done: "Complete mentoring",
       set_group_approved: "Approve group",
       set_admin_approved: "Approve request",

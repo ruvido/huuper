@@ -280,9 +280,7 @@ func requestNotificationValues(app *pocketbase.PocketBase, record *core.Record, 
 	if children, ok := data["children"].(string); ok {
 		values["children"] = strings.TrimSpace(children)
 	}
-	if mentoringNotes, ok := data["mentoring_notes"].(string); ok {
-		values["mentoring_notes"] = strings.TrimSpace(mentoringNotes)
-	}
+	values["mentoring_notes"] = MentoringNotesJoined(data)
 	values["age"] = requestAge(data)
 	if group != nil {
 		values["group_id"] = group.Id

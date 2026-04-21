@@ -13,7 +13,6 @@
     listSelector: "#requests-list",
     loadURL: "/api/me/requests",
     requestsURL: "/me/requests/",
-    roles: ["assistant", "guardian"],
     itemHref: (id) => `/me/request/?id=${encodeURIComponent(id)}`,
     detailURL: (id) => `/api/me/requests/${encodeURIComponent(id)}`,
     actionURL: (id) => `/api/me/requests/${encodeURIComponent(id)}/actions`,

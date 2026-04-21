@@ -293,7 +293,7 @@ func handleChatJoinRequest(request *tgbotapi.ChatJoinRequest) {
 		return
 	}
 
-	tokenRecord, user, err := tginternal.ConsumeMemberInvite(app, inviteLink)
+	user, err := tginternal.ConsumeMemberInvite(app, inviteLink)
 	if err != nil {
 		log.Printf("Failed to resolve invite link %q: %v", inviteLink, err)
 		notifyJoinFailure("resolve invite link", request, inviteLink, nil, err)
@@ -336,10 +336,6 @@ func handleChatJoinRequest(request *tgbotapi.ChatJoinRequest) {
 		InviteLink: inviteLink,
 	}); err != nil {
 		log.Printf("Failed to revoke invite link %q for chat %d: %v", inviteLink, request.Chat.ID, err)
-	}
-
-	if err := app.Delete(tokenRecord); err != nil {
-		log.Printf("Failed to delete invite token %q: %v", inviteLink, err)
 	}
 
 	syncUserGroupRecord(user, request.Chat.ID, "member")

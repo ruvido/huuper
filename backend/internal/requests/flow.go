@@ -139,25 +139,21 @@ var flowActionSpecs = map[string]flowActionSpec{
 	FlowActionMentoring: {
 		RequiredField: "mentoring_notes",
 		IsDone: func(_ *core.Record, data map[string]any) bool {
-			value, _ := data["mentoring_done_at"].(string)
-			return strings.TrimSpace(value) != ""
+			return mentoringDoneAt(data) != ""
 		},
 		Apply: func(_ core.App, actor *core.Record, _ *core.Record, data map[string]any, payload ActionPayload, _ FlowStep) error {
 			note := strings.TrimSpace(payload.MentoringNotes)
-			if note == "" {
+			if note != "" {
+				appendMentoringNote(data, note, actor)
+			}
+			if len(mentoringNotes(data)) == 0 {
 				return apis.NewBadRequestError("missing_mentoring_notes", nil)
 			}
-			data["mentoring_notes"] = note
-			data["mentoring_done_at"] = time.Now().UTC().Format(time.RFC3339)
-			if actor != nil {
-				data["mentoring_done_by"] = actorDisplayName(actor)
-			}
+			markMentoringDone(data, actor)
 			return nil
 		},
 		Reset: func(_ *core.Record, data map[string]any) {
-			delete(data, "mentoring_notes")
-			delete(data, "mentoring_done_at")
-			delete(data, "mentoring_done_by")
+			delete(data, mentoringDataKey)
 		},
 	},
 	FlowActionGroupApproved: {
