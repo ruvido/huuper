@@ -1,4 +1,34 @@
 window.huuperRequestActions = (() => {
+  function text(value) {
+    if (window.huuperListPage && typeof window.huuperListPage.text === "function") {
+      return window.huuperListPage.text(value);
+    }
+    return String(value || "").trim();
+  }
+
+  function errorMessage(error, fallback = "Action unavailable.") {
+    const payload = error && typeof error === "object" ? error.payload : null;
+    const payloadMessage = text(payload && payload.message);
+    if (payloadMessage) {
+      return payloadMessage;
+    }
+
+    const data = payload && typeof payload.data === "object" && payload.data ? payload.data : null;
+    if (data) {
+      const keys = Object.keys(data).filter((key) => text(key) !== "");
+      if (keys.length > 0) {
+        return keys[0];
+      }
+    }
+
+    const direct = text(error && error.message);
+    if (direct && direct !== "request_failed") {
+      return direct;
+    }
+
+    return fallback;
+  }
+
   function wait(ms) {
     return new Promise((resolve) => window.setTimeout(resolve, ms));
   }
@@ -36,5 +66,5 @@ window.huuperRequestActions = (() => {
     }
   }
 
-  return { submitAndRedirect };
+  return { submitAndRedirect, errorMessage };
 })();

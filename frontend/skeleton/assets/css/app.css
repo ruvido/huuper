@@ -78,7 +78,12 @@
   --request-line: #4a4438;
   --request-line-strong: #5a5242;
   --request-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
-  --detail-bg: rgba(20, 19, 12, 0.98);
+  --detail-bg: var(--bg);
+  --overlay-backdrop-bg: rgba(20, 18, 13, 0.78);
+  --overlay-backdrop-blur: 16px;
+  --sheet-surface-bg: var(--overlay-backdrop-bg);
+  --sheet-surface-border: transparent;
+  --sheet-surface-shadow: none;
   --request-space-2xs: 6px;
   --request-space-xs: 10px;
   --request-space-sm: 14px;
@@ -889,8 +894,9 @@ body:has(.top-bar-detail-page) .bottom-nav {
   display: grid;
   place-items: center;
   padding: var(--space-4);
-  background: rgba(0, 0, 0, 0.74);
-  backdrop-filter: blur(8px);
+  background: var(--overlay-backdrop-bg);
+  backdrop-filter: blur(var(--overlay-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--overlay-backdrop-blur));
 }
 
 .avatar-cropper-panel {
@@ -1057,25 +1063,6 @@ body:has(.top-bar-detail-page) .bottom-nav {
 
 .onboarding-actions {
   justify-content: center;
-}
-
-.onboarding-actions .is-loading {
-  position: relative;
-  padding-left: 40px;
-}
-
-.onboarding-actions .is-loading::before {
-  content: "";
-  position: absolute;
-  left: 16px;
-  top: 50%;
-  width: 14px;
-  height: 14px;
-  margin-top: -7px;
-  border: 2px solid rgba(22, 19, 10, 0.22);
-  border-top-color: #16130a;
-  border-radius: 999px;
-  animation: public-button-spin 0.8s linear infinite;
 }
 
 .onboarding-layout.onboarding-screen-flow #public-request-progress {
@@ -1643,29 +1630,48 @@ body:has(.top-bar-detail-page) .bottom-nav {
   fill: currentColor;
 }
 
+body.action-sheet-lock {
+  overflow: hidden;
+  touch-action: none;
+  overscroll-behavior: contain;
+}
+
 .action-sheet {
   position: fixed;
   inset: 0;
   z-index: 70;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  background: var(--overlay-backdrop-bg);
+  backdrop-filter: blur(var(--overlay-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--overlay-backdrop-blur));
+  overscroll-behavior: contain;
 }
 
 .action-sheet-backdrop {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  grid-row: 1;
+  margin: 0;
+  padding: 0;
   border: 0;
-  background: rgba(0, 0, 0, 0.26);
+  appearance: none;
+  background: transparent;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
 }
 
 .action-sheet-panel {
-  position: absolute;
-  inset-inline: 0;
-  bottom: 0;
+  position: relative;
+  grid-row: 2;
+  width: 100%;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto auto auto auto auto;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-6) calc(var(--space-6) + env(safe-area-inset-bottom));
-  border-top: 1px solid rgba(242, 204, 13, 0.28);
-  background: rgba(10, 10, 10, 0.98);
+  padding: var(--space-3) var(--space-6) calc(var(--space-4) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: transparent;
+  box-shadow: none;
   max-height: min(78dvh, 720px);
   animation: action-sheet-slide-up 180ms ease-out;
 }
@@ -1735,36 +1741,43 @@ body:has(.top-bar-detail-page) .bottom-nav {
   opacity: 0.45;
 }
 
-.action-sheet-action.request-action-loading:disabled,
-.action-sheet-footer-button.request-action-loading:disabled,
-body.request-page .request-workflow-card .action-row .primary.request-action-loading:disabled,
-.action-row button.request-action-loading:disabled {
+.request-action-loading {
+  position: relative;
+  color: transparent !important;
+  text-shadow: none;
+  cursor: wait;
+}
+
+.request-action-loading:disabled {
   opacity: 1;
 }
 
-.action-sheet-action.request-action-loading,
-.action-sheet-footer-button.request-action-loading,
-body.request-page .request-workflow-card .action-row .primary.request-action-loading,
-.action-row button.request-action-loading {
-  position: relative;
-  padding-left: 40px;
-}
-
-.action-sheet-action.request-action-loading::before,
-.action-sheet-footer-button.request-action-loading::before,
-body.request-page .request-workflow-card .action-row .primary.request-action-loading::before,
-.action-row button.request-action-loading::before {
+.request-action-loading::before {
   content: "";
   position: absolute;
-  left: 16px;
+  left: 50%;
   top: 50%;
-  width: 14px;
-  height: 14px;
-  margin-top: -7px;
-  border: 2px solid currentColor;
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  margin-top: -9px;
+  border: 2px solid var(--spinner-color, var(--text));
   border-right-color: transparent;
   border-radius: 999px;
   animation: public-button-spin 0.8s linear infinite;
+  pointer-events: none;
+}
+
+.action-sheet-footer-button.request-action-loading {
+  --spinner-color: var(--button-primary-text);
+}
+
+.action-sheet-footer-button-danger.request-action-loading {
+  --spinner-color: rgba(239, 68, 68, 0.95);
+}
+
+.action-sheet-action-danger.request-action-loading {
+  --spinner-color: #ef4444;
 }
 
 .action-sheet-footer-button-danger {

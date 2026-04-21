@@ -31,7 +31,7 @@ func SummaryHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error
 		telegramMissing := 0
 		notActive := 0
 		for _, user := range users {
-			if user.GetString("status") != "active" {
+			if user.GetString("status") != "approved" {
 				notActive++
 			}
 			if isTelegramMissing(user.Get("telegram")) {

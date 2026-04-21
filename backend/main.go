@@ -12,6 +12,7 @@ import (
 	"members/backend/api"
 	"members/backend/bot"
 	"members/backend/internal/hooks"
+	tginternal "members/backend/internal/telegram"
 	_ "members/backend/migrations"
 )
 
@@ -57,6 +58,7 @@ func main() {
 	hooks.RegisterSettingsValidation(app)
 	hooks.RegisterGroupsValidation(app)
 	hooks.RegisterUsersNormalization(app)
+	hooks.RegisterRequestsNormalization(app)
 
 	app.OnTerminate().BindFunc(func(e *core.TerminateEvent) error {
 		bot.StopTelegramBot()
@@ -123,6 +125,8 @@ func main() {
 		if !disableTelegramBot {
 			if err := bot.StartTelegramBot(app); err != nil {
 				log.Printf("Failed to start Telegram bot: %v", err)
+			} else {
+				go tginternal.BackfillDefaultGroupInvites(app)
 			}
 		}
 

@@ -58,6 +58,8 @@ func RegisterRoutes(app *pocketbase.PocketBase, se *core.ServeEvent) {
 		RegistrationReject:   adminroutes.RejectRegistrationHandler(app),
 		RegistrationCancel:   adminroutes.CancelRegistrationHandler(app),
 		GroupSyncMemberships: adminroutes.SyncGroupMembershipsHandler(app),
+		UsersList:            adminroutes.UsersListHandler(app),
+		UserCancel:           adminroutes.CancelUserHandler(app),
 		UserDelete:           adminroutes.DeleteUserHandler(app),
 	})
 

@@ -453,7 +453,10 @@ window.huuperRequestDetail = (() => {
               redirectURL: config.requestsURL,
             });
           } catch (error) {
-            window.huuperListPage.setStatus(statusNode, "Action unavailable.");
+            window.huuperListPage.setStatus(
+              statusNode,
+              window.huuperRequestActions.errorMessage(error, "Action unavailable."),
+            );
             button.disabled = false;
           }
         });

@@ -92,8 +92,11 @@ window.huuperRequestAssignment = (() => {
                     body,
                     redirectURL: config.requestsURL,
                   });
-                } catch (_) {
-                  window.huuperListPage.setStatus(statusNode, "Action unavailable.");
+                } catch (error) {
+                  window.huuperListPage.setStatus(
+                    statusNode,
+                    window.huuperRequestActions.errorMessage(error, "Action unavailable."),
+                  );
                 }
               },
             },

@@ -35,6 +35,7 @@ type GroupListItem struct {
 	MembersCount  int    `json:"members_count"`
 	RequestsCount *int   `json:"requests_count,omitempty"`
 	InviteLink    string `json:"invite_link,omitempty"`
+	IsMember      bool   `json:"is_member"`
 }
 
 type PendingRequestItem struct {

@@ -53,6 +53,7 @@ window.huuperActionSheet = (() => {
     }
     root.hidden = true;
     root.classList.remove("action-sheet-open");
+    document.body.classList.remove("action-sheet-lock");
     headerNode.hidden = true;
     headerNode.innerHTML = "";
     bodyNode.hidden = true;
@@ -128,6 +129,7 @@ window.huuperActionSheet = (() => {
 
     root.hidden = false;
     root.classList.add("action-sheet-open");
+    document.body.classList.add("action-sheet-lock");
     if (config && typeof config.onOpen === "function") {
       config.onOpen(root);
     }

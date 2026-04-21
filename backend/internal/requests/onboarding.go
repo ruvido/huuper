@@ -101,3 +101,31 @@ func DeleteOnboardingToken(app *pocketbase.PocketBase, token string) error {
 
 	return app.Delete(tokenRecord)
 }
+
+func deleteOnboardingTokensForUser(app *pocketbase.PocketBase, userID string) {
+	if app == nil || strings.TrimSpace(userID) == "" {
+		return
+	}
+
+	records, err := app.FindRecordsByFilter(
+		"tokens",
+		"user = {:user} && service = {:service}",
+		"",
+		500,
+		0,
+		map[string]any{
+			"user":    strings.TrimSpace(userID),
+			"service": onboardingTokenService,
+		},
+	)
+	if err != nil {
+		return
+	}
+
+	for _, record := range records {
+		if record == nil {
+			continue
+		}
+		_ = app.Delete(record)
+	}
+}

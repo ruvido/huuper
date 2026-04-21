@@ -1,6 +1,8 @@
 package requests
 
 import (
+	"database/sql"
+	"errors"
 	"log"
 	"strings"
 	"time"
@@ -12,6 +14,11 @@ import (
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 )
+
+type PromoteResult struct {
+	UserID  string
+	Created bool
+}
 
 func expectedCurrentStep(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any, expectedAction string) (FlowConfig, FlowStep, error) {
 	if record.GetBool("rejected") {
@@ -129,36 +136,36 @@ func ApplySetGroupAction(app *pocketbase.PocketBase, actor *core.Record, record 
 	return nil
 }
 
-func ApplyPromoteAction(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any) (string, error) {
+func ApplyPromoteAction(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any) (PromoteResult, error) {
 	if !actor.GetBool("admin") {
-		return "", apis.NewForbiddenError("forbidden_promote", nil)
+		return PromoteResult{}, apis.NewForbiddenError("forbidden_promote", nil)
 	}
 	if record.GetBool("rejected") {
-		return "", apis.NewBadRequestError("request_rejected", nil)
+		return PromoteResult{}, apis.NewBadRequestError("request_rejected", nil)
 	}
 
 	flow, err := LoadFlowForRequest(app, data)
 	if err != nil {
-		return "", apis.NewBadRequestError("invalid_requests_flow_settings", err)
+		return PromoteResult{}, apis.NewBadRequestError("invalid_requests_flow_settings", err)
 	}
 	stepIndex := EffectiveStepIndex(record, data, flow)
 	if stepIndex < len(flow.Steps) {
 		nextStep, hasNext := FlowStepAt(flow, stepIndex)
 		if !hasNext || nextStep.Action != FlowActionAdminApproved {
-			return "", apis.NewBadRequestError("invalid_promote_status", nil)
+			return PromoteResult{}, apis.NewBadRequestError("invalid_promote_status", nil)
 		}
 		ok, err := backendinternal.HasRoleForRequest(app, actor, record, nextStep.Role, RoleAdmin, RoleGuardian, RoleAssistant)
 		if err != nil {
-			return "", apis.NewBadRequestError("role_resolution_failed", err)
+			return PromoteResult{}, apis.NewBadRequestError("role_resolution_failed", err)
 		}
 		if !ok {
-			return "", apis.NewForbiddenError("forbidden_promote", nil)
+			return PromoteResult{}, apis.NewForbiddenError("forbidden_promote", nil)
 		}
 	}
 
 	email, err := backendinternal.NormalizeEmail(record.GetString("email"))
 	if err != nil {
-		return "", apis.NewBadRequestError("invalid_email", nil)
+		return PromoteResult{}, apis.NewBadRequestError("invalid_email", nil)
 	}
 
 	existing, err := app.FindFirstRecordByFilter(
@@ -166,19 +173,24 @@ func ApplyPromoteAction(app *pocketbase.PocketBase, actor *core.Record, record *
 		"email = {:email}",
 		map[string]any{"email": email},
 	)
-	if err == nil && existing != nil {
-		return "", apis.NewBadRequestError("user_already_exists", nil)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return PromoteResult{}, apis.NewBadRequestError("failed_user_lookup", err)
+	}
+	if existing != nil {
+		// Idempotent promote: if the user already exists for this email,
+		// treat the promote action as already completed.
+		return PromoteResult{UserID: existing.Id, Created: false}, nil
 	}
 
 	users, err := app.FindCollectionByNameOrId("users")
 	if err != nil {
-		return "", apis.NewNotFoundError("users_collection_not_found", err)
+		return PromoteResult{}, apis.NewNotFoundError("users_collection_not_found", err)
 	}
 
 	user := core.NewRecord(users)
 	tempPassword := backendinternal.RandomToken()
 	if tempPassword == "" {
-		return "", apis.NewBadRequestError("failed_to_generate_password", nil)
+		return PromoteResult{}, apis.NewBadRequestError("failed_to_generate_password", nil)
 	}
 	user.Set("email", email)
 	user.Set("password", tempPassword)
@@ -191,13 +203,13 @@ func ApplyPromoteAction(app *pocketbase.PocketBase, actor *core.Record, record *
 	}
 
 	if err := app.Save(user); err != nil {
-		return "", apis.NewBadRequestError("failed_to_create_user", err)
+		return PromoteResult{}, apis.NewBadRequestError("failed_to_create_user", err)
 	}
 
 	targetGroupIDs, err := promoteTargetGroupIDs(app, record)
 	if err != nil {
 		_ = app.Delete(user)
-		return "", err
+		return PromoteResult{}, err
 	}
 
 	createdInviteGroupIDs := generatePromoteInvites(
@@ -217,11 +229,16 @@ func ApplyPromoteAction(app *pocketbase.PocketBase, actor *core.Record, record *
 	onboardingToken, err := GenerateOnboardingToken(app, user.Id)
 	if err != nil {
 		rollbackPromotedUser(app, user.Id, createdInviteGroupIDs)
-		return "", apis.NewBadRequestError("failed_to_create_onboarding_token", err)
+		return PromoteResult{}, apis.NewBadRequestError("failed_to_create_onboarding_token", err)
 	}
-	data["onboarding_url"] = BuildOnboardingURL(app, onboardingToken)
+	onboardingURL := BuildOnboardingURL(app, onboardingToken)
+	if strings.TrimSpace(onboardingURL) == "" {
+		rollbackPromotedUser(app, user.Id, createdInviteGroupIDs)
+		return PromoteResult{}, apis.NewBadRequestError("invalid_onboarding_url", nil)
+	}
+	data["onboarding_url"] = onboardingURL
 
-	return user.Id, nil
+	return PromoteResult{UserID: user.Id, Created: true}, nil
 }
 
 // generatePromoteInvites tries to generate a telegram invite link for every
@@ -277,6 +294,10 @@ func promoteTargetGroupIDs(app *pocketbase.PocketBase, record *core.Record) ([]s
 }
 
 func rollbackPromotedUser(app *pocketbase.PocketBase, userID string, inviteGroupIDs []string) {
+	if app == nil || strings.TrimSpace(userID) == "" {
+		return
+	}
+
 	for _, groupID := range inviteGroupIDs {
 		group, err := app.FindRecordById("groups", strings.TrimSpace(groupID))
 		if err != nil || group == nil {
@@ -292,10 +313,25 @@ func rollbackPromotedUser(app *pocketbase.PocketBase, userID string, inviteGroup
 		}
 		_ = tginternal.DeleteInviteToken(app, userID, groupID)
 	}
+	deleteOnboardingTokensForUser(app, userID)
 	user, err := app.FindRecordById("users", userID)
 	if err == nil && user != nil {
 		_ = app.Delete(user)
 	}
+}
+
+func RollbackPromotedUser(app *pocketbase.PocketBase, userID string, record *core.Record) {
+	if app == nil || strings.TrimSpace(userID) == "" {
+		return
+	}
+
+	groupIDs := []string{}
+	if record != nil {
+		if ids, err := promoteTargetGroupIDs(app, record); err == nil {
+			groupIDs = ids
+		}
+	}
+	rollbackPromotedUser(app, userID, groupIDs)
 }
 
 func applyGroupAssignment(app *pocketbase.PocketBase, record *core.Record, data map[string]any, actor *core.Record, groupID string, filter string) error {

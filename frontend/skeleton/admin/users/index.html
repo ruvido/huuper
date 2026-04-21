@@ -1,0 +1,15 @@
+{{ define "content" }}
+<section id="admin-users-tabs" class="section-tabs" hidden>
+  <button id="admin-users-tab-approved" class="section-tab section-tab-current" type="button">
+    <span class="section-tab-text">Approved</span>
+    <span id="admin-users-count-approved" class="section-tab-count">0</span>
+  </button>
+  <button id="admin-users-tab-cancelled" class="section-tab" type="button">
+    <span class="section-tab-text">Cancelled</span>
+    <span id="admin-users-count-cancelled" class="section-tab-count">0</span>
+  </button>
+</section>
+<p id="admin-users-status" class="meta-text"></p>
+<section id="admin-users-list" class="list-card list-card-default" hidden></section>
+{{ end }}
+{{ define "page" }}{{ template "layout-admin" (dict "Title" "Huuper / Admin / Users" "TopbarTitle" "Users" "BackHref" "" "ProfileHref" "/admin/profile/" "ActiveNav" "" "Scripts" (list "/assets/js/core/auth.js" "/assets/js/core/guard-admin.js" "/assets/js/core/list-page.js" "/assets/js/core/entity-list.js" "/assets/js/admin/users.js")) }}{{ end }}

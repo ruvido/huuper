@@ -24,7 +24,9 @@ type Handlers struct {
 	RegistrationReject   func(e *core.RequestEvent) error
 	RegistrationCancel   func(e *core.RequestEvent) error
 	GroupSyncMemberships func(e *core.RequestEvent) error
+	UsersList           func(e *core.RequestEvent) error
 	UserDelete           func(e *core.RequestEvent) error
+	UserCancel           func(e *core.RequestEvent) error
 }
 
 func Register(se *core.ServeEvent, h Handlers) {
@@ -43,6 +45,8 @@ func Register(se *core.ServeEvent, h Handlers) {
 	se.Router.POST("/api/admin/registrations/{id}/reject", backendinternal.AdminOnly(h.RegistrationReject)).Bind(apis.RequireAuth())
 	se.Router.POST("/api/admin/registrations/{id}/cancel", backendinternal.AdminOnly(h.RegistrationCancel)).Bind(apis.RequireAuth())
 	se.Router.POST("/api/admin/groups/sync-memberships", backendinternal.AdminOnly(h.GroupSyncMemberships)).Bind(apis.RequireAuth())
+	se.Router.GET("/api/admin/users", backendinternal.AdminOnly(h.UsersList)).Bind(apis.RequireAuth())
 	se.Router.GET("/api/admin/users/{id}", backendinternal.AdminOnly(h.UserGet)).Bind(apis.RequireAuth())
+	se.Router.POST("/api/admin/users/{id}/cancel", backendinternal.AdminOnly(h.UserCancel)).Bind(apis.RequireAuth())
 	se.Router.DELETE("/api/admin/users/{id}", backendinternal.AdminOnly(h.UserDelete)).Bind(apis.RequireAuth())
 }

@@ -41,6 +41,7 @@ func ListForUser(app *pocketbase.PocketBase, userID string) ([]GroupListItem, er
 
 	groupIDs := make([]string, 0, len(membershipRelations)+len(tokenRelations))
 	groupTokens := make(map[string]string, len(tokenRelations))
+	memberships := make(map[string]struct{}, len(membershipRelations))
 	seen := make(map[string]struct{}, len(membershipRelations)+len(tokenRelations))
 
 	appendGroupID := func(groupID string) {
@@ -56,7 +57,12 @@ func ListForUser(app *pocketbase.PocketBase, userID string) ([]GroupListItem, er
 	}
 
 	for _, rel := range membershipRelations {
-		appendGroupID(rel.GetString("group"))
+		groupID := strings.TrimSpace(rel.GetString("group"))
+		if groupID == "" {
+			continue
+		}
+		memberships[groupID] = struct{}{}
+		appendGroupID(groupID)
 	}
 	for _, rel := range tokenRelations {
 		groupID := strings.TrimSpace(rel.GetString("group"))
@@ -113,6 +119,7 @@ func ListForUser(app *pocketbase.PocketBase, userID string) ([]GroupListItem, er
 			visibleRequestsCount = &count
 		}
 
+		_, isMember := memberships[groupID]
 		items = append(items, GroupListItem{
 			ID:            group.Id,
 			Name:          strings.TrimSpace(group.GetString("name")),
@@ -122,6 +129,7 @@ func ListForUser(app *pocketbase.PocketBase, userID string) ([]GroupListItem, er
 			MembersCount:  memberCounts[groupID],
 			RequestsCount: visibleRequestsCount,
 			InviteLink:    filteredTokens[groupID],
+			IsMember:      isMember,
 		})
 	}
 

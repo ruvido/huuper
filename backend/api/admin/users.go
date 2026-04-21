@@ -13,6 +13,76 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
+func UsersListHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		records, err := app.FindRecordsByFilter("users", "", "created", 500, 0)
+		if err != nil {
+			return apis.NewBadRequestError("failed_users", err)
+		}
+
+		items := make([]map[string]any, 0, len(records))
+		for _, user := range records {
+			if user == nil {
+				continue
+			}
+			items = append(items, map[string]any{
+				"id":        user.Id,
+				"email":     strings.TrimSpace(user.GetString("email")),
+				"full_name": groupinternal.UserDisplayName(user),
+				"status":    strings.TrimSpace(user.GetString("status")),
+				"admin":     user.GetBool("admin"),
+			})
+		}
+
+		return e.JSON(http.StatusOK, map[string]any{"items": items})
+	}
+}
+
+func CancelUserHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		userID := strings.TrimSpace(e.Request.PathValue("id"))
+		if userID == "" {
+			return apis.NewBadRequestError("invalid_user", nil)
+		}
+
+		user, err := app.FindRecordById("users", userID)
+		if err != nil || user == nil {
+			return apis.NewNotFoundError("user_not_found", err)
+		}
+
+		if strings.TrimSpace(user.GetString("status")) == "cancelled" {
+			return e.JSON(http.StatusOK, map[string]any{
+				"ok":     true,
+				"id":     userID,
+				"status": "already_cancelled",
+			})
+		}
+
+		removedMemberships, err := deleteUserGroupMemberships(app, userID)
+		if err != nil {
+			return apis.NewBadRequestError("failed_cleanup_user_groups", err)
+		}
+
+		clearedGroups, err := clearUserAsGroupAssistant(app, userID)
+		if err != nil {
+			return apis.NewBadRequestError("failed_cleanup_groups", err)
+		}
+
+		user.Set("status", "cancelled")
+		if err := app.Save(user); err != nil {
+			return apis.NewBadRequestError("failed_update_user_status", err)
+		}
+
+		return e.JSON(http.StatusOK, map[string]any{
+			"ok":                  true,
+			"id":                  userID,
+			"status":              "cancelled",
+			"removed_memberships": removedMemberships,
+			"cleared_groups":      clearedGroups,
+		})
+	}
+}
+
 func DeleteUserHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		userID := strings.TrimSpace(e.Request.PathValue("id"))

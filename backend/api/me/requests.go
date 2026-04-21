@@ -421,6 +421,7 @@ func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 
 		deleteRequest := false
 		promotedUserID := ""
+		promotedUserCreated := false
 		switch action {
 		case backendrequests.ActionSetGroup:
 			if err := backendrequests.ApplySetGroupAction(app, actor, record, data, strings.TrimSpace(payload.GroupID)); err != nil {
@@ -447,32 +448,37 @@ func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 				return apis.NewBadRequestError("invalid_requests_flow_settings", err)
 			}
 			if backendrequests.EffectiveStepIndex(record, data, flow) >= len(flow.Steps) {
-				userID, err := backendrequests.ApplyPromoteAction(app, actor, record, data)
+				promoteResult, err := backendrequests.ApplyPromoteAction(app, actor, record, data)
 				if err != nil {
 					notifyPromoteFailure(app, record, "auto-promote after admin approval", err)
 					return err
 				}
 				deleteRequest = true
-				promotedUserID = userID
+				promotedUserID = promoteResult.UserID
+				promotedUserCreated = promoteResult.Created
 			}
 		case backendrequests.ActionReject:
 			if err := backendrequests.ApplyRejectAction(actor, record, data, strings.TrimSpace(payload.Reason)); err != nil {
 				return err
 			}
 		case backendrequests.ActionPromote:
-			userID, err := backendrequests.ApplyPromoteAction(app, actor, record, data)
+			promoteResult, err := backendrequests.ApplyPromoteAction(app, actor, record, data)
 			if err != nil {
 				notifyPromoteFailure(app, record, "manual promote", err)
 				return err
 			}
 			deleteRequest = true
-			promotedUserID = userID
+			promotedUserID = promoteResult.UserID
+			promotedUserCreated = promoteResult.Created
 		default:
 			return apis.NewBadRequestError("unsupported_action", nil)
 		}
 
 		if deleteRequest {
 			if err := app.Delete(record); err != nil {
+				if promotedUserCreated && strings.TrimSpace(promotedUserID) != "" {
+					backendrequests.RollbackPromotedUser(app, promotedUserID, record)
+				}
 				return apis.NewBadRequestError("failed_to_delete_request", err)
 			}
 		} else if err := app.Save(record); err != nil {

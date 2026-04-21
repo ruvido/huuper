@@ -52,7 +52,10 @@ window.huuperRequestNoteSheet = (() => {
           } catch (error) {
             sheetButton.disabled = false;
             if (statusNode) {
-              window.huuperListPage.setStatus(statusNode, "Action unavailable.");
+              window.huuperListPage.setStatus(
+                statusNode,
+                window.huuperRequestActions.errorMessage(error, "Action unavailable."),
+              );
             }
             throw error;
           }

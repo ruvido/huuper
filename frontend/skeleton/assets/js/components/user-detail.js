@@ -20,6 +20,7 @@ window.huuperUserDetail = (() => {
   function init(config) {
     const statusNode = document.querySelector("#user-status");
     const summaryNode = document.querySelector("#user-summary");
+    const deleteButtonNode = document.querySelector("[data-request-reject]");
     const guardianLabelNode = document.querySelector("#user-guardian-label");
     const guardianDividerNode = guardianLabelNode ? guardianLabelNode.previousElementSibling : null;
     const requestsNode = document.querySelector("#user-requests");
@@ -34,6 +35,43 @@ window.huuperUserDetail = (() => {
     if (!id) {
       window.huuperListPage.setStatus(statusNode, "Missing user.");
       return;
+    }
+
+    const cancelCopy = (((window.huuperCopy || {}).ui || {}).admin || {}).user || {};
+    const cancelDialogCopy = cancelCopy.cancelDialog || {};
+    const cancelDialogTitle = window.huuperListPage.text(cancelDialogCopy.title) || "Set user as cancelled?";
+    const cancelDialogDescription = window.huuperListPage.text(cancelDialogCopy.description) || "The user will not be visible anymore in groups.";
+    const cancelDialogConfirmLabel = window.huuperListPage.text(cancelDialogCopy.confirmLabel) || "Cancel user";
+    const cancelDialogFallbackError = window.huuperListPage.text(cancelDialogCopy.fallbackError) || "Cancel unavailable.";
+
+    if (deleteButtonNode && typeof config.cancelURL === "function" && window.huuperActionSheet) {
+      deleteButtonNode.addEventListener("click", () => {
+        window.huuperActionSheet.open({
+          title: cancelDialogTitle,
+          contentHTML: `<p class="meta-text">${window.huuperListPage.escapeHTML(cancelDialogDescription)}</p>`,
+          footerAction: {
+            label: cancelDialogConfirmLabel,
+            tone: "danger",
+            onSelect: async () => {
+              try {
+                window.huuperListPage.setStatus(statusNode, "");
+                await Promise.all([
+                  window.huuperAuth.apiFetch(config.cancelURL(id), { method: "POST" }),
+                  new Promise((resolve) => setTimeout(resolve, 800)),
+                ]);
+                window.location.href = `/${config.scope}/users/`;
+                await new Promise(() => {});
+              } catch (error) {
+                const message = window.huuperRequestActions && typeof window.huuperRequestActions.errorMessage === "function"
+                  ? window.huuperRequestActions.errorMessage(error, cancelDialogFallbackError)
+                  : cancelDialogFallbackError;
+                window.huuperListPage.setStatus(statusNode, message);
+                throw error;
+              }
+            },
+          },
+        });
+      });
     }
 
     window.huuperAuth.apiFetch(config.detailURL(id)).then((payload) => {

@@ -77,7 +77,7 @@ func RegisterEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 				"email = {:email}",
 				map[string]any{"email": recipient},
 			)
-			if err == nil && user != nil && strings.TrimSpace(user.GetString("status")) == "active" {
+			if err == nil && user != nil && strings.TrimSpace(user.GetString("status")) == "approved" {
 				linkedUser = user
 			}
 		}

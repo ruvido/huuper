@@ -95,8 +95,11 @@ func NormalizePhone(raw string) (string, error) {
 	}
 
 	compact := strings.Join(strings.Fields(trimmed), "")
+	if strings.HasPrefix(compact, "00") {
+		compact = "+" + strings.TrimPrefix(compact, "00")
+	}
 	if !strings.HasPrefix(compact, "+") {
-		return "", fmt.Errorf("missing phone prefix")
+		compact = "+" + compact
 	}
 
 	digits := strings.TrimPrefix(compact, "+")
