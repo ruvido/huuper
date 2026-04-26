@@ -102,6 +102,7 @@ window.huuperAuth = (() => {
 
   function persist(payload) {
     localStorage.setItem(storageKey, JSON.stringify(payload));
+    window.dispatchEvent(new CustomEvent("huuper:auth", { detail: payload }));
   }
 
   function clear() {

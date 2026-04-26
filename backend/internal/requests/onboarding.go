@@ -102,7 +102,7 @@ func DeleteOnboardingToken(app *pocketbase.PocketBase, token string) error {
 	return app.Delete(tokenRecord)
 }
 
-func deleteOnboardingTokensForUser(app *pocketbase.PocketBase, userID string) {
+func DeleteOnboardingTokensForUser(app *pocketbase.PocketBase, userID string) {
 	if app == nil || strings.TrimSpace(userID) == "" {
 		return
 	}

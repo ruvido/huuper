@@ -7,6 +7,7 @@ import (
 	backendinternal "members/backend/internal"
 	groupinternal "members/backend/internal/groups"
 	requestinternal "members/backend/internal/requests"
+	tginternal "members/backend/internal/telegram"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
@@ -25,12 +26,20 @@ func UsersListHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) err
 			if user == nil {
 				continue
 			}
+			data := backendinternal.ParseJSONMap(user.Get("data"))
+			region := ""
+			if v, ok := data["region"].(string); ok {
+				region = strings.TrimSpace(v)
+			}
 			items = append(items, map[string]any{
 				"id":        user.Id,
 				"email":     strings.TrimSpace(user.GetString("email")),
 				"full_name": groupinternal.UserDisplayName(user),
 				"status":    strings.TrimSpace(user.GetString("status")),
 				"admin":     user.GetBool("admin"),
+				"avatar":    strings.TrimSpace(user.GetString("avatar")),
+				"region":    region,
+				"data":      data,
 			})
 		}
 
@@ -57,6 +66,10 @@ func CancelUserHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) er
 				"status": "already_cancelled",
 			})
 		}
+
+		tginternal.RevokeAndDeleteUserInviteTokens(app, userID)
+		tginternal.DeleteUserTelegramAuthTokens(app, userID)
+		requestinternal.DeleteOnboardingTokensForUser(app, userID)
 
 		removedMemberships, err := deleteUserGroupMemberships(app, userID)
 		if err != nil {
@@ -94,6 +107,10 @@ func DeleteUserHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) er
 		if err != nil || user == nil {
 			return apis.NewNotFoundError("user_not_found", err)
 		}
+
+		tginternal.RevokeAndDeleteUserInviteTokens(app, userID)
+		tginternal.DeleteUserTelegramAuthTokens(app, userID)
+		requestinternal.DeleteOnboardingTokensForUser(app, userID)
 
 		removedMemberships, err := deleteUserGroupMemberships(app, userID)
 		if err != nil {

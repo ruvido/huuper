@@ -10,6 +10,7 @@
   const approvedCountNode = document.querySelector("#admin-users-count-approved");
   const cancelledCountNode = document.querySelector("#admin-users-count-cancelled");
   const listNode = document.querySelector("#admin-users-list");
+  const filterBarNode = document.querySelector("#admin-users-filter");
 
   if (!statusNode || !tabsNode || !approvedTabNode || !cancelledTabNode || !approvedCountNode || !cancelledCountNode || !listNode) {
     return;
@@ -18,25 +19,134 @@
   let activeTab = "approved";
   let allItems = [];
 
+  const params = new URLSearchParams(window.location.search);
+  const filters = {
+    region: params.get("region") || "",
+    age: params.get("age") || "",
+    marital: params.get("marital") || "",
+    work: params.get("work") || "",
+    sport: params.get("sport") || "",
+    interest: params.get("interest") || "",
+    skill: params.get("skill") || "",
+  };
+
+  const FILTER_LABELS = {
+    region: "Regione",
+    age: "Età",
+    marital: "Stato",
+    work: "Settore",
+    sport: "Sport",
+    interest: "Interesse",
+    skill: "Skill",
+  };
+
+  function ageInBucket(birthYear, bucket) {
+    const year = Number(birthYear);
+    if (!year) return false;
+    const age = new Date().getFullYear() - year;
+    if (bucket === "nd") return false;
+    if (bucket === "55+") return age >= 55;
+    const [lo, hi] = bucket.split("-").map(Number);
+    return age >= lo && age <= hi;
+  }
+
+  function arrayContains(raw, needle) {
+    if (!Array.isArray(raw)) return false;
+    const target = needle.trim().toLowerCase();
+    for (const item of raw) {
+      if (typeof item !== "string") continue;
+      const parts = item.split(/[\n,;/]+/).map((p) => p.trim().toLowerCase());
+      if (parts.includes(target)) return true;
+    }
+    return false;
+  }
+
+  function matchesFilters(user) {
+    const data = user && user.data ? user.data : {};
+    if (filters.region) {
+      if (filters.region === "nd") {
+        if ((data.region || "").trim()) return false;
+      } else if ((data.region || "").trim() !== filters.region) {
+        return false;
+      }
+    }
+    if (filters.age) {
+      if (filters.age === "nd") {
+        if (data.birth_year) return false;
+      } else if (!ageInBucket(data.birth_year, filters.age)) {
+        return false;
+      }
+    }
+    if (filters.marital) {
+      if (filters.marital === "nd") {
+        if ((data.marital_status || "").trim()) return false;
+      } else if ((data.marital_status || "").trim() !== filters.marital) {
+        return false;
+      }
+    }
+    if (filters.work) {
+      if (filters.work === "nd") {
+        if ((data.work || "").trim()) return false;
+      } else if ((data.work || "").trim() !== filters.work) {
+        return false;
+      }
+    }
+    if (filters.sport && !arrayContains(data.sports, filters.sport)) return false;
+    if (filters.interest && !arrayContains(data.interests, filters.interest)) return false;
+    if (filters.skill && !arrayContains(data.skills, filters.skill)) return false;
+    return true;
+  }
+
+  function activeFilterChips() {
+    return Object.entries(filters)
+      .filter(([, v]) => v)
+      .map(([k, v]) => ({ key: k, label: FILTER_LABELS[k] || k, value: v }));
+  }
+
+  function renderFilterBar() {
+    if (!filterBarNode) return;
+    const chips = activeFilterChips();
+    if (chips.length === 0) {
+      filterBarNode.hidden = true;
+      filterBarNode.innerHTML = "";
+      return;
+    }
+    filterBarNode.hidden = false;
+    filterBarNode.innerHTML =
+      chips
+        .map(
+          (c) => `<span class="filter-chip">
+        <span class="filter-chip-label">${window.huuperListPage.escapeHTML(c.label)}</span>
+        <span class="filter-chip-value">${window.huuperListPage.escapeHTML(c.value)}</span>
+      </span>`
+        )
+        .join("") +
+      `<a class="filter-chip-clear" href="/admin/users/">Reset</a>`;
+  }
+
   function renderItem(item) {
+    const href = `/admin/user/?id=${encodeURIComponent(item.id)}`;
+    if (window.huuperListItem && window.huuperListItem.renderMember) {
+      return window.huuperListItem.renderMember(item, href);
+    }
     const status = window.huuperListPage.text(item.status);
     const role = item && item.admin === true ? "admin" : "";
     const meta = [status, role].filter(Boolean).join(" • ");
-    const href = `/admin/user/?id=${encodeURIComponent(item.id)}`;
     const title = window.huuperListPage.text(item.full_name) || window.huuperListPage.text(item.email) || item.id;
     return window.huuperListPage.renderListItemLink(href, title, meta);
   }
 
   function render() {
-    const approved = allItems.filter((u) => window.huuperListPage.text(u.status) !== "cancelled");
-    const cancelled = allItems.filter((u) => window.huuperListPage.text(u.status) === "cancelled");
+    const filtered = allItems.filter(matchesFilters);
+    const approved = filtered.filter((u) => window.huuperListPage.text(u.status) !== "cancelled");
+    const cancelled = filtered.filter((u) => window.huuperListPage.text(u.status) === "cancelled");
 
     approvedCountNode.textContent = String(approved.length);
     cancelledCountNode.textContent = String(cancelled.length);
     approvedTabNode.classList.toggle("section-tab-current", activeTab === "approved");
     cancelledTabNode.classList.toggle("section-tab-current", activeTab === "cancelled");
 
-    tabsNode.hidden = allItems.length === 0;
+    tabsNode.hidden = filtered.length === 0;
 
     const visibleItems = activeTab === "cancelled" ? cancelled : approved;
 
@@ -65,6 +175,7 @@
   function load() {
     window.huuperAuth.apiFetch("/api/admin/users").then((payload) => {
       allItems = Array.isArray(payload.items) ? payload.items : [];
+      renderFilterBar();
       render();
     }).catch(() => {
       window.huuperListPage.setStatus(statusNode, "Users unavailable.");

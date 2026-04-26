@@ -127,6 +127,7 @@ func main() {
 				log.Printf("Failed to start Telegram bot: %v", err)
 			} else {
 				go tginternal.BackfillDefaultGroupInvites(app)
+				tginternal.StartDefaultGroupInvitesSchedule(app)
 			}
 		}
 

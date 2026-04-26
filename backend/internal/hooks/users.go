@@ -34,6 +34,13 @@ func normalizeUserEmailAndValidateUnique(app core.App, record *core.Record) erro
 	}
 	record.Set("email", email)
 
+	if original := record.Original(); original != nil {
+		previous := strings.ToLower(strings.TrimSpace(original.GetString("email")))
+		if previous == email {
+			return nil
+		}
+	}
+
 	records, err := app.FindRecordsByFilter("users", "", "", 0, 0)
 	if err != nil {
 		return apis.NewBadRequestError("failed_to_validate_email_uniqueness", err)

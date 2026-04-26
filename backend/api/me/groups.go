@@ -126,11 +126,6 @@ func GroupGetHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) erro
 			return err
 		}
 
-		members, err := app.FindRecordsByFilter("user_groups", "group = {:group}", "", 500, 0, map[string]any{"group": group.Id})
-		if err != nil {
-			return apis.NewBadRequestError("failed_group_memberships", err)
-		}
-
 		requestsVisible := true
 		requestsCount := 0
 		pendingRequests := []groupinternal.PendingRequestItem{}
@@ -184,7 +179,7 @@ func GroupGetHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) erro
 			"name":             group.GetString("name"),
 			"type":             group.GetString("type"),
 			"description":      group.GetString("description"),
-			"members_count":    len(members),
+			"members_count":    len(membersResponse.Items),
 			"requests_visible": requestsVisible,
 			"requests_count":   requestsCount,
 			"pending_requests": pendingRequests,

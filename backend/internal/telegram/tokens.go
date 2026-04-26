@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"log"
 	"strings"
 	"time"
 
@@ -69,6 +70,72 @@ func GenerateInviteToken(app *pocketbase.PocketBase, userID string, groupID stri
 
 func DeleteInviteToken(app core.App, userID string, groupID string) error {
 	return deleteUserTokensByService(app, userID, inviteTokenService, groupID)
+}
+
+// RevokeAndDeleteUserInviteTokens revokes every outstanding Telegram invite
+// link previously issued to the user and deletes the matching token records.
+// Best-effort: a single failing group (missing chat_id, revoke error, ...)
+// does not abort the loop so the caller can proceed with the broader cleanup.
+func RevokeAndDeleteUserInviteTokens(app *pocketbase.PocketBase, userID string) {
+	userID = strings.TrimSpace(userID)
+	if app == nil || userID == "" {
+		return
+	}
+
+	tokens, err := app.FindRecordsByFilter(
+		"tokens",
+		"user = {:user} && service = {:service}",
+		"",
+		0,
+		0,
+		map[string]any{
+			"user":    userID,
+			"service": inviteTokenService,
+		},
+	)
+	if err != nil {
+		log.Printf("[cancel] user=%s failed to load invite tokens: %v", userID, err)
+		return
+	}
+
+	for _, token := range tokens {
+		if token == nil {
+			continue
+		}
+		groupID := strings.TrimSpace(token.GetString("group"))
+		link := strings.TrimSpace(token.GetString("token"))
+
+		if groupID != "" && link != "" {
+			if group, err := app.FindRecordById("groups", groupID); err == nil && group != nil {
+				if chatID, chatErr := TelegramChatIDForGroup(group); chatErr == nil {
+					if revokeErr := RevokeInviteLink(chatID, link); revokeErr != nil {
+						log.Printf("[cancel] user=%s group=%s revoke failed (non-blocking): %v", userID, groupID, revokeErr)
+					}
+				} else {
+					log.Printf("[cancel] user=%s group=%s missing chat_id, skipping revoke: %v", userID, groupID, chatErr)
+				}
+			} else {
+				log.Printf("[cancel] user=%s group=%s group lookup failed, skipping revoke: %v", userID, groupID, err)
+			}
+		}
+
+		if delErr := app.Delete(token); delErr != nil {
+			log.Printf("[cancel] user=%s group=%s failed to delete invite token: %v", userID, groupID, delErr)
+		}
+	}
+}
+
+// DeleteUserTelegramAuthTokens removes any pending telegram-binding tokens for
+// the user. Separate from invite tokens — these are the short-lived codes used
+// to associate a Telegram account with a webapp user.
+func DeleteUserTelegramAuthTokens(app *pocketbase.PocketBase, userID string) {
+	userID = strings.TrimSpace(userID)
+	if app == nil || userID == "" {
+		return
+	}
+	if err := deleteUserTokensByService(app, userID, "telegram", ""); err != nil {
+		log.Printf("[cancel] user=%s failed to delete telegram auth tokens: %v", userID, err)
+	}
 }
 
 func deleteUserTokensByService(app core.App, userID string, service string, groupID string) error {

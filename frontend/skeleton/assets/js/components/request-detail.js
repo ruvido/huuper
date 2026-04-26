@@ -71,21 +71,12 @@ window.huuperRequestDetail = (() => {
     return titleCase(spaced) || raw;
   }
 
-  function processSignature(prefix, who, at) {
-    const cleanPrefix = text(prefix);
+  function completedByLine(who) {
     const cleanWho = personLabel(who);
-    const parts = [];
-    if (cleanPrefix) {
-      parts.push(cleanPrefix);
-    }
-    if (cleanWho) {
-      parts.push(`by ${cleanWho}`);
-    }
-    const rendered = parts.join(" ").trim();
-    if (!rendered) {
+    if (!cleanWho) {
       return "";
     }
-    return rendered;
+    return `Completed by ${cleanWho}`;
   }
 
   function processNote(rawHTML, rawText) {
@@ -110,15 +101,14 @@ window.huuperRequestDetail = (() => {
     return {};
   }
 
-  function processStep(options) {
+  function renderTimelineStep(options) {
     const title = text(options.title);
-    const info = text(options.info);
     const date = dateOnly(options.date);
     const valueHTML = typeof options.valueHTML === "string" ? options.valueHTML : "";
     const value = text(options.valueText);
     const subtitle = text(options.subtitle);
     const subtitleClass = text(options.subtitleClass);
-    const signature = processSignature(options.signaturePrefix, options.signatureWho, options.signatureAt);
+    const completedBy = completedByLine(options.completedBy);
     const note = processNote(options.noteHTML, options.noteText);
     const noteClass = text(options.noteClass);
     const noteBodyClass = text(options.noteBodyClass) || "request-process-note-body";
@@ -149,23 +139,27 @@ window.huuperRequestDetail = (() => {
           <div class="request-process-head">
             ${title ? `
               <div class="request-process-label-col">
-                <div class="request-process-label-wrap">
+                <div class="request-process-title-row">
                   <p class="request-detail-term request-process-label">${escapeHTML(title)}</p>
+                  ${date ? `
+                    <div class="request-process-head-meta">
+                      <p class="request-process-date">${escapeHTML(date)}</p>
+                    </div>
+                  ` : ""}
                   ${current && !completed && !hasVisibleInfoNoteInTimeline && (infoNoteHTML || infoNoteText) ? `<button type="button" class="request-process-info" data-info-title="${escapeHTML(title)}"${infoNoteHTML ? ` data-info-html="${escapeHTML(encodeURIComponent(infoNoteHTML))}"` : ""}${infoNoteText ? ` data-info-text="${escapeHTML(encodeURIComponent(infoNoteText))}"` : ""} aria-label="${escapeHTML(`${title} info`)}">i</button>` : ""}
                 </div>
-                ${(value || date || subtitle || (completed && signature && options.showSignature !== false)) ? `
-                  <div class="request-process-meta">
-                    ${date ? `<p class="request-process-date">${escapeHTML(date)}</p>` : ""}
-                    ${valueHTML ? `<div class="request-process-value">${valueHTML}</div>` : value ? `<div class="request-process-value">${escapeHTML(value)}</div>` : ""}
-                    ${subtitle ? `<p class="request-process-subtitle${subtitleClass ? ` ${subtitleClass}` : ""}">${escapeHTML(subtitle)}</p>` : ""}
-                  </div>
-                ` : ""}
               </div>
             ` : ""}
           </div>
-          ${flowNoteHTML ? `<div class="request-process-flow-note">${flowNoteHTML}</div>` : flowNoteText ? `<p class="request-process-flow-note">${escapeHTML(flowNoteText)}</p>` : ""}
-          ${note ? `<div class="request-process-note${noteClass ? ` ${noteClass}` : ""}"><div class="${noteBodyClass}">${note}</div></div>` : ""}
-          ${(completed && signature && options.showSignature !== false) ? `<p class="request-process-signature">${escapeHTML(signature)}</p>` : ""}
+          ${(flowNoteHTML || flowNoteText || note || valueHTML || value || subtitle) ? `
+            <div class="request-process-body">
+              ${flowNoteHTML ? `<div class="request-process-flow-note">${flowNoteHTML}</div>` : flowNoteText ? `<p class="request-process-flow-note">${escapeHTML(flowNoteText)}</p>` : ""}
+              ${note ? `<div class="request-process-note${noteClass ? ` ${noteClass}` : ""}"><div class="${noteBodyClass}">${note}</div></div>` : ""}
+              ${!note && valueHTML ? `<div class="request-process-value">${valueHTML}</div>` : !note && value ? `<p class="request-process-value">${escapeHTML(value)}</p>` : ""}
+              ${!note && subtitle ? `<p class="request-process-subtitle${subtitleClass ? ` ${subtitleClass}` : ""}">${escapeHTML(subtitle)}</p>` : ""}
+            </div>
+          ` : ""}
+          ${completedBy ? `<p class="request-process-signature">${escapeHTML(completedBy)}</p>` : ""}
         </div>
       </article>
     `;
@@ -191,13 +185,20 @@ window.huuperRequestDetail = (() => {
       }
       const who = personLabel(note && note.by);
       const when = dateOnly(note && note.at);
+      const metaParts = [];
+      if (when) {
+        metaParts.push(`\u2014 ${when}`);
+      }
+      if (who) {
+        metaParts.push(who);
+      }
+      const meta = metaParts.join(" \u2022 ");
       return `
         <div>
-          <p class="request-notes-meta">
-            ${when ? `<span>${escapeHTML(when)}</span>` : "<span></span>"}
-            ${who ? `<span class="request-notes-author">${escapeHTML(who)}</span>` : ""}
+          <p>
+            ${escapeHTML(noteText)}
+            ${meta ? ` <span class="request-notes-meta-inline">${escapeHTML(meta)}</span>` : ""}
           </p>
-          <p>${escapeHTML(noteText)}</p>
         </div>
       `;
     }).filter(Boolean).join("");
@@ -252,9 +253,7 @@ window.huuperRequestDetail = (() => {
               current: isCurrent,
               date: groupAssignedAt,
               subtitle: "",
-              signaturePrefix: completed && groupAssignedBy ? "Completed" : (groupAssignedBy ? "Assigned" : ""),
-              signatureWho: groupAssignedBy,
-              signatureAt: groupAssignedAt,
+              completedBy: groupAssignedBy,
               flowNoteHTML: completed ? "" : flowNote.html,
               flowNoteText: completed ? "" : flowNote.text,
               variantClass: "request-process-step-group",
@@ -275,9 +274,7 @@ window.huuperRequestDetail = (() => {
               current: isCurrent,
               date: guardianData.assigned_at,
               subtitle: "",
-              signaturePrefix: completed && text(guardianData.assigned_by) ? "Completed" : (text(guardianData.assigned_by) ? "Assigned" : ""),
-              signatureWho: guardianData.assigned_by || payload.guardian_name,
-              signatureAt: guardianData.assigned_at,
+              completedBy: guardianData.assigned_by || payload.guardian_name,
               flowNoteHTML: completed ? "" : flowNote.html,
               flowNoteText: completed ? "" : flowNote.text,
               valueHTML: "",
@@ -292,9 +289,7 @@ window.huuperRequestDetail = (() => {
             completed: mentoringDoneAt !== "",
             current: isCurrent,
             date: mentoringDoneAt,
-            signaturePrefix: "Completed",
-            signatureWho: mentoringDoneBy,
-            signatureAt: mentoringDoneAt,
+            completedBy: mentoringDoneBy,
             flowNoteHTML: mentoringNotesHTML ? "" : undefined,
             flowNoteText: mentoringNotesHTML ? "" : undefined,
             noteBodyClass: "request-process-note-content-body",
@@ -308,9 +303,7 @@ window.huuperRequestDetail = (() => {
             date: data.group_approved_at,
             subtitle: text(data.group_approved_at) !== "" ? "Approved" : "",
             subtitleClass: "request-process-subtitle-content",
-            signaturePrefix: "Completed",
-            signatureWho: data.group_approved_by,
-            signatureAt: data.group_approved_at,
+            completedBy: data.group_approved_by,
             flowNoteHTML: text(data.group_approved_at) !== "" ? "" : undefined,
             flowNoteText: text(data.group_approved_at) !== "" ? "" : undefined,
             noteText: "",
@@ -322,9 +315,7 @@ window.huuperRequestDetail = (() => {
             date: data.admin_approved_at,
             subtitle: text(data.admin_approved_at) !== "" ? "Approved" : "",
             subtitleClass: "request-process-subtitle-content",
-            signaturePrefix: "Completed",
-            signatureWho: data.admin_approved_by,
-            signatureAt: data.admin_approved_at,
+            completedBy: data.admin_approved_by,
             flowNoteHTML: text(data.admin_approved_at) !== "" ? "" : undefined,
             flowNoteText: text(data.admin_approved_at) !== "" ? "" : undefined,
             noteText: "",
@@ -346,9 +337,8 @@ window.huuperRequestDetail = (() => {
       const displayTitle = text(step && step.label);
       const stepFlowNoteHTML = state.flowNoteHTML !== undefined ? state.flowNoteHTML : text(step && step.notes_html);
       const stepFlowNoteText = state.flowNoteText !== undefined ? state.flowNoteText : text(step && step.notes);
-      return processStep({
+      return renderTimelineStep({
         title: displayTitle,
-        info: text(step && step.info),
         flowNoteHTML: stepFlowNoteHTML,
         flowNoteText: stepFlowNoteText,
         infoNoteHTML: text(step && step.notes_html),
@@ -357,9 +347,7 @@ window.huuperRequestDetail = (() => {
         current: state.current === true,
         date: state.date,
         subtitle: state.subtitle,
-        signaturePrefix: state.signaturePrefix,
-        signatureWho: state.signatureWho,
-        signatureAt: state.signatureAt,
+        completedBy: state.completedBy,
         noteHTML: state.noteHTML,
         noteText: state.noteText,
         valueHTML: state.valueHTML,
@@ -507,16 +495,16 @@ window.huuperRequestDetail = (() => {
             submitLabel: "Add",
             emptyStatus: "Write a note.",
             statusNode,
-            onSubmit: async (note) => {
-              await window.huuperAuth.apiFetch(config.actionURL(id), {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
+            onSubmit: async (note, sheetButton) => {
+              await window.huuperRequestActions.submitAndRedirect({
+                actionURL: config.actionURL(id),
+                body: {
                   action: "add_mentoring_note",
                   mentoring_notes: note,
-                }),
+                },
+                button: sheetButton,
+                redirectURL: config.requestsURL,
               });
-              await refreshDetail();
             },
           });
         });

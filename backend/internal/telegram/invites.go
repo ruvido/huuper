@@ -33,6 +33,9 @@ func DefaultGroupInvite(app *pocketbase.PocketBase, actor *core.Record) (string,
 	if actor == nil {
 		return "", "", apis.NewUnauthorizedError("Unauthorized", nil)
 	}
+	if strings.TrimSpace(actor.GetString("status")) == "cancelled" {
+		return "", "", apis.NewForbiddenError("user_cancelled", nil)
+	}
 	log.Printf("[default-invite] user=%s request started", strings.TrimSpace(actor.Id))
 
 	group, err := app.FindFirstRecordByFilter("groups", "type = 'local'", map[string]any{})
@@ -127,6 +130,9 @@ func ConsumeMemberInvite(app *pocketbase.PocketBase, inviteLink string) (*core.R
 func GenerateGroupInvite(app *pocketbase.PocketBase, user *core.Record, group *core.Record) (string, error) {
 	if user == nil {
 		return "", apis.NewBadRequestError("missing_user", nil)
+	}
+	if strings.TrimSpace(user.GetString("status")) == "cancelled" {
+		return "", apis.NewForbiddenError("user_cancelled", nil)
 	}
 	if group == nil {
 		return "", apis.NewBadRequestError("missing_group", nil)

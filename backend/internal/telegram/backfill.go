@@ -13,6 +13,8 @@ import (
 	"github.com/pocketbase/pocketbase"
 )
 
+const sundayEveningStartHour = 20
+
 func BackfillDefaultGroupInvites(app *pocketbase.PocketBase) {
 	defaultGroup, err := app.FindFirstRecordByFilter(
 		"groups",
@@ -119,6 +121,36 @@ func BackfillDefaultGroupInvites(app *pocketbase.PocketBase) {
 	}
 }
 
+func StartDefaultGroupInvitesSchedule(app *pocketbase.PocketBase) {
+	now := time.Now()
+	lastSentYear, lastSentWeek := 0, 0
+	if isSundayEvening(now) {
+		lastSentYear, lastSentWeek = now.ISOWeek()
+	}
+
+	go func() {
+		ticker := time.NewTicker(30 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			current := time.Now()
+			if !isSundayEvening(current) {
+				continue
+			}
+			year, week := current.ISOWeek()
+			if year == lastSentYear && week == lastSentWeek {
+				continue
+			}
+			log.Printf("[backfill] running weekly sunday-evening default-group scan")
+			BackfillDefaultGroupInvites(app)
+			lastSentYear, lastSentWeek = year, week
+		}
+	}()
+}
+
+func isSundayEvening(now time.Time) bool {
+	return now.Weekday() == time.Sunday && now.Hour() >= sundayEveningStartHour
+}
+
 func resolveLocalGroupName(app *pocketbase.PocketBase, userID string) string {
 	memberships, err := app.FindRecordsByFilter(
 		"user_groups",
@@ -157,4 +189,3 @@ func daysSince(t time.Time, now time.Time) int {
 	}
 	return int(math.Floor(diff))
 }
-

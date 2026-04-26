@@ -1,5 +1,106 @@
 {{ define "content" }}
-<p id="admin-status" class="meta-text"></p>
-<section id="admin-summary" class="list-card" hidden></section>
+<section class="dashboard">
+  <p id="admin-status" class="meta-text"></p>
+
+  <header class="dashboard-hero" id="admin-hero" hidden>
+    <h1 class="dashboard-title" id="admin-hero-title"></h1>
+  </header>
+
+  <section class="dashboard-block" id="block-metrics" hidden>
+    <div class="dashboard-hdr">
+      <h2>Metriche chiave · 30g</h2>
+    </div>
+    <article class="dashboard-card dashboard-multichart">
+      <div class="mc-legend" id="mc-legend"></div>
+      <svg class="mc-svg" id="mc-svg" viewBox="0 0 340 180" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
+      <div class="mc-axis" id="mc-axis"></div>
+    </article>
+  </section>
+
+  <section class="dashboard-block" id="block-regions" hidden>
+    <div class="dashboard-hdr">
+      <h2>Dove vivono</h2>
+      <span id="regions-meta"></span>
+    </div>
+    <article class="dashboard-card">
+      <div class="dashboard-card-hd">
+        <h3>Distribuzione per regione</h3>
+        <span id="regions-total"></span>
+      </div>
+      <div class="hbar" id="regions-chart"></div>
+    </article>
+  </section>
+
+  <section class="dashboard-block" id="block-age" hidden>
+    <div class="dashboard-hdr">
+      <h2>Generazioni</h2>
+      <span id="age-meta"></span>
+    </div>
+    <article class="dashboard-card">
+      <div class="dashboard-card-hd">
+        <h3>Fascia d'età</h3>
+        <span id="age-total"></span>
+      </div>
+      <div class="hbar" id="age-chart"></div>
+    </article>
+  </section>
+
+  <section class="dashboard-block" id="block-marital" hidden>
+    <div class="dashboard-hdr">
+      <h2>Vita personale</h2>
+      <span id="marital-meta"></span>
+    </div>
+    <article class="dashboard-card">
+      <div class="dashboard-card-hd">
+        <h3>Stato relazionale</h3>
+        <span id="marital-total"></span>
+      </div>
+      <div class="hbar" id="marital-chart"></div>
+    </article>
+  </section>
+
+  <section class="dashboard-block" id="block-work" hidden>
+    <div class="dashboard-hdr">
+      <h2>Cosa fanno</h2>
+      <span>settori</span>
+    </div>
+    <article class="dashboard-card">
+      <div class="dashboard-card-hd">
+        <h3>Settori professionali</h3>
+        <span id="work-total"></span>
+      </div>
+      <div class="hbar" id="work-chart"></div>
+    </article>
+  </section>
+
+  <section class="dashboard-block" id="block-passions" hidden>
+    <div class="dashboard-hdr">
+      <h2>Passioni</h2>
+      <span>top</span>
+    </div>
+    <article class="dashboard-card">
+      <div class="dashboard-card-hd">
+        <h3>Top nella community</h3>
+        <div class="mini-tabs" id="passion-tabs" role="tablist">
+          <button type="button" class="active" data-p="sports">Sport</button>
+          <button type="button" data-p="interests">Interessi</button>
+          <button type="button" data-p="skills">Skills</button>
+        </div>
+      </div>
+      <div class="hbar" id="passion-chart"></div>
+    </article>
+  </section>
+
+  <section class="dashboard-block" id="block-next-event" hidden>
+    <div class="dashboard-hdr">
+      <h2>Agenda</h2>
+      <span>prossimo evento</span>
+    </div>
+    <a class="next-event" id="next-event-link" href="#">
+      <span class="next-event-title" id="next-event-title"></span>
+      <span class="next-event-meta" id="next-event-meta"></span>
+    </a>
+  </section>
+</section>
 {{ end }}
-{{ define "page" }}{{ template "layout-admin" (dict "Title" "Huuper / Admin" "TopbarTitle" "Dashboard" "BackHref" "" "ProfileHref" "/admin/profile/" "ActiveNav" "dashboard" "Scripts" (list "/assets/js/core/auth.js" "/assets/js/core/guard-admin.js" "/assets/js/core/list-page.js" "/assets/js/admin/dashboard.js")) }}{{ end }}
+{{ define "page" }}{{ template "layout-admin" (dict "Title" "Huuper / Admin" "TopbarTitle" "Overview" "BackHref" "" "ProfileHref" "/admin/profile/" "ActiveNav" "dashboard" "Scripts" (list "/assets/js/core/auth.js" "/assets/js/core/guard-admin.js" "/assets/js/core/list-page.js" "/assets/js/admin/dashboard.js")) }}{{ end }}

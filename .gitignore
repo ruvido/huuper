@@ -1,9 +1,13 @@
 # PocketBase
+BUG.md
+rollback
+backups
 .codex
 .claude
 frontend/site
 .cache
 data/
+data.*
 pocketbase
 extra/bin/
 extra/

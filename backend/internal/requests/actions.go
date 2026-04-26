@@ -337,7 +337,7 @@ func rollbackPromotedUser(app *pocketbase.PocketBase, userID string, inviteGroup
 		}
 		_ = tginternal.DeleteInviteToken(app, userID, groupID)
 	}
-	deleteOnboardingTokensForUser(app, userID)
+	DeleteOnboardingTokensForUser(app, userID)
 	user, err := app.FindRecordById("users", userID)
 	if err == nil && user != nil {
 		_ = app.Delete(user)

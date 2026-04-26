@@ -23,7 +23,7 @@ func BuildPendingDefaultGroupEmail(groupName string, users []PendingDefaultGroup
 		displayGroup = "default group"
 	}
 
-	subject := fmt.Sprintf("[Huuper] %d utenti non ancora in %s", len(users), displayGroup)
+	subject := fmt.Sprintf("%d users not yet in %s", len(users), displayGroup)
 
 	var body strings.Builder
 	body.WriteString("html:")
@@ -32,19 +32,19 @@ func BuildPendingDefaultGroupEmail(groupName string, users []PendingDefaultGroup
 	body.WriteString(`<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:720px;background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;">`)
 
 	body.WriteString(`<tr><td style="padding:32px 32px 8px 32px;">`)
-	body.WriteString(`<h1 style="margin:0;font-size:24px;line-height:30px;font-weight:700;color:#111827;">Utenti non ancora nel ` + escape(displayGroup) + `</h1>`)
+	body.WriteString(`<h1 style="margin:0;font-size:24px;line-height:30px;font-weight:700;color:#111827;">Users not yet in ` + escape(displayGroup) + `</h1>`)
 	body.WriteString(`</td></tr>`)
 
 	body.WriteString(`<tr><td style="padding:0 32px 16px 32px;">`)
-	body.WriteString(fmt.Sprintf(`<p style="margin:0;font-size:15px;line-height:22px;color:#374151;">Scan al boot: <strong>%d</strong> utenti approvati non sono ancora membri del gruppo Telegram di default. Ogni utente ha (o ha appena ricevuto) un invite link personale.</p>`, len(users)))
+	body.WriteString(fmt.Sprintf(`<p style="margin:0;font-size:15px;line-height:22px;color:#374151;">Scan result: <strong>%d</strong> approved users are not yet members of the default Telegram group. Each user has (or has just received) a personal invite link.</p>`, len(users)))
 	body.WriteString(`</td></tr>`)
 
 	body.WriteString(`<tr><td style="padding:8px 32px 32px 32px;">`)
 	body.WriteString(`<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;">`)
 	body.WriteString(`<tr>`)
-	body.WriteString(`<th style="text-align:left;padding:10px 8px;border-bottom:2px solid #e5e7eb;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em;">Nome e cognome</th>`)
-	body.WriteString(`<th style="text-align:left;padding:10px 8px;border-bottom:2px solid #e5e7eb;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em;">Gruppo local</th>`)
-	body.WriteString(`<th style="text-align:right;padding:10px 8px;border-bottom:2px solid #e5e7eb;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em;">Giorni</th>`)
+	body.WriteString(`<th style="text-align:left;padding:10px 8px;border-bottom:2px solid #e5e7eb;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em;">Full name</th>`)
+	body.WriteString(`<th style="text-align:left;padding:10px 8px;border-bottom:2px solid #e5e7eb;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em;">Local group</th>`)
+	body.WriteString(`<th style="text-align:right;padding:10px 8px;border-bottom:2px solid #e5e7eb;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em;">Days</th>`)
 	body.WriteString(`</tr>`)
 
 	for _, u := range users {

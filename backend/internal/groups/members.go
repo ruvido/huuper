@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/pocketbase/pocketbase"
+	"github.com/pocketbase/pocketbase/core"
 )
 
 func GuardianCounts(app *pocketbase.PocketBase, groupID string) (map[string]int, error) {
@@ -75,7 +76,11 @@ func MembersResponseForGroup(app *pocketbase.PocketBase, groupID string) (*Membe
 		if user == nil {
 			continue
 		}
+		isAssistant := assistantID != "" && user.Id == assistantID
 		_, isGuardian := guardianCounts[userID]
+		if !shouldIncludeGroupMember(user, isAssistant, isGuardian) {
+			continue
+		}
 		items = append(items, MemberItem{
 			ID:            user.Id,
 			Email:         user.GetString("email"),
@@ -83,7 +88,7 @@ func MembersResponseForGroup(app *pocketbase.PocketBase, groupID string) (*Membe
 			Avatar:        strings.TrimSpace(user.GetString("avatar")),
 			Age:           UserAge(user),
 			Region:        UserRegion(user),
-			IsAssistant:   assistantID != "" && user.Id == assistantID,
+			IsAssistant:   isAssistant,
 			IsGuardian:    isGuardian,
 			ProtegesCount: guardianCounts[userID],
 		})
@@ -112,6 +117,23 @@ func MembersResponseForGroup(app *pocketbase.PocketBase, groupID string) (*Membe
 		GroupID: groupID,
 		Items:   items,
 	}, nil
+}
+
+func shouldIncludeGroupMember(user *core.Record, isAssistant bool, isGuardian bool) bool {
+	if user == nil {
+		return false
+	}
+	if !isAdminUser(user) {
+		return true
+	}
+	return isAssistant || isGuardian
+}
+
+func isAdminUser(user *core.Record) bool {
+	if user == nil {
+		return false
+	}
+	return user.GetBool("admin")
 }
 
 func GuardiansResponseForGroup(app *pocketbase.PocketBase, groupID string) (*GuardiansResponse, error) {
