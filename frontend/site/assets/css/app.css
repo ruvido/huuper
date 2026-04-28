@@ -3685,15 +3685,21 @@ textarea.field-input {
 
 .wizard-routine-delete {
   width: 24px;
-  height: 24px;
+  height: 22px;
   border: 0;
-  background: transparent;
+  background: rgba(242, 87, 87, 0.06);
   color: #f25757;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0;
+  box-shadow: none;
+}
+
+.wizard-routine-delete svg {
+  width: 14px;
+  height: 14px;
 }
 
 .wizard-routine-collapse {
@@ -3742,10 +3748,20 @@ textarea.field-input {
 .wizard-routine-body {
   display: grid;
   gap: var(--space-3);
+  max-height: 1200px;
+  opacity: 1;
+  overflow: hidden;
+  transition: max-height 220ms ease, opacity 180ms ease;
 }
 
 .wizard-routine.is-collapsed .wizard-routine-body {
-  display: none;
+  max-height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.wizard-routine.is-collapsed {
+  gap: 0;
 }
 
 .wizard-summary {

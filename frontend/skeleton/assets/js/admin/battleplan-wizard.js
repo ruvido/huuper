@@ -32,6 +32,7 @@
     submitting: false,
     ui: {
       collapsedRoutines: {},
+      focusRoutine: null,
     },
     input: {
       start_date: new Date().toISOString().slice(0, 10),
@@ -299,6 +300,31 @@
     dom.aside.hidden = false;
   }
 
+  function routineChevronSVG(collapsed) {
+    if (collapsed) {
+      return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="wizard-routine-chevron" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708"/></svg>`;
+    }
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="wizard-routine-chevron" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M7.646 4.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1-.708.708L8 5.707l-5.646 5.647a.5.5 0 0 1-.708-.708z"/></svg>`;
+  }
+
+  function animateCollapseOtherRoutines(pillarKey, keepIdx) {
+    if (!dom.stage) return;
+    const cards = dom.stage.querySelectorAll(`.wizard-routine[data-pillar="${pillarKey}"]`);
+    cards.forEach((card) => {
+      const idx = Number(card.getAttribute("data-routine-idx"));
+      if (!Number.isFinite(idx) || idx === keepIdx) return;
+      card.classList.add("is-collapsed");
+      state.ui.collapsedRoutines[`${pillarKey}:${idx}`] = true;
+      const trash = card.querySelector(".wizard-routine-delete");
+      if (trash) trash.remove();
+      const toggle = card.querySelector(".wizard-routine-toggle");
+      if (toggle) {
+        toggle.setAttribute("aria-label", copy.actions.expandRoutineAria);
+        toggle.innerHTML = routineChevronSVG(true);
+      }
+    });
+  }
+
   function renderRoutine(pillarKey, idx, routine) {
     const collapseKey = `${pillarKey}:${idx}`;
     const collapsed = Object.prototype.hasOwnProperty.call(state.ui.collapsedRoutines, collapseKey)
@@ -343,8 +369,8 @@
     }
 
     return `
-      <article class="wizard-routine${collapsed ? " is-collapsed" : ""}" data-routine-idx="${idx}">
-        <header class="wizard-routine-hdr">
+      <article class="wizard-routine${collapsed ? " is-collapsed" : ""}" data-routine-idx="${idx}" data-pillar="${esc(pillarKey)}">
+        <header class="wizard-routine-hdr" data-action="toggle-routine" data-pillar="${esc(pillarKey)}" data-idx="${idx}">
           <div class="wizard-routine-left">
             ${collapsed ? "" : `<button type="button" class="wizard-routine-delete" data-action="remove-routine" data-pillar="${esc(pillarKey)}" data-idx="${idx}" aria-label="${esc(copy.actions.removeRoutineAria)}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M2.5 1a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1H3v9a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V4h.5a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H10a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1zm3 4a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 .5-.5M8 5a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7A.5.5 0 0 1 8 5m3 .5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 1 0"/></svg></button>`}
             <button type="button" class="wizard-routine-collapse" data-action="toggle-routine" data-pillar="${esc(pillarKey)}" data-idx="${idx}" aria-expanded="${collapsed ? "false" : "true"}">
@@ -352,9 +378,7 @@
             </button>
           </div>
           <button type="button" class="wizard-routine-toggle" data-action="toggle-routine" data-pillar="${esc(pillarKey)}" data-idx="${idx}" aria-label="${collapsed ? esc(copy.actions.expandRoutineAria) : esc(copy.actions.collapseRoutineAria)}">
-            ${collapsed
-              ? `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="wizard-routine-chevron" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708"/></svg>`
-              : `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="wizard-routine-chevron" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M7.646 4.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1-.708.708L8 5.707l-5.646 5.647a.5.5 0 0 1-.708-.708z"/></svg>`}
+            ${routineChevronSVG(collapsed)}
           </button>
         </header>
         <div class="wizard-routine-body">
@@ -521,6 +545,15 @@
       renderPillar(state.step - 2);
     } else {
       renderConfirm();
+    }
+    if (state.ui.focusRoutine && dom.stage) {
+      const { pillarKey, idx } = state.ui.focusRoutine;
+      const input = dom.stage.querySelector(`[name="routine_title_${pillarKey}_${idx}"]`);
+      if (input) {
+        input.scrollIntoView({ behavior: "smooth", block: "center" });
+        input.focus({ preventScroll: true });
+      }
+      state.ui.focusRoutine = null;
     }
   }
 
@@ -705,14 +738,29 @@
       syncFromDOM();
       const key = target.dataset.pillar;
       const value = ensurePillar(key);
+      const newIdx = value.routines.length;
       value.routines.push(newRoutine());
+      state.ui.collapsedRoutines[`${key}:${newIdx}`] = false;
+      state.ui.focusRoutine = { pillarKey: key, idx: newIdx };
       render();
+      animateCollapseOtherRoutines(key, newIdx);
     } else if (action === "toggle-routine") {
       syncFromDOM();
       const key = target.dataset.pillar;
       const idx = Number(target.dataset.idx);
       const collapseKey = `${key}:${idx}`;
-      state.ui.collapsedRoutines[collapseKey] = !state.ui.collapsedRoutines[collapseKey];
+      const value = ensurePillar(key);
+      const currentCollapsed = Object.prototype.hasOwnProperty.call(state.ui.collapsedRoutines, collapseKey)
+        ? !!state.ui.collapsedRoutines[collapseKey]
+        : true;
+      if (currentCollapsed) {
+        for (let i = 0; i < value.routines.length; i += 1) {
+          state.ui.collapsedRoutines[`${key}:${i}`] = true;
+        }
+        state.ui.collapsedRoutines[collapseKey] = false;
+      } else {
+        state.ui.collapsedRoutines[collapseKey] = true;
+      }
       render();
     } else if (action === "remove-routine") {
       syncFromDOM();
