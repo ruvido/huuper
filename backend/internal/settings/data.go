@@ -31,6 +31,7 @@ var MemberNames = map[string]bool{
 	"profile_schema":   true,
 	"telegram":         true,
 	"telegram_connect": true,
+	"battleplan":       true,
 }
 
 func Unwrap(raw any) map[string]any {

@@ -22,6 +22,11 @@ type Handlers struct {
 	GroupGuardians     func(e *core.RequestEvent) error
 	GroupRequestsCount func(e *core.RequestEvent) error
 	DefaultInvite      func(e *core.RequestEvent) error
+	BattleplansList    func(e *core.RequestEvent) error
+	BattleplanGet      func(e *core.RequestEvent) error
+	BattleplanCreate   func(e *core.RequestEvent) error
+	BattleplanUpdate   func(e *core.RequestEvent) error
+	BattleplanStatus   func(e *core.RequestEvent) error
 }
 
 func Register(se *core.ServeEvent, h Handlers) {
@@ -41,4 +46,9 @@ func Register(se *core.ServeEvent, h Handlers) {
 	se.Router.GET("/api/me/groups/{id}/guardians", h.GroupGuardians).Bind(apis.RequireAuth())
 	se.Router.GET("/api/me/groups/{id}/requests-count", h.GroupRequestsCount).Bind(apis.RequireAuth())
 	se.Router.GET("/api/me/groups/default/invite", h.DefaultInvite).Bind(apis.RequireAuth())
+	se.Router.GET("/api/me/battleplans", h.BattleplansList).Bind(apis.RequireAuth())
+	se.Router.POST("/api/me/battleplans", h.BattleplanCreate).Bind(apis.RequireAuth())
+	se.Router.GET("/api/me/battleplans/{id}", h.BattleplanGet).Bind(apis.RequireAuth())
+	se.Router.PATCH("/api/me/battleplans/{id}", h.BattleplanUpdate).Bind(apis.RequireAuth())
+	se.Router.POST("/api/me/battleplans/{id}/status", h.BattleplanStatus).Bind(apis.RequireAuth())
 }

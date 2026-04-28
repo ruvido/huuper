@@ -1,0 +1,31 @@
+{{ define "step-progress" }}
+<div class="step-progress" hidden>
+  <div class="step-progress-meta">
+    <span id="{{ .Prefix }}-progress-label" class="step-progress-meta-label"></span>
+    <span id="{{ .Prefix }}-progress-state" class="step-progress-meta-state"></span>
+  </div>
+  <div class="step-progress-bar">
+    <div id="{{ .Prefix }}-progress-fill" class="step-progress-fill" style="width: 0"></div>
+  </div>
+  <div class="step-progress-aside" id="{{ .Prefix }}-aside" hidden></div>
+</div>
+{{ end }}
+
+{{ define "wizard-shell" }}
+<main class="wizard-page">
+  {{ template "step-progress" (dict "Prefix" .Prefix) }}
+  <form id="{{ .Prefix }}-form" hidden novalidate>
+    <div id="{{ .Prefix }}-stage"></div>
+    <p id="{{ .Prefix }}-status" class="meta-text" hidden></p>
+  </form>
+  <p id="{{ .Prefix }}-loading" class="meta-text">Loading...</p>
+</main>
+
+<footer class="sticky-actions" id="{{ .Prefix }}-sticky" hidden>
+  <button class="sticky-actions-back" id="{{ .Prefix }}-back" type="button">INDIETRO</button>
+  <button class="sticky-actions-next" id="{{ .Prefix }}-next" type="submit" form="{{ .Prefix }}-form">
+    <span id="{{ .Prefix }}-next-label">AVANTI</span>
+    {{ template "icon-bolt" . }}
+  </button>
+</footer>
+{{ end }}

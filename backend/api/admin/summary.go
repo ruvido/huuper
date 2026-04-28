@@ -236,7 +236,7 @@ func buildSeries(users, requests []*core.Record, guardianDates []time.Time, stat
 	}
 
 	cumulativeUsers := cumulativeByTime(users, ends)
-	cumulativeRequests := cumulativeByTime(requests, ends)
+	activeRequests := activeRequestsByTime(requests, ends)
 	cumulativeAngeli := cumulativeBy(guardianDates, ends)
 
 	labels := make([]string, points)
@@ -248,20 +248,20 @@ func buildSeries(users, requests []*core.Record, guardianDates []time.Time, stat
 		}
 	}
 
-	deltaUtenti := cumulativeUsers[5] - cumulativeUsers[0]
-	deltaRichieste := cumulativeRequests[5] - cumulativeRequests[0]
-	deltaAngeli := cumulativeAngeli[5] - cumulativeAngeli[0]
+	deltaUtenti := cumulativeUsers[points-1] - cumulativeUsers[0]
+	deltaRichieste := activeRequests[points-1] - activeRequests[0]
+	deltaAngeli := cumulativeAngeli[points-1] - cumulativeAngeli[0]
 
 	return map[string]any{
 		"labels": labels,
 		"weekly": map[string]any{
 			"utenti":    cumulativeUsers,
-			"richieste": cumulativeRequests,
+			"richieste": activeRequests,
 			"angeli":    cumulativeAngeli,
 		},
 		"totals": map[string]any{
 			"utenti":    stats.Total,
-			"richieste": len(requests),
+			"richieste": activeRequests[points-1],
 			"angeli":    stats.Angeli,
 		},
 		"delta": map[string]any{
@@ -270,6 +270,62 @@ func buildSeries(users, requests []*core.Record, guardianDates []time.Time, stat
 			"angeli":    deltaAngeli,
 		},
 	}
+}
+
+func activeRequestsByTime(records []*core.Record, ends []time.Time) []int {
+	out := make([]int, len(ends))
+	for _, r := range records {
+		createdAt := r.GetDateTime("created").Time()
+		closedAt := requestClosedAt(r)
+		for i, end := range ends {
+			if createdAt.After(end) {
+				continue
+			}
+			if !closedAt.IsZero() && !closedAt.After(end) {
+				continue
+			}
+			out[i]++
+		}
+	}
+	return out
+}
+
+func requestClosedAt(record *core.Record) time.Time {
+	data := parseJSONMap(record.Get("data"))
+	if data == nil {
+		return time.Time{}
+	}
+
+	adminApprovedAt := parseRFC3339(strings.TrimSpace(stringField(data["admin_approved_at"])))
+	if !record.GetBool("rejected") {
+		return adminApprovedAt
+	}
+
+	rejectedAt := time.Time{}
+	if rejectedData, ok := data["rejected"].(map[string]any); ok {
+		rejectedAt = parseRFC3339(strings.TrimSpace(stringField(rejectedData["rejected_at"])))
+	}
+	if rejectedAt.IsZero() {
+		return adminApprovedAt
+	}
+	if adminApprovedAt.IsZero() {
+		return rejectedAt
+	}
+	if rejectedAt.Before(adminApprovedAt) {
+		return rejectedAt
+	}
+	return adminApprovedAt
+}
+
+func parseRFC3339(value string) time.Time {
+	if strings.TrimSpace(value) == "" {
+		return time.Time{}
+	}
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return time.Time{}
+	}
+	return parsed
 }
 
 func cumulativeByTime(records []*core.Record, ends []time.Time) []int {
@@ -298,6 +354,10 @@ func cumulativeBy(times []time.Time, ends []time.Time) []int {
 }
 
 func parseUserData(raw any) map[string]any {
+	return parseJSONMap(raw)
+}
+
+func parseJSONMap(raw any) map[string]any {
 	if raw == nil {
 		return nil
 	}

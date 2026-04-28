@@ -11,6 +11,7 @@
     hero: document.getElementById("admin-hero"),
     heroTitle: document.getElementById("admin-hero-title"),
     blockMetrics: document.getElementById("block-metrics"),
+    metricsUpdated: document.getElementById("metrics-updated"),
     mcLegend: document.getElementById("mc-legend"),
     mcSvg: document.getElementById("mc-svg"),
     mcAxis: document.getElementById("mc-axis"),
@@ -43,25 +44,44 @@
   const metricLabels = copy.metrics || {};
 
   const METRICS = [
-    { key: "utenti", label: metricLabels.utenti || "Utenti", color: "accent", axis: "left" },
-    { key: "richieste", label: metricLabels.richieste || "Richieste", color: "text", axis: "right" },
-    { key: "angeli", label: metricLabels.angeli || "Angeli", color: "muted", axis: "right" },
+    { key: "utenti", label: metricLabels.users, color: "accent", axis: "left" },
+    { key: "angeli", label: metricLabels.guardians, color: "muted", axis: "right" },
+    { key: "richieste", label: metricLabels.requests, color: "text", axis: "right" },
   ];
 
   let payload = null;
   let currentPassion = "sports";
+  let lastLoadedAt = null;
+
+  function formatAgo(ms) {
+    const sec = Math.max(0, Math.floor(ms / 1000));
+    if (sec < 60) return "aggiornato ora";
+    const min = Math.floor(sec / 60);
+    if (min < 60) return `aggiornato ${min} min fa`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `aggiornato ${hr} ${hr === 1 ? "ora" : "ore"} fa`;
+    const day = Math.floor(hr / 24);
+    return `aggiornato ${day} ${day === 1 ? "giorno" : "giorni"} fa`;
+  }
+
+  function updateAgo() {
+    if (!nodes.metricsUpdated || !lastLoadedAt) return;
+    nodes.metricsUpdated.textContent = formatAgo(Date.now() - lastLoadedAt);
+  }
 
   function show(node, hasData) {
     if (node) node.hidden = !hasData;
   }
 
-  function renderHero(users) {
+  function renderHero(users, groups) {
     const total = users.total || 0;
+    const groupsTotal = (groups && groups.total) || 0;
     const regions = (users.byRegion || []).filter((r) => r.name !== "nd").length;
-    const template = copy.heroTemplate || "Il Branco è di {users} presenti su {regions} regioni";
+    const template = copy.heroTemplate || "Il Branco sono {users},<br>attivi in {groups} e {regions}";
     const html = template
-      .replace("{users}", `<b>${esc(total)} uomini</b>`)
-      .replace("{regions}", `${esc(regions)}`);
+      .replace("{users}", `<a href="/admin/users/"><b>${esc(total)} uomini</b></a>`)
+      .replace("{groups}", `<a href="/admin/groups/"><b>${esc(groupsTotal)} gruppi</b></a>`)
+      .replace("{regions}", `${esc(regions)} regioni`);
     nodes.heroTitle.innerHTML = html;
     show(nodes.hero, true);
   }
@@ -88,6 +108,8 @@
 
     const W = Math.max(280, Math.round(nodes.mcSvg.clientWidth || 340));
     const H = 180;
+    const yTicks = 5;
+    const yIntervals = yTicks - 1;
     nodes.mcSvg.setAttribute("viewBox", `0 0 ${W} ${H}`);
     const pad = { top: 14, bottom: 24, left: 32, right: 32 };
     const xs = [];
@@ -96,28 +118,48 @@
     }
     const plotH = H - pad.top - pad.bottom;
 
-    const niceAxis = (v) => {
-      if (v <= 5) return { step: 1, max: 5 };
-      if (v <= 10) return { step: 2, max: 10 };
-      if (v <= 25) return { step: 5, max: 25 };
-      if (v <= 50) return { step: 10, max: 50 };
-      if (v <= 100) return { step: 20, max: 100 };
-      const mag = Math.pow(10, Math.floor(Math.log10(v)));
-      const step = Math.ceil(v / (5 * mag)) * mag;
-      return { step, max: step * 5 };
+    const buildAxis = (vals) => {
+      const finite = vals.filter((v) => Number.isFinite(v));
+      if (!finite.length) {
+        return { min: 0, max: yIntervals, step: 1 };
+      }
+      let min = Math.min(...finite);
+      let max = Math.max(...finite);
+      if (min === max) {
+        const pad = Math.max(1, Math.abs(min) * 0.1);
+        min -= pad;
+        max += pad;
+      }
+      const span = Math.max(1, max - min);
+      const step = Math.max(1, Math.ceil(span / yIntervals));
+      const free = yIntervals * step - span;
+      let axisMin = Math.max(0, Math.floor(min - free / 2));
+      let axisMax = axisMin + yIntervals * step;
+      if (axisMax < max) {
+        axisMax = Math.ceil(max);
+        axisMin = Math.max(0, axisMax - yIntervals * step);
+        axisMax = axisMin + yIntervals * step;
+      }
+      return { min: axisMin, max: axisMax, step };
     };
+
+    const formatTick = (value) => String(Math.max(0, value));
 
     const leftVals = METRICS.filter((s) => s.axis === "left").flatMap((s) => weekly[s.key] || []);
     const rightVals = METRICS.filter((s) => s.axis === "right").flatMap((s) => weekly[s.key] || []);
-    const left = niceAxis(Math.max(1, ...leftVals));
-    const right = niceAxis(Math.max(1, ...rightVals));
-    const maxLeft = left.max;
-    const maxRight = right.max;
+    const left = buildAxis(leftVals);
+    const right = buildAxis(rightVals);
+    const toY = (value, axis) => {
+      const range = axis.max - axis.min || 1;
+      return H - pad.bottom - ((value - axis.min) / range) * plotH;
+    };
 
     const ticks = [];
     const tickLabels = [];
-    for (let i = 0; i <= 5; i++) {
-      const y = H - pad.bottom - (i / 5) * plotH;
+    for (let i = 0; i < yTicks; i++) {
+      const y = H - pad.bottom - (i / yIntervals) * plotH;
+      const leftValue = left.min + i * left.step;
+      const rightValue = right.min + i * right.step;
       ticks.push(
         `<line x1="${pad.left}" x2="${W - pad.right}" y1="${y.toFixed(1)}" y2="${y.toFixed(
           1
@@ -126,14 +168,14 @@
       tickLabels.push(
         `<text x="${pad.left - 6}" y="${(y + 3).toFixed(
           1
-        )}" text-anchor="end" fill="var(--text-faint)" font-size="9" font-family="var(--font-family-ui)">${
-          i * left.step
-        }</text>`,
+        )}" text-anchor="end" fill="var(--text-faint)" font-size="9" font-family="var(--font-family-ui)">${formatTick(
+          leftValue
+        )}</text>`,
         `<text x="${W - pad.right + 6}" y="${(y + 3).toFixed(
           1
-        )}" text-anchor="start" fill="var(--text-faint)" font-size="9" font-family="var(--font-family-ui)">${
-          i * right.step
-        }</text>`
+        )}" text-anchor="start" fill="var(--text-faint)" font-size="9" font-family="var(--font-family-ui)">${formatTick(
+          rightValue
+        )}</text>`
       );
     }
 
@@ -148,9 +190,9 @@
       const stroke = strokes[s.color] || "var(--text-muted)";
       const width = 4;
       const dotR = 5;
-      const maxScale = s.axis === "left" ? maxLeft : maxRight;
+      const axis = s.axis === "left" ? left : right;
       const pts = vals.map((v, i) => {
-        const y = H - pad.bottom - (v / maxScale) * plotH;
+        const y = toY(v, axis);
         return { x: xs[i], y };
       });
       const line = pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
@@ -324,7 +366,9 @@
       const users = payload.users || {};
       const events = payload.events || { total: 0 };
 
-      renderHero(users);
+      lastLoadedAt = Date.now();
+      updateAgo();
+      renderHero(users, payload.groups);
       renderMetrics(payload.series);
       renderRegions(users);
       renderAge(users);
@@ -359,4 +403,5 @@
   }
 
   load();
+  setInterval(updateAgo, 60000);
 })();

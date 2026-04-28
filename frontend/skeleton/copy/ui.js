@@ -2,11 +2,11 @@ window.huuperCopy = Object.assign({}, window.huuperCopy || {}, {
   ui: {
     admin: {
       dashboard: {
-        heroTemplate: "Il Branco è di {users},<br>attivi in {regions} regioni",
+        heroTemplate: "Il Branco sono {users},<br>attivi in {groups} e {regions}",
         metrics: {
-          utenti: "Utenti",
-          richieste: "Richieste",
-          angeli: "Angeli",
+          users: "Users",
+          requests: "Requests",
+          guardians: "Guardians",
         },
       },
       user: {
@@ -20,4 +20,3 @@ window.huuperCopy = Object.assign({}, window.huuperCopy || {}, {
     },
   },
 });
-

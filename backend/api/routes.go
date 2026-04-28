@@ -39,6 +39,11 @@ func RegisterRoutes(app *pocketbase.PocketBase, se *core.ServeEvent) {
 		GroupGuardians:     meroutes.GroupGuardiansHandler(app),
 		GroupRequestsCount: meroutes.GroupRequestsCountHandler(app),
 		DefaultInvite:      meroutes.DefaultGroupInviteHandler(app),
+		BattleplansList:    meroutes.ListBattleplansHandler(app),
+		BattleplanGet:      meroutes.GetBattleplanHandler(app),
+		BattleplanCreate:   meroutes.CreateBattleplanHandler(app),
+		BattleplanUpdate:   meroutes.UpdateBattleplanHandler(app),
+		BattleplanStatus:   meroutes.BattleplanStatusHandler(app),
 	})
 
 	adminroutes.Register(se, adminroutes.Handlers{

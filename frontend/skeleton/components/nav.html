@@ -39,6 +39,10 @@
 </nav>
 {{ end }}
 
+{{ define "fab" }}
+<a class="fab" href="{{ .Href }}" aria-label="{{ .Aria }}">{{ template "icon-plus" . }}</a>
+{{ end }}
+
 {{ define "bottomnav-admin" }}
 <nav class="bottom-nav" aria-label="Admin primary">
   <a class="nav-item{{ if eq .ActiveNav "dashboard" }} nav-item-current{{ end }}" href="/admin/">
@@ -56,6 +60,10 @@
   <a class="nav-item{{ if eq .ActiveNav "requests" }} nav-item-current{{ end }}" href="/admin/requests/">
     {{ template "icon-requests" . }}
     <span>Requests</span>
+  </a>
+  <a class="nav-item{{ if eq .ActiveNav "battleplan" }} nav-item-current{{ end }}" href="/admin/battleplan/">
+    {{ template "icon-battleplan" . }}
+    <span>Battleplan</span>
   </a>
 </nav>
 {{ end }}
