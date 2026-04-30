@@ -2,6 +2,10 @@ window.huuperCopy = Object.assign({}, window.huuperCopy || {}, {
   battleplan: {
     titleBattleplan: "Battleplan",
     archiveLabel: "Archive",
+    list: {
+      activeSectionLabel: "The Active Plan",
+      archiveSectionLabel: "Archive",
+    },
     wizard: {
       progressPrefix: "MISSION PHASE",
       statePriority: "PRIORITY",

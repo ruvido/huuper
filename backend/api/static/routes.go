@@ -8,5 +8,18 @@ import (
 )
 
 func Register(se *core.ServeEvent) {
-	se.Router.GET("/{path...}", apis.Static(os.DirFS("./frontend/site"), false))
+	site := os.DirFS("./frontend/site")
+	se.Router.GET("/admin/battleplan/view/{id}", func(e *core.RequestEvent) error {
+		return e.FileFS(site, "admin/battleplan/view/index.html")
+	})
+	se.Router.GET("/admin/battleplan/view/{id}/", func(e *core.RequestEvent) error {
+		return e.FileFS(site, "admin/battleplan/view/index.html")
+	})
+	se.Router.GET("/admin/battleplan/edit/{id}", func(e *core.RequestEvent) error {
+		return e.FileFS(site, "admin/battleplan/edit/index.html")
+	})
+	se.Router.GET("/admin/battleplan/edit/{id}/", func(e *core.RequestEvent) error {
+		return e.FileFS(site, "admin/battleplan/edit/index.html")
+	})
+	se.Router.GET("/{path...}", apis.Static(site, false))
 }

@@ -3,6 +3,21 @@
     return;
   }
 
+  (async () => {
+    try {
+      const settings = await window.huuperAuth.apiFetch("/api/admin/settings/battleplan");
+      const title = settings && settings.data && settings.data.title;
+      if (!title) return;
+      const hero = document.getElementById("battleplan-hero");
+      const target = document.getElementById("battleplan-hero-title");
+      if (!hero || !target) return;
+      target.innerHTML = title;
+      hero.hidden = false;
+    } catch (_) {
+      /* hero is optional */
+    }
+  })();
+
   const STATUS_LABELS = {
     active: "Active",
     completed: "Completed",
@@ -38,6 +53,88 @@
     return `<span class="battleplan-list-meta">${range ? `<span class="battleplan-list-date">${range}</span>` : ""}${tags ? `<span class="battleplan-list-tags">${tags}</span>` : ""}</span>`;
   }
 
+  function itemTime(item) {
+    const raw = item.start_date || item.created || "";
+    const parsed = new Date(raw);
+    return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+  }
+
+  function orderedItems(items) {
+    const statusRank = { active: 0, completed: 1, archived: 2 };
+    return [...items].sort((a, b) => {
+      const ar = Object.prototype.hasOwnProperty.call(statusRank, a.status) ? statusRank[a.status] : 3;
+      const br = Object.prototype.hasOwnProperty.call(statusRank, b.status) ? statusRank[b.status] : 3;
+      if (ar !== br) return ar - br;
+      return itemTime(b) - itemTime(a);
+    });
+  }
+
+  function activeBattleplan(items) {
+    return items.find((item) => item && item.status === "active") || null;
+  }
+
+  function wireNewButton(items) {
+    const trigger = document.querySelector('[data-battleplan-new]');
+    if (!trigger) return;
+    const active = activeBattleplan(items);
+    trigger.onclick = (event) => {
+      if (!active) return;
+      event.preventDefault();
+      const sheet = window.huuperActionSheet;
+      if (!sheet || typeof sheet.open !== "function") return;
+      sheet.open({
+        title: "Vuoi abbandonare il tuo attuale battleplan?",
+        actions: [],
+        footerAction: {
+          label: "YES",
+          onSelect: async () => {
+            await window.huuperAuth.apiFetch(`/api/me/battleplans/${encodeURIComponent(active.id)}/status`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ status: "archived" }),
+            });
+            window.location.href = "/admin/battleplan/new/";
+          },
+        },
+      });
+    };
+  }
+
+  function arrangeSections(listNode, items) {
+    if (!listNode) return;
+    const copy = (window.huuperCopy && window.huuperCopy.battleplan && window.huuperCopy.battleplan.list) || {};
+    const activeSection = document.getElementById("battleplan-active-section");
+    const archiveSection = document.getElementById("battleplan-archive-section");
+    const activeContainer = document.getElementById("battleplan-active");
+    const activeLabel = document.getElementById("battleplan-active-label");
+    const archiveLabel = document.getElementById("battleplan-archive-label");
+
+    const activeEl = listNode.querySelector(".battleplan-list-item-active");
+    if (activeContainer) {
+      activeContainer.innerHTML = "";
+      if (activeEl) {
+        activeContainer.appendChild(activeEl);
+        activeContainer.hidden = false;
+      } else {
+        activeContainer.hidden = true;
+      }
+    }
+
+    const hasActive = items.some((it) => it.status === "active");
+    const hasOther = items.some((it) => it.status !== "active");
+
+    if (activeLabel) {
+      activeLabel.textContent = copy.activeSectionLabel || "";
+      activeLabel.hidden = !(hasActive && copy.activeSectionLabel);
+    }
+    if (archiveLabel) {
+      archiveLabel.textContent = copy.archiveSectionLabel || "";
+      archiveLabel.hidden = !(hasOther && copy.archiveSectionLabel);
+    }
+    if (activeSection) activeSection.hidden = !hasActive;
+    if (archiveSection) archiveSection.hidden = !hasOther;
+  }
+
   function renderEmpty() {
     return `
       <section class="empty-state empty-state-icon-only" aria-label="Battleplan">
@@ -53,16 +150,26 @@
     requiresAuth: true,
     errorMessage: "Battleplan unavailable.",
     renderEmpty,
-    load: () => window.huuperAuth.apiFetch("/api/me/battleplans"),
+    load: async () => {
+      const payload = await window.huuperAuth.apiFetch("/api/me/battleplans?per_page=200");
+      const items = Array.isArray(payload.items) ? payload.items : [];
+      return { ...payload, items: orderedItems(items) };
+    },
     renderItem: (item) => {
       const lp = window.huuperListPage;
       const title = (item.data && item.data.priority && item.data.priority.title) || "Battleplan";
-      const href = `/admin/battleplan/view/?view=${encodeURIComponent(item.id)}`;
+      const href = `/admin/battleplan/view/${encodeURIComponent(item.id)}/`;
       const status = STATUS_LABELS[item.status] || item.status || "";
       const meta = metaHTML(item, lp.escapeHTML);
-      const side = status ? `<span class="list-item-side"><span class="list-item-side-title request-item-status">${lp.escapeHTML(status)}</span></span>` : "";
+      const activeArrow = `<svg class="battleplan-list-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" aria-hidden="true"><rect x="0" y="0" width="32" height="32" rx="6" fill="#0c0c0c"/><g fill="none" stroke="#f2cc0d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="9" y1="16" x2="22" y2="16"/><polyline points="17,11 22,16 17,21"/></g></svg>`;
+      const sideContent = item.status === "active"
+        ? activeArrow
+        : (status ? `<span class="list-item-side-title request-item-status">${lp.escapeHTML(status)}</span>` : "");
+      const side = sideContent ? `<span class="list-item-side">${sideContent}</span>` : "";
+      const activeClass = item.status === "active" ? " battleplan-list-item-active" : "";
+      const archivedClass = item.status === "archived" ? " battleplan-list-item-archived" : "";
       return `
-        <a href="${lp.escapeHTML(href)}" class="list-item request-item">
+        <a href="${lp.escapeHTML(href)}" class="list-item request-item battleplan-list-item${activeClass}${archivedClass}">
           <span class="list-item-copy request-item-copy">
             <strong>${lp.escapeHTML(title)}</strong>
             <span class="list-item-meta request-item-meta">${meta}</span>
@@ -70,6 +177,10 @@
           ${side}
         </a>
       `;
+    },
+    afterRender: (node, items) => {
+      wireNewButton(items);
+      arrangeSections(node, items);
     },
   });
 })();

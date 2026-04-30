@@ -1336,9 +1336,7 @@ body:has(.top-bar-detail-page) .bottom-nav {
   transform: rotate(180deg);
 }
 
-.list-card > a,
-.list-card > article,
-.list-card > button {
+:where(.list-card) > :where(a, article, button) {
   display: grid;
   gap: var(--space-2);
   padding: var(--space-4);
@@ -1360,9 +1358,7 @@ body:has(.top-bar-detail-page) .bottom-nav {
   box-shadow: none;
 }
 
-.list-card-default > a,
-.list-card-default > article,
-.list-card-default > button {
+:where(.list-card-default) > :where(a, article, button) {
   padding: var(--user-section-gap) 0;
   border: 0;
   border-bottom: 1px solid rgba(242, 204, 13, 0.08);
@@ -1389,6 +1385,7 @@ body:has(.top-bar-detail-page) .bottom-nav {
   align-items: center;
   gap: var(--space-4) !important;
   min-height: 72px;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .list-item-main {
@@ -1515,6 +1512,103 @@ body:has(.top-bar-detail-page) .bottom-nav {
   color: var(--text-muted);
   font-size: var(--font-ui-xs);
   font-weight: 600;
+}
+
+/* Hide empty status placeholder so it doesn't occupy a grid row before the list. */
+.app-shell > .meta-text:empty,
+.battleplan-section > .meta-text:empty {
+  display: none;
+}
+
+/* Battleplan page owns its own vertical rhythm; .app-shell gap is bypassed
+   by wrapping all blocks under .battleplan-page (single grid child). */
+.battleplan-page {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.battleplan-section {
+  display: grid;
+  gap: var(--space-2);
+}
+
+#battleplan-hero {
+  margin-top: var(--space-5);
+  padding-inline: 0;
+}
+
+#battleplan-active,
+#battleplan-list {
+  padding-inline: 0;
+  padding-top: 0;
+}
+
+/* Drop the first archive item's top padding so the visual gap from "Archive:"
+   to the first row of text matches the gap from the active label to the yellow
+   card edge (no padding adds up since the active card has visible bg). */
+#battleplan-list > :first-child {
+  padding-top: 0;
+}
+
+/* All battleplan list items share the same internal padding so titles/meta/tags
+   align across every status. The active state only adds yellow bg + inverted text. */
+.battleplan-list-item {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  margin: 0 0 var(--space-2);
+}
+
+.battleplan-list-item-active {
+  background: var(--accent);
+  color: var(--button-primary-text);
+  border: 0;
+  border-radius: 0;
+  padding-top: var(--space-4);
+  padding-bottom: var(--space-2);
+}
+
+.battleplan-list-item-active .list-item-copy strong,
+.battleplan-list-item-active .list-item-meta,
+.battleplan-list-item-active .battleplan-list-date,
+.battleplan-list-item-active .wizard-summary-tag-outline {
+  color: var(--button-primary-text);
+}
+
+.battleplan-list-item-active .list-item-copy strong {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  font-weight: 900;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+.battleplan-list-item-active .wizard-summary-tag-outline {
+  border-color: currentColor;
+}
+
+.battleplan-list-item-active .request-item-status {
+  background: var(--button-primary-text);
+  color: var(--accent);
+}
+
+.battleplan-list-item-archived {
+  opacity: 0.6;
+}
+
+.battleplan-list-section-label {
+  margin: 0;
+  padding: 0;
+  color: var(--text);
+  font-family: var(--font-family-ui);
+  font-size: var(--font-ui-md);
+  font-weight: 700;
+}
+
+
+.battleplan-list-arrow {
+  width: var(--space-8);
+  height: var(--space-8);
 }
 
 .group-warning-badge {
@@ -2829,9 +2923,11 @@ body.request-page {
   line-height: 1.12;
 }
 
-.dashboard-title b {
+.dashboard-title b,
+.dashboard-title em {
   color: var(--accent);
   font-weight: 800;
+  font-style: normal;
 }
 
 .dashboard-title a {
@@ -3230,6 +3326,24 @@ body.has-section-banner .app-shell {
   margin-top: var(--space-2);
 }
 
+.step-progress-aside-controls {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.step-progress-aside-controls .segmented {
+  width: 100%;
+}
+
+.step-progress-duration-options {
+  grid-column: span 3;
+}
+
+.step-progress-visibility-options {
+  grid-column: span 2;
+}
+
 .step-progress-aside .segmented {
   padding: 2px;
 }
@@ -3332,6 +3446,12 @@ body.has-section-banner .app-shell {
   border-color: var(--accent);
 }
 
+.field-input-error,
+.field-input-error:focus {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.32);
+}
+
 textarea.field-input {
   height: auto;
   padding: var(--space-4);
@@ -3395,7 +3515,7 @@ textarea.field-input {
   height: var(--routine-field-height);
   grid-auto-flow: initial;
   grid-auto-columns: initial;
-  grid-template-columns: 36px repeat(3, minmax(0, 1fr));
+  grid-template-columns: var(--routine-field-height) repeat(3, minmax(0, 1fr));
   gap: 0;
   padding: 0;
 }
@@ -3403,8 +3523,9 @@ textarea.field-input {
 .segmented-reset {
   display: grid;
   place-items: center;
-  width: 36px;
+  width: var(--routine-field-height);
   height: 100%;
+  aspect-ratio: 1;
   padding: 0;
   border: 0;
   background: transparent;
@@ -3668,15 +3789,21 @@ textarea.field-input {
   min-height: calc(100dvh - 260px);
 }
 
+.wizard-form-view#battleplan-wizard-form {
+  min-height: calc(100dvh - var(--topbar-height) - (var(--sticky-actions-height) + env(safe-area-inset-bottom)));
+}
+
 .wizard-form-confirm {
   height: calc(100dvh - 88px - (var(--sticky-actions-height) + env(safe-area-inset-bottom)));
   margin-top: 88px;
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  overflow-y: auto;
 }
 
 .wizard-stage-confirm {
-  flex: 1;
+  flex: 0 0 auto;
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -3687,10 +3814,14 @@ textarea.field-input {
 }
 
 .wizard-form-view {
+  min-height: calc(100dvh - var(--topbar-height) - (var(--sticky-actions-height) + env(safe-area-inset-bottom)));
   height: auto;
-  margin-top: 0;
+  margin-top: var(--topbar-height);
+  display: flex;
+  flex-direction: column;
   overflow: visible;
-  padding: var(--space-4) 0 0;
+  padding: 0;
+  justify-content: center;
   box-sizing: border-box;
 }
 
@@ -3699,7 +3830,7 @@ textarea.field-input {
 }
 
 .wizard-stage-view {
-  justify-content: flex-start;
+  flex: 0 0 auto;
 }
 
 .wizard-step-confirm .wizard-step-header {
@@ -3971,6 +4102,10 @@ textarea.field-input {
   transition: max-height 220ms ease, opacity 180ms ease;
 }
 
+.wizard-routine-body > .wizard-btn-danger {
+  margin-top: var(--space-6);
+}
+
 .wizard-routine.is-collapsed .wizard-routine-body {
   max-height: 0;
   opacity: 0;
@@ -3992,11 +4127,14 @@ textarea.field-input {
 
 .wizard-summary-value {
   margin: 0;
-  padding: var(--space-1) var(--space-3) 0;
-  color: var(--text-muted);
-  font-size: var(--font-ui-s);
-  font-weight: 700;
-  line-height: 1.35;
+  padding: var(--space-1) 0 0;
+  color: var(--text);
+  font-family: var(--font-family-ui) !important;
+  font-size: var(--font-ui-md);
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.18;
+  text-transform: uppercase;
 }
 
 .wizard-summary-muted-card {

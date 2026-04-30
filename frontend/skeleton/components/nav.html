@@ -42,7 +42,7 @@
 {{ end }}
 
 {{ define "fab" }}
-<a class="fab" href="{{ .Href }}" aria-label="{{ .Aria }}">{{ template "icon-plus" . }}</a>
+<a class="fab" href="{{ .Href }}" aria-label="{{ .Aria }}"{{ if .BattleplanNew }} data-battleplan-new{{ end }}>{{ template "icon-plus" . }}</a>
 {{ end }}
 
 {{ define "bottomnav-admin" }}

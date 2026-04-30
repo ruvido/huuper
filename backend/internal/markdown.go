@@ -22,3 +22,17 @@ func RenderMarkdownHTML(raw string) (string, bool) {
 	}
 	return out.String(), true
 }
+
+// RenderInlineMarkdown renders a single-line string as inline markdown,
+// stripping the surrounding <p> wrapper that goldmark adds by default.
+// Useful for headings/titles where block-level wrapping is unwanted.
+func RenderInlineMarkdown(raw string) (string, bool) {
+	html, ok := RenderMarkdownHTML(raw)
+	if !ok {
+		return "", false
+	}
+	html = strings.TrimSpace(html)
+	html = strings.TrimPrefix(html, "<p>")
+	html = strings.TrimSuffix(html, "</p>")
+	return strings.TrimSpace(html), true
+}

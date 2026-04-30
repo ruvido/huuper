@@ -65,6 +65,12 @@
     return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
   }
 
+  function idFromPath() {
+    const parts = window.location.pathname.split("/").filter(Boolean);
+    const idx = parts.findIndex((part, i) => part === "view" && parts[i - 1] === "battleplan");
+    return idx >= 0 && parts[idx + 1] ? decodeURIComponent(parts[idx + 1]) : null;
+  }
+
   function renderSummary(bp, cfg, id) {
     const data = bp.data || {};
     const priority = data.priority || {};
@@ -94,7 +100,7 @@
           <div class="wizard-pillars-col wizard-pillars-col-label"><strong>${esc(def.label)}</strong></div>
           <div class="wizard-pillars-col wizard-pillars-col-content">
             ${objective ? `<p class="wizard-pillars-objective-inline">${esc(objective)}</p>` : ""}
-            <ul class="wizard-summary-muted-card wizard-pillars-routines">${routineItems || "<li><span>-</span></li>"}</ul>
+            ${routineItems ? `<ul class="wizard-summary-muted-card wizard-pillars-routines">${routineItems}</ul>` : ""}
           </div>
         </li>
       `;
@@ -122,7 +128,7 @@
 
   async function init() {
     const params = new URLSearchParams(window.location.search);
-    const id = params.get("id");
+    const id = idFromPath() || params.get("id");
     if (!id) { window.location.href = "/admin/battleplan/"; return; }
 
     try {
@@ -171,7 +177,7 @@
       if (dom.nextLabel) dom.nextLabel.textContent = "EDIT";
       if (dom.next) {
         dom.next.addEventListener("click", () => {
-          window.location.href = `/admin/battleplan/edit/?edit=${encodeURIComponent(id)}&step=2`;
+          window.location.href = `/admin/battleplan/edit/${encodeURIComponent(id)}/?step=2`;
         });
       }
       if (dom.sticky) dom.sticky.hidden = false;

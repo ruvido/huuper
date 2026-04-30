@@ -25,8 +25,15 @@
   };
   const cancelEditButton = document.querySelector("[data-battleplan-cancel-edit]");
 
-  const editId = new URLSearchParams(window.location.search).get("edit") || null;
-  const viewId = new URLSearchParams(window.location.search).get("view") || null;
+  function idFromPath(kind) {
+    const parts = window.location.pathname.split("/").filter(Boolean);
+    const idx = parts.findIndex((part, i) => part === kind && parts[i - 1] === "battleplan");
+    return idx >= 0 && parts[idx + 1] ? decodeURIComponent(parts[idx + 1]) : null;
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const editId = idFromPath("edit") || params.get("edit") || null;
+  const viewId = idFromPath("view") || params.get("view") || null;
 
   const state = {
     cfg: null,
@@ -40,6 +47,7 @@
       collapsedRoutines: {},
       focusRoutine: null,
     },
+    fieldErrors: {},
     input: {
       start_date: new Date().toISOString().slice(0, 10),
       duration_days: 30,
@@ -291,7 +299,6 @@
       title: priority.label,
       priorityField: copy.labels.priorityField,
       whyField: copy.labels.whyField,
-      durationField: copy.labels.durationField,
       priorityPlaceholder: copy.placeholders.priorityTitle,
       whyPlaceholder: copy.placeholders.priorityWhy,
     };
@@ -301,13 +308,6 @@
         <p>${descriptionHTML}</p>
       </div>
     `;
-    const durationOpts = state.cfg.durations.map((d) => `
-      <label class="segmented-option">
-        <input type="radio" name="duration" value="${d.value}" ${state.input.duration_days === d.value ? "checked" : ""} />
-        <span>${d.value} ${copy.daysSuffix}</span>
-      </label>
-    `).join("");
-
     dom.stage.innerHTML = `
       <section class="wizard-step wizard-step-priority">
         <header class="wizard-step-header">
@@ -322,12 +322,7 @@
 
         <div>
           <label class="field-label">${esc(labels.whyField)}</label>
-          <textarea class="field-input" name="priority_why" rows="4" placeholder="${esc(labels.whyPlaceholder)}">${esc(state.input.data.priority.why)}</textarea>
-        </div>
-
-        <div>
-          <label class="field-label">${esc(labels.durationField)}</label>
-          <div class="segmented">${durationOpts}</div>
+          <textarea class="field-input${state.fieldErrors.priorityWhy ? " field-input-error" : ""}" name="priority_why" rows="4" placeholder="${esc(labels.whyPlaceholder)}">${esc(state.input.data.priority.why)}</textarea>
         </div>
       </section>
     `;
@@ -336,6 +331,7 @@
   function renderVisibilityAside() {
     if (!dom.aside) return;
     dom.aside.classList.remove("step-progress-aside-badges");
+    dom.aside.classList.add("step-progress-aside-controls");
     const items = [...state.cfg.visibility].sort((a, b) => {
       if (a.value === "group" && b.value !== "group") return 1;
       if (b.value === "group" && a.value !== "group") return -1;
@@ -347,7 +343,16 @@
         <span>${esc(item.label)}</span>
       </label>
     `).join("");
-    dom.aside.innerHTML = `<div class="segmented">${opts}</div>`;
+    const durationOpts = state.cfg.durations.map((item) => `
+      <label class="segmented-option">
+        <input type="radio" name="duration_aside" value="${item.value}" ${state.input.duration_days === item.value ? "checked" : ""} />
+        <span>${item.value}${esc(copy.daysSuffix || "D")}</span>
+      </label>
+    `).join("");
+    dom.aside.innerHTML = `
+      <div class="segmented step-progress-duration-options">${durationOpts}</div>
+      <div class="segmented step-progress-visibility-options">${opts}</div>
+    `;
     dom.aside.hidden = false;
   }
 
@@ -545,15 +550,6 @@
     return true;
   }
 
-  function hasPillarContent(value) {
-    if (!value) return false;
-    if ((value.objective || "").trim()) return true;
-    return (value.routines || []).some((r) => {
-      if (!r) return false;
-      return !!((r.title || "").trim() || (r.trigger || "").trim() || (r.cadence && r.cadence.type && r.cadence.type !== "paused"));
-    });
-  }
-
   function isPillarComplete(value) {
     if (!value || !(value.objective || "").trim()) return false;
     return (value.routines || []).some((r) => isRoutineComplete(r));
@@ -570,7 +566,6 @@
       const value = state.input.data.pillars[def.key] || { objective: "", routines: [] };
       const objective = (value.objective || "").trim();
       const routines = (value.routines || []);
-      const missing = hasPillarContent(value) && !isPillarComplete(value);
       const routineItems = routines
         .map((r) => {
           if (!r || !r.title) return "";
@@ -588,17 +583,15 @@
           <div class="wizard-pillars-col wizard-pillars-col-label"><strong>${esc(def.label)}</strong></div>
           <div class="wizard-pillars-col wizard-pillars-col-content">
             ${objective ? `<p class="wizard-pillars-objective-inline">${esc(objective)}</p>` : ""}
-            <ul class="wizard-summary-muted-card wizard-pillars-routines">${routineItems || "<li><span>-</span></li>"}</ul>
+            ${routineItems ? `<ul class="wizard-summary-muted-card wizard-pillars-routines">${routineItems}</ul>` : ""}
           </div>
-          ${missing
-            ? `<p class="wizard-missing-line${state.confirmAttempted ? " is-error" : ""}">${state.confirmAttempted ? "Error: Missing Objective" : "Missing Objective"}</p>`
-            : ""}
         </li>
       `;
     }).join("");
 
     if (dom.aside) {
       dom.aside.classList.add("step-progress-aside-badges");
+      dom.aside.classList.remove("step-progress-aside-controls");
       dom.aside.innerHTML = `
         <span class="wizard-confirm-badge">${state.input.duration_days}${esc(copy.daysSuffix)}</span>
         <span class="wizard-confirm-badge">${esc(visibilityLabel(state.input.visibility)).toUpperCase()}</span>
@@ -652,9 +645,8 @@
       const value = state.input.data.pillars[def.key] || { objective: "", routines: [] };
       if (isPillarComplete(value)) {
         hasCompletePillar = true;
-        continue;
+        break;
       }
-      if (hasPillarContent(value)) return true;
     }
     return !hasCompletePillar;
   }
@@ -700,13 +692,13 @@
   function syncFromDOM() {
     const visAside = dom.aside && dom.aside.querySelector('[name="visibility_aside"]:checked');
     if (visAside) state.input.visibility = visAside.value;
+    const durationAside = dom.aside && dom.aside.querySelector('[name="duration_aside"]:checked');
+    if (durationAside) state.input.duration_days = Number(durationAside.value);
     if (state.step === 1) {
       const titleEl = dom.stage.querySelector('[name="priority_title"]');
       const whyEl = dom.stage.querySelector('[name="priority_why"]');
-      const dur = dom.stage.querySelector('[name="duration"]:checked');
       if (titleEl) state.input.data.priority.title = titleEl.value.trim();
       if (whyEl) state.input.data.priority.why = whyEl.value.trim();
-      if (dur) state.input.duration_days = Number(dur.value);
     } else if (state.step >= 2 && state.step <= state.cfg.pillars.length + 1) {
       const def = state.cfg.pillars[state.step - 2];
       const value = ensurePillar(def.key);
@@ -735,12 +727,16 @@
   }
 
   function validateStep() {
+    state.fieldErrors = {};
     if (state.step === 0) {
       return "";
     }
     if (state.step === 1) {
       if (!state.input.data.priority.title) return copy.errors.priorityRequired;
-      if (!state.input.data.priority.why) return copy.errors.priorityWhyRequired;
+      if (!state.input.data.priority.why) {
+        state.fieldErrors.priorityWhy = true;
+        return copy.errors.priorityWhyRequired;
+      }
       if (!state.cfg.durations.some((item) => item.value === state.input.duration_days)) return copy.errors.invalidDuration;
       if (!state.cfg.visibility.find((v) => v.value === state.input.visibility)) return copy.errors.invalidVisibility;
     } else if (state.step >= 2 && state.step <= state.cfg.pillars.length + 1) {
@@ -859,14 +855,13 @@
       const url = state.editId
         ? `/api/me/battleplans/${encodeURIComponent(state.editId)}`
         : "/api/me/battleplans";
-      const result = await auth.apiFetch(url, {
+      await auth.apiFetch(url, {
         method: state.editId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildPayload()),
       });
-      const id = state.editId || (result && result.id);
       clearDraft();
-      window.location.href = id ? `/admin/battleplan/view/?view=${encodeURIComponent(id)}` : "/admin/battleplan/";
+      window.location.href = "/admin/battleplan/";
     } catch (err) {
       if (isConfirm()) {
         state.confirmAttempted = true;
@@ -888,7 +883,7 @@
         render();
         return;
       }
-      window.location.href = `/admin/battleplan/view/?view=${encodeURIComponent(state.editId)}`;
+      window.location.href = `/admin/battleplan/view/${encodeURIComponent(state.editId)}/`;
       return;
     }
     if (state.step <= 0 || (!shouldShowIntro() && state.step <= 1)) {
@@ -919,7 +914,11 @@
       }
     }
     const err = validateStep();
-    if (err) { setStatus(err); return; }
+    if (err) {
+      render();
+      setStatus(err);
+      return;
+    }
     if (isConfirm()) {
       if (hasConfirmMissing()) {
         state.confirmAttempted = true;
@@ -997,7 +996,7 @@
       const step = Number(target.dataset.step);
       const id = state.viewId || state.editId;
       if (!id || !Number.isFinite(step)) return;
-      window.location.href = `/admin/battleplan/edit/?edit=${encodeURIComponent(id)}&step=${encodeURIComponent(String(step))}`;
+      window.location.href = `/admin/battleplan/edit/${encodeURIComponent(id)}/?step=${encodeURIComponent(String(step))}`;
     }
   });
 
@@ -1007,13 +1006,30 @@
     render();
   });
 
-  dom.form.addEventListener("input", () => {
+  dom.form.addEventListener("input", (e) => {
+    if (e.target && e.target.name === "priority_why") {
+      state.fieldErrors.priorityWhy = false;
+      e.target.classList.remove("field-input-error");
+    }
     syncFromDOM();
   });
+
+  if (dom.aside) {
+    dom.aside.addEventListener("change", (e) => {
+      if (!e.target || (e.target.name !== "duration_aside" && e.target.name !== "visibility_aside")) return;
+      syncFromDOM();
+      render();
+    });
+  }
 
   dom.form.addEventListener("change", (e) => {
     if (e.target && e.target.name === "visibility_aside") {
       syncFromDOM();
+      return;
+    }
+    if (e.target && e.target.name === "duration") {
+      syncFromDOM();
+      render();
       return;
     }
     syncFromDOM();
@@ -1179,7 +1195,7 @@
           nextBtn.setAttribute("type", "button");
           nextBtn.removeAttribute("form");
           nextBtn.onclick = () => {
-            window.location.href = `/admin/battleplan/edit/?edit=${encodeURIComponent(state.viewId)}&step=1`;
+            window.location.href = `/admin/battleplan/edit/${encodeURIComponent(state.viewId)}/?step=1`;
           };
         }
       }
