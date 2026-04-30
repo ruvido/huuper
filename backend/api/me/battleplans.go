@@ -113,7 +113,7 @@ func BattleplanStatusHandler(app *pocketbase.PocketBase) func(e *core.RequestEve
 			return apis.NewBadRequestError("invalid_payload", err)
 		}
 		next := strings.TrimSpace(payload.Status)
-		if next != battleplans.StatusCompleted && next != battleplans.StatusAbandoned {
+		if next != battleplans.StatusCompleted && next != battleplans.StatusArchived {
 			return apis.NewBadRequestError("invalid_status_transition", nil)
 		}
 		if record.GetString("status") != battleplans.StatusActive {

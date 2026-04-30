@@ -10,6 +10,8 @@
   <div class="top-bar-title">{{ .Title }}</div>
   {{ if .RightActionTrash }}
     <button class="topbar-action topbar-action-danger" type="button" aria-label="{{ if .RightActionTrashAria }}{{ .RightActionTrashAria }}{{ else }}Reject candidate{{ end }}" data-request-reject>{{ template "icon-trash-fill" . }}</button>
+  {{ else if .RightActionCancel }}
+    <button class="topbar-action topbar-action-cancel" type="button" aria-label="Cancel" data-battleplan-cancel-edit>{{ template "icon-x" . }}</button>
   {{ else if .RightActionShuffle }}
     <button class="topbar-action topbar-action-accent" type="button" aria-label="Change assistant" data-group-assistant-action hidden>{{ template "icon-shuffle" . }}</button>
   {{ else if .ProfileHref }}

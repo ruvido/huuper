@@ -4,9 +4,9 @@
   }
 
   const STATUS_LABELS = {
-    active: "Attivo",
-    completed: "Completato",
-    abandoned: "Abbandonato",
+    active: "Active",
+    completed: "Completed",
+    archived: "Archived",
   };
 
   function durationDays(item) {
@@ -17,10 +17,25 @@
     return Math.round((end - start) / (1000 * 60 * 60 * 24));
   }
 
-  function metaFor(item) {
-    const status = STATUS_LABELS[item.status] || item.status || "";
+  function shortDate(str) {
+    if (!str) return "";
+    const d = new Date(str);
+    if (isNaN(d)) return "";
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  }
+
+  function metaHTML(item, esc) {
     const days = durationDays(item);
-    return [status, days ? `${days} giorni` : ""].filter(Boolean).join(" · ");
+    const vis = item.visibility || "";
+    const start = shortDate(item.start_date);
+    const closeDate = item.status === "archived" ? shortDate(item.updated) : shortDate(item.end_date);
+    const range = (start && closeDate) ? `${esc(start)} → ${esc(closeDate)}` : esc(start || closeDate);
+    const tags = [
+      days ? `<label class="field-label wizard-summary-tag wizard-summary-tag-outline">${days}D</label>` : "",
+      vis ? `<label class="field-label wizard-summary-tag wizard-summary-tag-outline">${esc(vis.toUpperCase())}</label>` : "",
+    ].filter(Boolean).join("");
+    return `<span class="battleplan-list-meta">${range ? `<span class="battleplan-list-date">${range}</span>` : ""}${tags ? `<span class="battleplan-list-tags">${tags}</span>` : ""}</span>`;
   }
 
   function renderEmpty() {
@@ -40,9 +55,21 @@
     renderEmpty,
     load: () => window.huuperAuth.apiFetch("/api/me/battleplans"),
     renderItem: (item) => {
-      const title = (item.data && item.data.priority && item.data.priority.title) || "Piano di Battaglia";
-      const href = `/admin/battleplan/?id=${encodeURIComponent(item.id)}`;
-      return window.huuperListPage.renderListItemLink(href, title, metaFor(item));
+      const lp = window.huuperListPage;
+      const title = (item.data && item.data.priority && item.data.priority.title) || "Battleplan";
+      const href = `/admin/battleplan/view/?view=${encodeURIComponent(item.id)}`;
+      const status = STATUS_LABELS[item.status] || item.status || "";
+      const meta = metaHTML(item, lp.escapeHTML);
+      const side = status ? `<span class="list-item-side"><span class="list-item-side-title request-item-status">${lp.escapeHTML(status)}</span></span>` : "";
+      return `
+        <a href="${lp.escapeHTML(href)}" class="list-item request-item">
+          <span class="list-item-copy request-item-copy">
+            <strong>${lp.escapeHTML(title)}</strong>
+            <span class="list-item-meta request-item-meta">${meta}</span>
+          </span>
+          ${side}
+        </a>
+      `;
     },
   });
 })();

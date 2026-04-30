@@ -18,7 +18,7 @@ func init() {
 
 		record.Set("data", map[string]any{
 			"priority": map[string]any{
-				"label": "Nuovo Piano di Battaglia",
+				"label":       "Nuovo Piano di Battaglia",
 				"description": "Scegli un'esigenza profonda della tua vita. Sarà il faro del tuo cammino.\n- Cosa mi impedisce di vivere appieno?\n- Quale emozione o vuoto sento più forte in questo momento?\n- Come vorrei ricordare questo periodo tra un anno?",
 			},
 			"pillars": []map[string]any{
@@ -28,7 +28,8 @@ func init() {
 				{"key": "salute", "label": "Salute", "description": ""},
 			},
 			"cadences": []map[string]any{
-				{"type": "daily", "label": "Ogni giorno", "default": true},
+				{"type": "paused", "label": "In pausa", "default": true},
+				{"type": "daily", "label": "Ogni giorno"},
 				{"type": "specific_days", "label": "Giorni specifici"},
 				{"type": "times_per_week", "label": "Volte a settimana"},
 			},

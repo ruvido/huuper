@@ -63,11 +63,7 @@ window.huuperListPage = (() => {
     const sideHTML = options && options.sideHTML ? String(options.sideHTML) : "";
     return `
       <a class="list-item" href="${safeHref}">
-        <span class="list-item-media" aria-hidden="true">
-          <span class="list-item-media-face">
-            <span class="list-item-media-text">${escapeHTML(initials(title))}</span>
-          </span>
-        </span>
+        ${options.noMedia ? "" : `<span class="list-item-media" aria-hidden="true"><span class="list-item-media-face"><span class="list-item-media-text">${escapeHTML(initials(title))}</span></span></span>`}
         <span class="list-item-main">
           <span class="list-item-copy">
             <strong>${safeTitle}</strong>

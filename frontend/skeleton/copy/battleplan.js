@@ -1,5 +1,7 @@
 window.huuperCopy = Object.assign({}, window.huuperCopy || {}, {
   battleplan: {
+    titleBattleplan: "Battleplan",
+    archiveLabel: "Archive",
     wizard: {
       progressPrefix: "MISSION PHASE",
       statePriority: "PRIORITY",
@@ -40,6 +42,11 @@ window.huuperCopy = Object.assign({}, window.huuperCopy || {}, {
           cancelLabel: "Cancel",
           confirmLabel: "Delete",
         },
+        cancelEdit: {
+          title: "Are you sure you want to discard your changes?",
+          keepLabel: "Keep editing",
+          confirmLabel: "Discard changes",
+        },
       },
       dayShort: {
         mon: "M",
@@ -53,8 +60,10 @@ window.huuperCopy = Object.assign({}, window.huuperCopy || {}, {
       errors: {
         saveFailed: "Save failed. Try again.",
         priorityRequired: "Priority is required",
+        priorityWhyRequired: "Why is required",
         invalidDuration: "Invalid duration",
         invalidVisibility: "Invalid visibility",
+        completePillarRequired: "Add at least one pillar with an objective and one routine",
         routineTitleRequired: "Each routine needs a title",
         routineTriggerRequired: "Each routine needs a trigger",
         selectAtLeastOneDay: "Select at least one day",

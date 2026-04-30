@@ -23,9 +23,15 @@
     back: $("back"),
     nextLabel: $("next-label"),
   };
+  const cancelEditButton = document.querySelector("[data-battleplan-cancel-edit]");
+
+  const editId = new URLSearchParams(window.location.search).get("edit") || null;
+  const viewId = new URLSearchParams(window.location.search).get("view") || null;
 
   const state = {
     cfg: null,
+    editId,
+    viewId,
     hasExistingBattleplan: false,
     step: 0,
     confirmAttempted: false,
@@ -97,6 +103,17 @@
     dom.loading.hidden = !visible;
   }
 
+  function sleep(ms) {
+    return new Promise((resolve) => window.setTimeout(resolve, ms));
+  }
+
+  async function pulseNextLoading(ms = 220) {
+    if (!dom.nextLabel) return;
+    dom.nextLabel.classList.add("request-action-loading");
+    await sleep(ms);
+    dom.nextLabel.classList.remove("request-action-loading");
+  }
+
   function showWizard() {
     setLoading(false);
     dom.form.hidden = false;
@@ -140,10 +157,13 @@
   }
 
   function minStep() {
+    if (state.viewId) return totalSteps() - 1;
+    if (state.editId) return 2; // pillars only; priority not editable via edit page
     return shouldShowIntro() ? 0 : 1;
   }
 
   function maxStep() {
+    if (state.viewId) return totalSteps() - 1;
     return totalSteps() - 1;
   }
 
@@ -152,18 +172,39 @@
     return Math.max(minStep(), Math.min(maxStep(), step));
   }
 
+  function isPillarStep() {
+    return state.step >= 2 && state.step <= state.cfg.pillars.length + 1;
+  }
+
+  function internalStepFromURLStep(urlStep) {
+    if (!Number.isFinite(urlStep)) return null;
+    if (state.viewId) return null;
+    if (urlStep < 1 || urlStep > state.cfg.pillars.length) return null;
+    return urlStep + 1;
+  }
+
+  function urlStepFromInternalStep() {
+    if (!isPillarStep()) return null;
+    return state.step - 1;
+  }
+
   function readStepFromURL() {
     const url = new URL(window.location.href);
     const raw = url.searchParams.get("step");
     if (!raw) return null;
     const parsed = Number.parseInt(raw, 10);
     if (!Number.isFinite(parsed)) return null;
-    return parsed;
+    return internalStepFromURLStep(parsed);
   }
 
   function writeStepToURL() {
     const url = new URL(window.location.href);
-    url.searchParams.set("step", String(state.step));
+    const urlStep = urlStepFromInternalStep();
+    if (urlStep === null) {
+      url.searchParams.delete("step");
+    } else {
+      url.searchParams.set("step", String(urlStep));
+    }
     window.history.replaceState({}, "", url.toString());
   }
 
@@ -171,6 +212,10 @@
 
   function isConfirm() {
     return state.step === totalSteps() - 1;
+  }
+
+  function isSummaryView() {
+    return isConfirm() && (state.viewId || state.editId);
   }
 
   function stateLabel() {
@@ -182,8 +227,8 @@
   }
 
   function syncProgress() {
-    const n = totalSteps() - 1;
-    const cur = state.step;
+    const n = state.cfg.pillars.length;
+    const cur = isPillarStep() ? state.step - 1 : 0;
     dom.progressLabel.textContent = `${copy.progressPrefix}: ${pad2(cur)}/${pad2(n)}`;
     dom.progressState.textContent = stateLabel();
     dom.progressFill.style.width = `${(cur / n) * 100}%`;
@@ -208,12 +253,18 @@
   function syncChrome() {
     const onIntro = state.step === 0 && shouldShowIntro();
     const onConfirm = isConfirm();
+    const onSummaryView = isSummaryView();
     if (dom.page) dom.page.classList.toggle("wizard-page-intro", onIntro);
-    if (dom.page) dom.page.classList.toggle("wizard-page-confirm", onConfirm);
-    if (dom.page) dom.page.classList.toggle("wizard-page-has-progress", !onIntro);
-    if (dom.stage) dom.stage.classList.toggle("wizard-stage-confirm", onConfirm);
-    if (dom.form) dom.form.classList.toggle("wizard-form-confirm", onConfirm);
-    if (dom.progress) dom.progress.hidden = onIntro;
+    if (dom.page) dom.page.classList.toggle("wizard-page-confirm", onConfirm && !onSummaryView);
+    if (dom.page) dom.page.classList.toggle("wizard-page-has-progress", !onIntro && !onConfirm);
+    if (dom.stage) dom.stage.classList.toggle("wizard-stage-confirm", onConfirm && !onSummaryView);
+    if (dom.stage) dom.stage.classList.toggle("wizard-stage-view", onSummaryView);
+    if (dom.form) dom.form.classList.toggle("wizard-form-confirm", onConfirm && !onSummaryView);
+    if (dom.form) {
+      dom.form.classList.toggle("wizard-form-view", onSummaryView);
+      if (!onSummaryView) dom.form.classList.remove("wizard-form-view-overflow");
+    }
+    if (dom.progress) dom.progress.hidden = onIntro || isConfirm();
     if (dom.aside) dom.aside.hidden = onIntro || isConfirm();
     if (dom.back) dom.back.hidden = onIntro;
     if (dom.sticky) dom.sticky.classList.toggle("sticky-actions-intro", onIntro);
@@ -300,6 +351,13 @@
     dom.aside.hidden = false;
   }
 
+  function highlightCurrentRoutines() {
+    const box = dom.stage && dom.stage.querySelector(".wizard-routines");
+    if (!box) return;
+    box.classList.add("wizard-routines-highlight");
+    window.setTimeout(() => box.classList.remove("wizard-routines-highlight"), 1400);
+  }
+
   function routineChevronSVG(collapsed) {
     if (collapsed) {
       return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="wizard-routine-chevron" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708"/></svg>`;
@@ -330,12 +388,20 @@
     const collapsed = Object.prototype.hasOwnProperty.call(state.ui.collapsedRoutines, collapseKey)
       ? !!state.ui.collapsedRoutines[collapseKey]
       : true;
-    const cadenceOpts = state.cfg.cadences.map((c) => `
+    const routineTitle = String((routine && routine.title) || "").trim();
+    const cadenceOpts = state.cfg.cadences.filter((c) => c && c.type !== "paused").map((c) => `
       <label class="segmented-option">
         <input type="radio" name="cadence_type_${pillarKey}_${idx}" value="${esc(c.type)}" ${routine.cadence.type === c.type ? "checked" : ""} />
         <span>${esc(c.label)}</span>
       </label>
     `).join("");
+    const cadenceReset = `
+      <button type="button" class="segmented-option segmented-reset${routine.cadence.type === "paused" ? " is-selected" : ""}" data-action="pause-cadence" data-pillar="${esc(pillarKey)}" data-idx="${idx}" aria-label="Routine in pausa">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M6 3.5a.5.5 0 0 1 .5.5v8a.5.5 0 0 1-1 0V4a.5.5 0 0 1 .5-.5m4 0a.5.5 0 0 1 .5.5v8a.5.5 0 0 1-1 0V4a.5.5 0 0 1 .5-.5"/>
+        </svg>
+      </button>
+    `;
 
     let extra = "";
     if (routine.cadence.type === "specific_days") {
@@ -352,7 +418,7 @@
       extra = `
         <div class="day-toggles">
           ${dayLabels.map(([key, label]) => `
-            <label class="day-toggle">
+            <label class="segmented-option day-toggle">
               <input type="checkbox" name="cadence_day_${pillarKey}_${idx}" value="${key}" ${days.includes(key) ? "checked" : ""} />
               <span>${label}</span>
             </label>
@@ -361,20 +427,21 @@
       `;
     } else if (routine.cadence.type === "times_per_week") {
       extra = `
-        <div>
-          <label class="field-label">${esc(copy.labels.timesPerWeek)}</label>
-          <input class="field-input" type="number" min="1" max="7" name="cadence_times_${pillarKey}_${idx}" value="${routine.cadence.times || 1}" />
+        <div class="day-toggles cadence-times-card">
+          <label class="segmented-option day-toggle cadence-times-box">
+            <input class="cadence-times-input" type="number" min="1" max="7" name="cadence_times_${pillarKey}_${idx}" value="${routine.cadence.times || 1}" />
+          </label>
         </div>
       `;
     }
 
     return `
-      <article class="wizard-routine${collapsed ? " is-collapsed" : ""}" data-routine-idx="${idx}" data-pillar="${esc(pillarKey)}">
+      <article class="wizard-routine${collapsed ? " is-collapsed" : ""}${routine.cadence.type === "paused" ? " is-paused" : ""}" data-routine-idx="${idx}" data-pillar="${esc(pillarKey)}">
         <header class="wizard-routine-hdr" data-action="toggle-routine" data-pillar="${esc(pillarKey)}" data-idx="${idx}">
           <div class="wizard-routine-left">
-            ${collapsed ? "" : `<button type="button" class="wizard-routine-delete" data-action="remove-routine" data-pillar="${esc(pillarKey)}" data-idx="${idx}" aria-label="${esc(copy.actions.removeRoutineAria)}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M2.5 1a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1H3v9a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V4h.5a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H10a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1zm3 4a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 .5-.5M8 5a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7A.5.5 0 0 1 8 5m3 .5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 1 0"/></svg></button>`}
             <button type="button" class="wizard-routine-collapse" data-action="toggle-routine" data-pillar="${esc(pillarKey)}" data-idx="${idx}" aria-expanded="${collapsed ? "false" : "true"}">
-              <span>${esc(copy.routineWord)} ${idx + 1}</span>
+              <span>${routine.cadence.type === "paused" ? "⏸ " : ""}${esc(copy.routineWord)} ${idx + 1}</span>
+              ${collapsed && routineTitle ? `<span class="wizard-routine-collapsed-title">${esc(routineTitle)}</span>` : ""}
             </button>
           </div>
           <button type="button" class="wizard-routine-toggle" data-action="toggle-routine" data-pillar="${esc(pillarKey)}" data-idx="${idx}" aria-label="${collapsed ? esc(copy.actions.expandRoutineAria) : esc(copy.actions.collapseRoutineAria)}">
@@ -392,9 +459,15 @@
           </div>
           <div>
             <label class="field-label">${esc(copy.labels.cadenceField)}</label>
-            <div class="segmented">${cadenceOpts}</div>
+            <div class="segmented segmented-cadence">${cadenceReset}${cadenceOpts}</div>
           </div>
           ${extra}
+          <button type="button" class="wizard-btn wizard-btn-danger" data-action="remove-routine" data-pillar="${esc(pillarKey)}" data-idx="${idx}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293z"/>
+            </svg>
+            <span>delete</span>
+          </button>
         </div>
       </article>
     `;
@@ -431,53 +504,92 @@
     return def ? def.label : value;
   }
 
+  function routineCadenceLabel(cadence) {
+    if (!cadence || !cadence.type) return "";
+    if (cadence.type === "paused") return "";
+    const cadenceTimes = Number(cadence.times);
+    if (cadence.type === "times_per_week" && Number.isFinite(cadenceTimes) && cadenceTimes > 0) {
+      return `${cadenceTimes}X`;
+    }
+    if (cadence.type === "specific_days") {
+      const dayLabels = {
+        mon: "M",
+        tue: "T",
+        wed: "W",
+        thu: "T",
+        fri: "F",
+        sat: "S",
+        sun: "S",
+      };
+      const days = Array.isArray(cadence.days) ? cadence.days : [];
+      const ordered = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+        .filter((day) => days.includes(day))
+        .map((day) => dayLabels[day]);
+      return ordered.length ? `(${ordered.join(",")})` : "";
+    }
+    if (cadence.type === "daily") return "W";
+    return "";
+  }
+
+  function isRoutineComplete(routine) {
+    if (!routine) return false;
+    if (!(routine.title || "").trim()) return false;
+    if (!(routine.trigger || "").trim()) return false;
+    const cadence = routine.cadence || {};
+    if (!cadence.type || cadence.type === "paused") return false;
+    if (cadence.type === "specific_days") return Array.isArray(cadence.days) && cadence.days.length > 0;
+    if (cadence.type === "times_per_week") {
+      const times = Number(cadence.times);
+      return Number.isFinite(times) && times >= 1 && times <= 7;
+    }
+    return true;
+  }
+
+  function hasPillarContent(value) {
+    if (!value) return false;
+    if ((value.objective || "").trim()) return true;
+    return (value.routines || []).some((r) => {
+      if (!r) return false;
+      return !!((r.title || "").trim() || (r.trigger || "").trim() || (r.cadence && r.cadence.type && r.cadence.type !== "paused"));
+    });
+  }
+
+  function isPillarComplete(value) {
+    if (!value || !(value.objective || "").trim()) return false;
+    return (value.routines || []).some((r) => isRoutineComplete(r));
+  }
+
   function renderConfirm() {
     const c = state.cfg.wizard.confirmation;
     const priorityText = (state.input.data.priority.title || "").trim();
+    const priorityWhy = (state.input.data.priority.why || "").trim();
     const priorityMissing = !priorityText;
-    const pillarsSummary = state.cfg.pillars.map((def) => {
+    const summaryEditId = state.viewId || state.editId;
+    const hasCompletePillar = state.cfg.pillars.some((def) => isPillarComplete(state.input.data.pillars[def.key]));
+    const pillarsSummary = state.cfg.pillars.map((def, pillarIndex) => {
       const value = state.input.data.pillars[def.key] || { objective: "", routines: [] };
       const objective = (value.objective || "").trim();
       const routines = (value.routines || []);
-      const routineCount = routines.length;
-      const invalidRoutine = (value.routines || []).some((r) => {
-        if (!r) return true;
-        if (!(r.title || "").trim()) return true;
-        if (!(r.trigger || "").trim()) return true;
-        if (!r.cadence || !r.cadence.type) return true;
-        return false;
-      });
-      const missing = (!objective && routineCount === 0) || invalidRoutine;
+      const missing = hasPillarContent(value) && !isPillarComplete(value);
       const routineItems = routines
         .map((r) => {
           if (!r || !r.title) return "";
+          if ((r.cadence || {}).type === "paused") return "";
           const title = String(r.title).trim();
           if (!title) return "";
           const cadence = r.cadence || {};
-          const cadenceTimes = Number(cadence.times);
-          if (cadence.type === "times_per_week" && Number.isFinite(cadenceTimes) && cadenceTimes > 0) {
-            return `${title} ${cadenceTimes}x`;
-          }
-          if (cadence.type === "specific_days") {
-            const dayCount = Array.isArray(cadence.days) ? cadence.days.length : 0;
-            if (dayCount > 0) return `${title} ${dayCount}x`;
-          }
-          if (cadence.type === "daily") {
-            return `${title} 7x`;
-          }
-          return title;
+          const cadenceLabel = routineCadenceLabel(cadence);
+          return `<li><span>${esc(title)}</span>${cadenceLabel ? ` <span class="wizard-routine-count-label">${esc(cadenceLabel)}</span>` : ""}</li>`;
         })
         .filter((line) => !!line)
-        .map((line) => `<li>${esc(line)}</li>`)
         .join("");
       return `
-        <li class="wizard-pillars-item">
-          <div class="wizard-pillars-row">
-            <strong>${esc(def.label)}</strong>
-            <span class="wizard-confirm-badge wizard-confirm-badge-sm" title="${routineCount} ${esc(copy.routineCountWord)}">${routineCount}R</span>
+        <li class="wizard-pillars-item wizard-summary-edit-target" data-action="${summaryEditId ? "edit-pillar" : "go-step"}" data-step="${summaryEditId ? pillarIndex + 1 : pillarIndex + 2}">
+          <div class="wizard-pillars-col wizard-pillars-col-label"><strong>${esc(def.label)}</strong></div>
+          <div class="wizard-pillars-col wizard-pillars-col-content">
+            ${objective ? `<p class="wizard-pillars-objective-inline">${esc(objective)}</p>` : ""}
+            <ul class="wizard-summary-muted-card wizard-pillars-routines">${routineItems || "<li><span>-</span></li>"}</ul>
           </div>
-          ${objective ? `<p class="wizard-pillars-objective">${esc(objective)}</p>` : ""}
-          ${routineItems ? `<ul class="wizard-pillars-routines">${routineItems}</ul>` : ""}
           ${missing
             ? `<p class="wizard-missing-line${state.confirmAttempted ? " is-error" : ""}">${state.confirmAttempted ? "Error: Missing Objective" : "Missing Objective"}</p>`
             : ""}
@@ -494,20 +606,39 @@
       dom.aside.hidden = false;
     }
 
+    const summaryView = isSummaryView();
+    const heroHTML = summaryView
+      ? `<h2 class="display-hero">${esc(priorityText)}</h2>`
+      : (c.text ? `<h2 class="display-hero">${esc(c.text)}</h2>` : "");
+    const priorityBodyHTML = summaryView
+      ? (priorityWhy ? `<p class="wizard-view-why">${esc(priorityWhy)}</p>` : "")
+      : (priorityMissing
+          ? `<p class="wizard-missing-line${state.confirmAttempted ? " is-error" : ""}">${state.confirmAttempted ? "Error: Missing Priority" : "Missing Priority"}</p>`
+          : `<p class="wizard-summary-value">${esc(priorityText)}</p>${priorityWhy ? `<p class="wizard-summary-muted-card wizard-summary-why">${esc(priorityWhy)}</p>` : ""}`);
+    const priorityTargetAttrs = summaryView
+      ? ""
+      : ` class="wizard-summary-edit-target" data-action="go-step" data-step="1"`;
+
     dom.stage.innerHTML = `
-      <section class="wizard-step wizard-step-confirm">
+      <section class="wizard-step wizard-step-confirm${summaryView ? " wizard-step-view" : ""}">
         <header class="wizard-step-header">
-          ${c.text ? `<h2 class="display-hero">${esc(c.text)}</h2>` : ""}
+          ${heroHTML}
         </header>
 
         <div class="wizard-summary">
-          <div>
-            <label class="field-label wizard-summary-tag">${esc(copy.labels.summaryPriority)}</label>
-            ${priorityMissing
-              ? `<p class="wizard-missing-line${state.confirmAttempted ? " is-error" : ""}">${state.confirmAttempted ? "Error: Missing Priority" : "Missing Priority"}</p>`
-              : `<p class="wizard-summary-value">${esc(priorityText)}</p>`}
+          <div${priorityTargetAttrs}>
+            <div class="wizard-summary-tags">
+              <label class="field-label wizard-summary-tag">${esc(copy.labels.summaryPriority)}</label>
+              <label class="field-label wizard-summary-tag wizard-summary-tag-outline">${state.input.duration_days} days</label>
+              <label class="field-label wizard-summary-tag wizard-summary-tag-outline">${esc(visibilityLabel(state.input.visibility)).toUpperCase()}</label>
+            </div>
+            ${priorityBodyHTML}
           </div>
-          <div><label class="field-label wizard-summary-tag">${esc(copy.labels.summaryPillars)}</label><ul class="wizard-pillars-summary">${pillarsSummary}</ul></div>
+          <div class="wizard-summary-pillars-block">
+            <label class="field-label wizard-summary-tag">${esc(copy.labels.summaryPillars)}</label>
+            ${state.confirmAttempted && !hasCompletePillar ? `<p class="wizard-missing-line is-error">Error: ${esc(copy.errors.completePillarRequired)}</p>` : ""}
+            <ul class="wizard-pillars-summary">${pillarsSummary}</ul>
+          </div>
         </div>
       </section>
     `;
@@ -516,18 +647,16 @@
   function hasConfirmMissing() {
     const priorityMissing = !(state.input.data.priority.title || "").trim();
     if (priorityMissing) return true;
+    let hasCompletePillar = false;
     for (const def of state.cfg.pillars) {
       const value = state.input.data.pillars[def.key] || { objective: "", routines: [] };
-      const objective = (value.objective || "").trim();
-      const routineCount = (value.routines || []).length;
-      if (!objective && routineCount === 0) return true;
-      for (const r of value.routines || []) {
-        if (!(r.title || "").trim()) return true;
-        if (!(r.trigger || "").trim()) return true;
-        if (!r.cadence || !r.cadence.type) return true;
+      if (isPillarComplete(value)) {
+        hasCompletePillar = true;
+        continue;
       }
+      if (hasPillarContent(value)) return true;
     }
-    return false;
+    return !hasCompletePillar;
   }
 
   function render() {
@@ -555,6 +684,15 @@
       }
       state.ui.focusRoutine = null;
     }
+    syncViewOverflow();
+  }
+
+  function syncViewOverflow() {
+    if (!isSummaryView() || !dom.form) return;
+    window.requestAnimationFrame(() => {
+      const needsBottomSpace = document.documentElement.scrollHeight > window.innerHeight;
+      dom.form.classList.toggle("wizard-form-view-overflow", needsBottomSpace);
+    });
   }
 
   // ---------- Form sync ----------
@@ -593,7 +731,7 @@
         }
       });
     }
-    saveDraft();
+    if (!state.editId) saveDraft();
   }
 
   function validateStep() {
@@ -602,6 +740,7 @@
     }
     if (state.step === 1) {
       if (!state.input.data.priority.title) return copy.errors.priorityRequired;
+      if (!state.input.data.priority.why) return copy.errors.priorityWhyRequired;
       if (!state.cfg.durations.some((item) => item.value === state.input.duration_days)) return copy.errors.invalidDuration;
       if (!state.cfg.visibility.find((v) => v.value === state.input.visibility)) return copy.errors.invalidVisibility;
     } else if (state.step >= 2 && state.step <= state.cfg.pillars.length + 1) {
@@ -633,6 +772,18 @@
         pillars,
       },
     };
+  }
+
+  function pruneIncompleteRoutinesForPillar(pillarKey) {
+    const value = ensurePillar(pillarKey);
+    const before = (value.routines || []).length;
+    value.routines = (value.routines || []).filter((r) => {
+      if (!r) return false;
+      const title = String(r.title || "").trim();
+      const trigger = String(r.trigger || "").trim();
+      return title !== "" && trigger !== "";
+    });
+    return before - value.routines.length;
   }
 
   function removeRoutineAt(pillarKey, idx) {
@@ -675,19 +826,47 @@
     });
   }
 
+  function cancelEdit() {
+    window.location.href = "/admin/battleplan/";
+  }
+
+  function confirmCancelEdit() {
+    const sheet = window.huuperActionSheet;
+    const cancelCopy = copy.actions.cancelEdit;
+    if (!sheet || typeof sheet.open !== "function") {
+      cancelEdit();
+      return;
+    }
+
+    sheet.open({
+      title: cancelCopy.title,
+      actions: [],
+      footerAction: {
+        label: cancelCopy.confirmLabel,
+        tone: "danger",
+        onSelect: () => {
+          cancelEdit();
+        },
+      },
+    });
+  }
+
   async function submit() {
     if (state.submitting) return;
     state.submitting = true;
     setStatus("");
     try {
-      const result = await auth.apiFetch("/api/me/battleplans", {
-        method: "POST",
+      const url = state.editId
+        ? `/api/me/battleplans/${encodeURIComponent(state.editId)}`
+        : "/api/me/battleplans";
+      const result = await auth.apiFetch(url, {
+        method: state.editId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildPayload()),
       });
-      const id = result && result.id;
+      const id = state.editId || (result && result.id);
       clearDraft();
-      window.location.href = id ? `/admin/battleplan/?id=${encodeURIComponent(id)}` : "/admin/battleplan/";
+      window.location.href = id ? `/admin/battleplan/view/?view=${encodeURIComponent(id)}` : "/admin/battleplan/";
     } catch (err) {
       if (isConfirm()) {
         state.confirmAttempted = true;
@@ -703,6 +882,15 @@
 
   dom.back.addEventListener("click", () => {
     syncFromDOM();
+    if (state.editId && isPillarStep()) {
+      if (state.step > 2) {
+        state.step -= 1;
+        render();
+        return;
+      }
+      window.location.href = `/admin/battleplan/view/?view=${encodeURIComponent(state.editId)}`;
+      return;
+    }
     if (state.step <= 0 || (!shouldShowIntro() && state.step <= 1)) {
       window.location.href = "/admin/battleplan/";
       return;
@@ -711,9 +899,25 @@
     render();
   });
 
-  dom.form.addEventListener("submit", (e) => {
+  if (cancelEditButton) {
+    cancelEditButton.addEventListener("click", () => {
+      confirmCancelEdit();
+    });
+  }
+
+  dom.form.addEventListener("submit", async (e) => {
     e.preventDefault();
+    await pulseNextLoading();
     syncFromDOM();
+    if (state.step >= 2 && state.step <= state.cfg.pillars.length + 1) {
+      const def = state.cfg.pillars[state.step - 2];
+      const removed = pruneIncompleteRoutinesForPillar(def.key);
+      if (removed > 0) {
+        setStatus(`Removed ${removed} incomplete routine${removed > 1 ? "s" : ""} (missing title or trigger).`);
+        render();
+        highlightCurrentRoutines();
+      }
+    }
     const err = validateStep();
     if (err) { setStatus(err); return; }
     if (isConfirm()) {
@@ -730,19 +934,25 @@
     render();
   });
 
-  dom.stage.addEventListener("click", (e) => {
+  dom.stage.addEventListener("click", async (e) => {
     const target = e.target.closest("[data-action]");
     if (!target) return;
     const action = target.dataset.action;
     if (action === "add-routine") {
+      await pulseNextLoading();
       syncFromDOM();
       const key = target.dataset.pillar;
+      const removed = pruneIncompleteRoutinesForPillar(key);
       const value = ensurePillar(key);
       const newIdx = value.routines.length;
       value.routines.push(newRoutine());
       state.ui.collapsedRoutines[`${key}:${newIdx}`] = false;
       state.ui.focusRoutine = { pillarKey: key, idx: newIdx };
       render();
+      if (removed > 0) {
+        setStatus(`Removed ${removed} incomplete routine${removed > 1 ? "s" : ""} (missing title or trigger).`);
+        highlightCurrentRoutines();
+      }
       animateCollapseOtherRoutines(key, newIdx);
     } else if (action === "toggle-routine") {
       syncFromDOM();
@@ -767,6 +977,27 @@
       const key = target.dataset.pillar;
       const idx = Number(target.dataset.idx);
       confirmRoutineRemoval(key, idx);
+    } else if (action === "pause-cadence") {
+      syncFromDOM();
+      const key = target.dataset.pillar;
+      const idx = Number(target.dataset.idx);
+      const value = ensurePillar(key);
+      const routine = value.routines[idx];
+      if (!routine) return;
+      routine.cadence = { type: "paused" };
+      render();
+    } else if (action === "go-step") {
+      syncFromDOM();
+      const step = Number(target.dataset.step);
+      if (!Number.isFinite(step)) return;
+      state.step = clampStep(step);
+      state.confirmAttempted = false;
+      render();
+    } else if (action === "edit-pillar") {
+      const step = Number(target.dataset.step);
+      const id = state.viewId || state.editId;
+      if (!id || !Number.isFinite(step)) return;
+      window.location.href = `/admin/battleplan/edit/?edit=${encodeURIComponent(id)}&step=${encodeURIComponent(String(step))}`;
     }
   });
 
@@ -802,6 +1033,13 @@
     if (!c.actions.deleteRoutine.meta) throw new Error("battleplan copy missing actions.deleteRoutine.meta");
     if (!c.actions.deleteRoutine.cancelLabel) throw new Error("battleplan copy missing actions.deleteRoutine.cancelLabel");
     if (!c.actions.deleteRoutine.confirmLabel) throw new Error("battleplan copy missing actions.deleteRoutine.confirmLabel");
+    if (!c.actions.cancelEdit || typeof c.actions.cancelEdit !== "object") throw new Error("battleplan copy missing actions.cancelEdit");
+    if (!c.actions.cancelEdit.title) throw new Error("battleplan copy missing actions.cancelEdit.title");
+    if (!c.actions.cancelEdit.keepLabel) throw new Error("battleplan copy missing actions.cancelEdit.keepLabel");
+    if (!c.actions.cancelEdit.confirmLabel) throw new Error("battleplan copy missing actions.cancelEdit.confirmLabel");
+    if (!c.errors.priorityRequired) throw new Error("battleplan copy missing errors.priorityRequired");
+    if (!c.errors.priorityWhyRequired) throw new Error("battleplan copy missing errors.priorityWhyRequired");
+    if (!c.errors.completePillarRequired) throw new Error("battleplan copy missing errors.completePillarRequired");
   }
 
   function validateSettings(cfg) {
@@ -828,20 +1066,51 @@
   async function init() {
     try {
       validateCopy(copy);
-      const [settings, existing] = await Promise.all([
+      const activeId = state.editId || state.viewId;
+      const fetchList = activeId
+        ? auth.apiFetch(`/api/me/battleplans/${encodeURIComponent(activeId)}`)
+        : auth.apiFetch("/api/me/battleplans?per_page=1");
+      const [settings, existingOrBp] = await Promise.all([
         auth.apiFetch("/api/me/settings/battleplan"),
-        auth.apiFetch("/api/me/battleplans?per_page=1"),
+        fetchList,
       ]);
       state.cfg = settings.data;
-      state.hasExistingBattleplan = !!(existing && Array.isArray(existing.items) && existing.items.length > 0);
+      if (state.editId || state.viewId) {
+        state.hasExistingBattleplan = true;
+        const bp = existingOrBp;
+        if (bp.visibility) state.input.visibility = bp.visibility;
+        if (bp.start_date) state.input.start_date = bp.start_date.slice(0, 10);
+        const bpData = bp.data || {};
+        if (bpData.priority) {
+          state.input.data.priority.title = String(bpData.priority.title || "");
+          state.input.data.priority.why = String(bpData.priority.why || "");
+        }
+        if (bpData.pillars && typeof bpData.pillars === "object") {
+          for (const def of (state.cfg.pillars || [])) {
+            const src = bpData.pillars[def.key];
+            if (!src) continue;
+            const target = ensurePillar(def.key);
+            target.objective = String(src.objective || "");
+            if (Array.isArray(src.routines)) {
+              target.routines = src.routines.map((r) => ({
+                title: String((r && r.title) || ""),
+                trigger: String((r && r.trigger) || ""),
+                cadence: (r && r.cadence && typeof r.cadence === "object") ? r.cadence : { type: defaultCadenceType() },
+              }));
+            }
+          }
+        }
+      } else {
+        state.hasExistingBattleplan = !!(existingOrBp && Array.isArray(existingOrBp.items) && existingOrBp.items.length > 0);
+      }
       validateSettings(state.cfg);
-      state.input.visibility = defaultVisibilityValue();
+      state.input.visibility = state.input.visibility || defaultVisibilityValue();
       for (const p of state.cfg.pillars) {
         ensurePillar(p.key);
       }
       if (dom.back) dom.back.textContent = copy.backLabel.toUpperCase();
-      state.input.duration_days = defaultDurationValue();
-      const draft = loadDraft();
+      if (!state.editId && !state.viewId) state.input.duration_days = defaultDurationValue();
+      const draft = (state.editId || state.viewId) ? null : loadDraft();
       if (draft && draft.input && typeof draft.input === "object") {
         if (typeof draft.input.start_date === "string") state.input.start_date = draft.input.start_date;
         if (Number.isFinite(draft.input.duration_days) && state.cfg.durations.some((item) => item.value === draft.input.duration_days)) {
@@ -874,12 +1143,7 @@
       }
       const stepFromURL = readStepFromURL();
       if (stepFromURL === null) {
-        const draftStep = draft && Number.isFinite(draft.step) ? draft.step : null;
-        if (draftStep !== null) {
-          state.step = clampStep(draftStep);
-        } else {
-          state.step = minStep();
-        }
+        state.step = minStep();
       } else {
         state.step = clampStep(stepFromURL);
       }
@@ -887,10 +1151,38 @@
         dom.progress.appendChild(dom.status);
         dom.status.classList.add("wizard-progress-status");
       }
-      saveDraft();
+      if (!state.editId && !state.viewId) saveDraft();
       showWizard();
       renderVisibilityAside();
       render();
+      if (state.viewId) {
+        const bpCopy = (window.huuperCopy && window.huuperCopy.battleplan) || {};
+        if (dom.back) {
+          dom.back.textContent = (bpCopy.archiveLabel || "Archive").toUpperCase();
+          dom.back.addEventListener("click", async () => {
+            if (dom.back.disabled) return;
+            dom.back.disabled = true;
+            try {
+              await auth.apiFetch(`/api/me/battleplans/${encodeURIComponent(state.viewId)}/status`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "archived" }),
+              });
+              window.location.href = "/admin/battleplan/";
+            } catch { dom.back.disabled = false; }
+          });
+        }
+        const nextBtn = document.getElementById(`${PREFIX}-next`);
+        const nextLabel = document.getElementById(`${PREFIX}-next-label`);
+        if (nextLabel) nextLabel.textContent = "EDIT";
+        if (nextBtn) {
+          nextBtn.setAttribute("type", "button");
+          nextBtn.removeAttribute("form");
+          nextBtn.onclick = () => {
+            window.location.href = `/admin/battleplan/edit/?edit=${encodeURIComponent(state.viewId)}&step=1`;
+          };
+        }
+      }
     } catch (err) {
       dom.loading.hidden = true;
       dom.stage.innerHTML = `

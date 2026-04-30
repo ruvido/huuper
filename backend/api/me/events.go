@@ -2,6 +2,7 @@ package me
 
 import (
 	"net/http"
+	"strings"
 
 	backendinternal "members/backend/internal"
 	eventinternal "members/backend/internal/events"
@@ -144,4 +145,328 @@ func EventUnsubscribeHandler(app *pocketbase.PocketBase) func(e *core.RequestEve
 
 		return e.JSON(http.StatusOK, map[string]any{"unsubscribed": true})
 	}
+}
+
+func ListEventsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		actor, err := backendinternal.RequireAuthenticatedActor(e)
+		if err != nil {
+			return err
+		}
+		window := strings.TrimSpace(e.Request.URL.Query().Get("window"))
+		if window == "" {
+			window = eventinternal.WindowFuture
+		}
+		items, err := eventinternal.ListForUser(app, actor, window)
+		if err != nil {
+			return apis.NewBadRequestError("failed_events", err)
+		}
+		return e.JSON(http.StatusOK, map[string]any{"items": items})
+	}
+}
+
+func CreateEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		actor, err := backendinternal.RequireAuthenticatedActor(e)
+		if err != nil {
+			return err
+		}
+		var input eventinternal.CreateInput
+		if err := e.BindBody(&input); err != nil {
+			return apis.NewBadRequestError("invalid_payload", err)
+		}
+		if !actor.GetBool("admin") && !eventinternal.IsAssistantCreatableType(input.Type) {
+			return apis.NewForbiddenError("forbidden_event_type", nil)
+		}
+		var group *core.Record
+		if groupID := strings.TrimSpace(input.Group); groupID != "" {
+			group, err = app.FindRecordById("groups", groupID)
+			if err != nil || group == nil {
+				return apis.NewBadRequestError("invalid_group", err)
+			}
+		}
+		if !eventinternal.CanCreate(actor, group, input.Type) {
+			return apis.NewForbiddenError("forbidden_event_create", nil)
+		}
+		records, err := eventinternal.Create(app, actor, input)
+		if err != nil {
+			return apis.NewBadRequestError("failed_event_create", err)
+		}
+		out := make([]eventinternal.Item, 0, len(records))
+		for _, record := range records {
+			out = append(out, eventinternal.MapItem(record))
+		}
+		return e.JSON(http.StatusCreated, map[string]any{"items": out})
+	}
+}
+
+func UpdateEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		actor, err := backendinternal.RequireAuthenticatedActor(e)
+		if err != nil {
+			return err
+		}
+		record, err := loadEvent(app, e.Request.PathValue("id"))
+		if err != nil {
+			return err
+		}
+		ok, err := eventinternal.CanEdit(app, actor, record)
+		if err != nil {
+			return apis.NewBadRequestError("failed_event_edit_check", err)
+		}
+		if !ok {
+			return apis.NewForbiddenError("forbidden_event_edit", nil)
+		}
+		var input eventinternal.UpdateInput
+		if err := e.BindBody(&input); err != nil {
+			return apis.NewBadRequestError("invalid_payload", err)
+		}
+		if err := eventinternal.Update(app, record, input); err != nil {
+			return apis.NewBadRequestError("failed_event_update", err)
+		}
+		return e.JSON(http.StatusOK, eventinternal.MapItem(record))
+	}
+}
+
+func RescheduleEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		actor, err := backendinternal.RequireAuthenticatedActor(e)
+		if err != nil {
+			return err
+		}
+		record, err := loadEvent(app, e.Request.PathValue("id"))
+		if err != nil {
+			return err
+		}
+		ok, err := eventinternal.CanEdit(app, actor, record)
+		if err != nil {
+			return apis.NewBadRequestError("failed_event_edit_check", err)
+		}
+		if !ok {
+			return apis.NewForbiddenError("forbidden_event_edit", nil)
+		}
+		var payload struct {
+			EventDate string `json:"event_date"`
+		}
+		if err := e.BindBody(&payload); err != nil {
+			return apis.NewBadRequestError("invalid_payload", err)
+		}
+		if err := eventinternal.Reschedule(app, record, payload.EventDate); err != nil {
+			return apis.NewBadRequestError("failed_event_reschedule", err)
+		}
+		return e.JSON(http.StatusOK, eventinternal.MapItem(record))
+	}
+}
+
+func CancelEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		actor, err := backendinternal.RequireAuthenticatedActor(e)
+		if err != nil {
+			return err
+		}
+		record, err := loadEvent(app, e.Request.PathValue("id"))
+		if err != nil {
+			return err
+		}
+		ok, err := eventinternal.CanEdit(app, actor, record)
+		if err != nil {
+			return apis.NewBadRequestError("failed_event_edit_check", err)
+		}
+		if !ok {
+			return apis.NewForbiddenError("forbidden_event_cancel", nil)
+		}
+		var payload struct {
+			Scope string `json:"scope"`
+		}
+		if err := e.BindBody(&payload); err != nil {
+			return apis.NewBadRequestError("invalid_payload", err)
+		}
+		scope := strings.TrimSpace(payload.Scope)
+		if scope == "" {
+			scope = eventinternal.CancelScopeThis
+		}
+		count, err := eventinternal.Cancel(app, record, scope)
+		if err != nil {
+			return apis.NewBadRequestError("failed_event_cancel", err)
+		}
+		return e.JSON(http.StatusOK, map[string]any{"deleted": count})
+	}
+}
+
+func RegisterEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		actor, err := backendinternal.RequireAuthenticatedActor(e)
+		if err != nil {
+			return err
+		}
+		event, err := loadEvent(app, e.Request.PathValue("id"))
+		if err != nil {
+			return err
+		}
+		eventType := event.GetString("type")
+		if eventType != eventinternal.TypeCall && eventType != eventinternal.TypeMeetup {
+			return apis.NewBadRequestError("registration_not_allowed", nil)
+		}
+		canView, err := eventinternal.CanView(app, actor, event)
+		if err != nil {
+			return apis.NewBadRequestError("failed_event_visibility", err)
+		}
+		if !canView {
+			return apis.NewForbiddenError("forbidden_event", nil)
+		}
+
+		targets, err := eventsForRegistrationScope(app, event)
+		if err != nil {
+			return apis.NewBadRequestError("failed_event_registration_scope", err)
+		}
+
+		registered, err := registerForEvents(app, actor, targets)
+		if err != nil {
+			return apis.NewBadRequestError("failed_event_register", err)
+		}
+		return e.JSON(http.StatusOK, map[string]any{"registered": registered})
+	}
+}
+
+func UnregisterEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		actor, err := backendinternal.RequireAuthenticatedActor(e)
+		if err != nil {
+			return err
+		}
+		event, err := loadEvent(app, e.Request.PathValue("id"))
+		if err != nil {
+			return err
+		}
+		targets, err := eventsForRegistrationScope(app, event)
+		if err != nil {
+			return apis.NewBadRequestError("failed_event_registration_scope", err)
+		}
+		removed := 0
+		for _, target := range targets {
+			registration, _ := eventinternal.FindRegistrationByUser(app, target.Id, actor.Id, false)
+			if registration == nil {
+				continue
+			}
+			if err := app.Delete(registration); err != nil {
+				return apis.NewBadRequestError("failed_event_unregister", err)
+			}
+			removed++
+		}
+		return e.JSON(http.StatusOK, map[string]any{"unregistered": removed})
+	}
+}
+
+func MarkAttendanceHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		actor, err := backendinternal.RequireAuthenticatedActor(e)
+		if err != nil {
+			return err
+		}
+		regID := strings.TrimSpace(e.Request.PathValue("id"))
+		if regID == "" {
+			return apis.NewBadRequestError("invalid_registration", nil)
+		}
+		registration, err := app.FindRecordById("event_registrations", regID)
+		if err != nil || registration == nil {
+			return apis.NewNotFoundError("registration_not_found", err)
+		}
+		event, err := app.FindRecordById("events", registration.GetString("event"))
+		if err != nil || event == nil {
+			return apis.NewNotFoundError("event_not_found", err)
+		}
+		ok, err := eventinternal.CanEdit(app, actor, event)
+		if err != nil {
+			return apis.NewBadRequestError("failed_event_edit_check", err)
+		}
+		if !ok {
+			return apis.NewForbiddenError("forbidden_attendance", nil)
+		}
+		var payload struct {
+			Attended *bool `json:"attended"`
+		}
+		if err := e.BindBody(&payload); err != nil {
+			return apis.NewBadRequestError("invalid_payload", err)
+		}
+		if payload.Attended == nil {
+			if err := eventinternal.ClearAttendance(app, registration); err != nil {
+				return apis.NewBadRequestError("failed_attendance_clear", err)
+			}
+		} else {
+			if err := eventinternal.MarkAttendance(app, registration, *payload.Attended); err != nil {
+				return apis.NewBadRequestError("failed_attendance", err)
+			}
+		}
+		return e.JSON(http.StatusOK, map[string]any{"ok": true})
+	}
+}
+
+func loadEvent(app *pocketbase.PocketBase, id string) (*core.Record, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, apis.NewBadRequestError("invalid_event", nil)
+	}
+	record, err := app.FindRecordById("events", id)
+	if err != nil || record == nil {
+		return nil, apis.NewNotFoundError("event_not_found", err)
+	}
+	return record, nil
+}
+
+func eventsForRegistrationScope(app *pocketbase.PocketBase, event *core.Record) ([]*core.Record, error) {
+	cfg, err := eventinternal.LoadConfig(app)
+	if err != nil {
+		return []*core.Record{event}, nil
+	}
+	typeDef, ok := cfg.TypeDef(event.GetString("type"))
+	if !ok || typeDef.RegistrationScope != "series" {
+		return []*core.Record{event}, nil
+	}
+	series := strings.TrimSpace(event.GetString("series"))
+	if series == "" {
+		return []*core.Record{event}, nil
+	}
+	records, err := app.FindRecordsByFilter(
+		"events",
+		"series = {:series}",
+		"event_date",
+		0, 0,
+		map[string]any{"series": series},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return records, nil
+}
+
+func registerForEvents(app *pocketbase.PocketBase, actor *core.Record, events []*core.Record) (int, error) {
+	collection, err := app.FindCollectionByNameOrId("event_registrations")
+	if err != nil {
+		return 0, err
+	}
+	registered := 0
+	for _, event := range events {
+		existing, _ := eventinternal.FindRegistrationByUser(app, event.Id, actor.Id, false)
+		if existing != nil {
+			if existing.GetString("status") != "active" {
+				existing.Set("status", "active")
+				if err := app.Save(existing); err != nil {
+					return registered, err
+				}
+			}
+			registered++
+			continue
+		}
+		record := core.NewRecord(collection)
+		record.Set("event", event.Id)
+		record.Set("user", actor.Id)
+		record.Set("email", strings.TrimSpace(actor.GetString("email")))
+		record.Set("status", "active")
+		record.Set("data", map[string]any{})
+		if err := app.Save(record); err != nil {
+			return registered, err
+		}
+		registered++
+	}
+	return registered, nil
 }

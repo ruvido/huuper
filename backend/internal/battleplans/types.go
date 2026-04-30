@@ -10,11 +10,12 @@ import (
 )
 
 const (
-	StatusActive    = "active"
+	StatusActive   = "active"
 	StatusCompleted = "completed"
-	StatusAbandoned = "abandoned"
+	StatusArchived  = "archived"
 
 	CadenceDaily        = "daily"
+	CadencePaused       = "paused"
 	CadenceSpecificDays = "specific_days"
 	CadenceTimesPerWeek = "times_per_week"
 )
@@ -63,11 +64,13 @@ type ListItem struct {
 }
 
 func IsValidStatus(s string) bool {
-	return s == StatusActive || s == StatusCompleted || s == StatusAbandoned
+	return s == StatusActive || s == StatusCompleted || s == StatusArchived
 }
 
 func IsValidCadence(c Cadence) bool {
 	switch c.Type {
+	case CadencePaused:
+		return true
 	case CadenceDaily:
 		return true
 	case CadenceSpecificDays:

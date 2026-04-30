@@ -22,8 +22,8 @@
 </main>
 
 <footer class="sticky-actions" id="{{ .Prefix }}-sticky" hidden>
-  <button class="sticky-actions-back" id="{{ .Prefix }}-back" type="button">INDIETRO</button>
-  <button class="sticky-actions-next" id="{{ .Prefix }}-next" type="submit" form="{{ .Prefix }}-form">
+  <button class="wizard-btn wizard-btn-dark" id="{{ .Prefix }}-back" type="button">INDIETRO</button>
+  <button class="wizard-btn wizard-btn-primary" id="{{ .Prefix }}-next" type="submit" form="{{ .Prefix }}-form">
     <span id="{{ .Prefix }}-next-label">AVANTI</span>
     {{ template "icon-bolt" . }}
   </button>
