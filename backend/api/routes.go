@@ -52,6 +52,8 @@ func RegisterRoutes(app *pocketbase.PocketBase, se *core.ServeEvent) {
 		BattleplanCreate:   meroutes.CreateBattleplanHandler(app),
 		BattleplanUpdate:   meroutes.UpdateBattleplanHandler(app),
 		BattleplanStatus:   meroutes.BattleplanStatusHandler(app),
+		BattleplanDelete:   meroutes.DeleteBattleplanHandler(app),
+		BattleplanAccess:   meroutes.BattleplanAccessHandler(app),
 	})
 
 	adminroutes.Register(se, adminroutes.Handlers{

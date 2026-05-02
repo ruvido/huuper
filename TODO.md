@@ -1,14 +1,14 @@
 # Battleplan 
 
-Nella lista, il battleplan active deve avere una grafica diversa, sfondo giallo e scritte nere. Essere in cima a tutto ed essere completamente visibile. Poi tutta la lista dei battle plan completed ed infine gli archived. Ognuno di questi gruppi deve essere in ordine cronologico, chiaramente. Non c'è bisogno di separarli: semplicemente prima va active, poi completed, poi archived. 
-
-Quando si crea un nuovo battle plan con il tasto +, se esiste un battle plan attivo -> bottom menu modal che dice: "Vuoi abbandonare il tuo attuale battleplan?" bottoni no yes (giallo) -> se yes archive il battleplan attivo e inizia il wizard per il nuovo battleplan 
-
-Quando si finisce di creare il battleplan e si scrive sul database, bisogna tornare alla lista, non a view/id
-
-Duration deve stare in alto a sinistra, nella stessa riga di visibility. Quindi in alto appare il progress bar poi sotto il progress bar, a sinistra duration, a destra visibility. 
-
-Perché usi http://localhost:9090/admin/battleplan/view/?view=9302l3o7m5b4us5 e non view/id?? lo stesso per edit perche? sembra inutile e logorroico
+X save draft
+X duplicate
+X icona freccia su next (fulmine solo alla fine)
+X invece che "+" "crea nuovo piano" in evidenza (se c'e' draft => modifica draft)
+- set end date
+- note per il piano
+- icona "libro" per link alla pagina pdb
+- spazio in alto sopra al titolo buggy!
+- reminder in request a 7gg e 1gg dalla scadenza (anche un celebrate!)
 
 ---
 

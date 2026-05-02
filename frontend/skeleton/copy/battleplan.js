@@ -4,13 +4,38 @@ window.huuperCopy = Object.assign({}, window.huuperCopy || {}, {
     archiveLabel: "Archive",
     list: {
       activeSectionLabel: "The Active Plan",
+      draftSectionLabel: "Draft",
       archiveSectionLabel: "Archive",
+      duplicateLabel: "Duplicate",
+      newPlanLabel: "New Plan",
+      overwriteDraftDialog: {
+        title: "You already have an active plan and a draft. Overwrite the draft?",
+        cancelLabel: "No",
+        confirmLabel: "Yes",
+      },
+    },
+    view: {
+      editLabel: "Edit",
+      deleteLabel: "Delete",
+      deleteDialog: {
+        title: "Delete this battleplan?",
+        cancelLabel: "Cancel",
+        confirmLabel: "Delete",
+      },
+    },
+    placeholder: {
+      label: "sharpening the blades",
+    },
+    fab: {
+      newAria: "New Battleplan",
     },
     wizard: {
       progressPrefix: "MISSION PHASE",
       statePriority: "PRIORITY",
       nextLabel: "NEXT",
       backLabel: "BACK",
+      confirmLabel: "Confirm",
+      saveDraftLabel: "Save Draft",
       daysSuffix: "D",
       routineWord: "Routine",
       routineCountWord: "routines",
@@ -68,6 +93,8 @@ window.huuperCopy = Object.assign({}, window.huuperCopy || {}, {
         invalidDuration: "Invalid duration",
         invalidVisibility: "Invalid visibility",
         completePillarRequired: "Add at least one pillar with an objective and one routine",
+        pillarObjectiveRequired: "Missing objective",
+        pillarRoutineRequired: "Missing routine",
         routineTitleRequired: "Each routine needs a title",
         routineTriggerRequired: "Each routine needs a trigger",
         selectAtLeastOneDay: "Select at least one day",

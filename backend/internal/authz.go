@@ -245,3 +245,40 @@ func IsMemberOfGroup(app *pocketbase.PocketBase, userID string, groupID string) 
 	}
 	return len(records) > 0, nil
 }
+
+// IsBetaTester reports whether the user belongs to any group whose
+// type is "beta_testers".
+func IsBetaTester(app *pocketbase.PocketBase, userID string) (bool, error) {
+	id := strings.TrimSpace(userID)
+	if id == "" || app == nil {
+		return false, nil
+	}
+
+	records, err := app.FindRecordsByFilter(
+		"user_groups",
+		"user = {:user} && group.type = {:type}",
+		"",
+		1,
+		0,
+		map[string]any{
+			"user": id,
+			"type": "beta_testers",
+		},
+	)
+	if err != nil {
+		return false, err
+	}
+	return len(records) > 0, nil
+}
+
+// HasBattleplanAccess reports whether the actor can use the battleplan
+// feature: either an admin, or a member of a beta_testers group.
+func HasBattleplanAccess(app *pocketbase.PocketBase, actor *core.Record) (bool, error) {
+	if actor == nil {
+		return false, nil
+	}
+	if actor.GetBool("admin") {
+		return true, nil
+	}
+	return IsBetaTester(app, actor.Id)
+}

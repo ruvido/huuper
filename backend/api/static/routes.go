@@ -21,5 +21,17 @@ func Register(se *core.ServeEvent) {
 	se.Router.GET("/admin/battleplan/edit/{id}/", func(e *core.RequestEvent) error {
 		return e.FileFS(site, "admin/battleplan/edit/index.html")
 	})
+	se.Router.GET("/me/battleplan/view/{id}", func(e *core.RequestEvent) error {
+		return e.FileFS(site, "me/battleplan/view/index.html")
+	})
+	se.Router.GET("/me/battleplan/view/{id}/", func(e *core.RequestEvent) error {
+		return e.FileFS(site, "me/battleplan/view/index.html")
+	})
+	se.Router.GET("/me/battleplan/edit/{id}", func(e *core.RequestEvent) error {
+		return e.FileFS(site, "me/battleplan/edit/index.html")
+	})
+	se.Router.GET("/me/battleplan/edit/{id}/", func(e *core.RequestEvent) error {
+		return e.FileFS(site, "me/battleplan/edit/index.html")
+	})
 	se.Router.GET("/{path...}", apis.Static(site, false))
 }

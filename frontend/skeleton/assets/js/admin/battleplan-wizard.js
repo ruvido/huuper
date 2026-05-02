@@ -21,6 +21,7 @@
     loading: $("loading"),
     sticky: $("sticky"),
     back: $("back"),
+    next: $("next"),
     nextLabel: $("next-label"),
   };
   const cancelEditButton = document.querySelector("[data-battleplan-cancel-edit]");
@@ -29,6 +30,130 @@
     const parts = window.location.pathname.split("/").filter(Boolean);
     const idx = parts.findIndex((part, i) => part === kind && parts[i - 1] === "battleplan");
     return idx >= 0 && parts[idx + 1] ? decodeURIComponent(parts[idx + 1]) : null;
+  }
+
+  function basePath() {
+    return window.location.pathname.startsWith("/me/") ? "/me/battleplan" : "/admin/battleplan";
+  }
+
+  function setNextIcon(kind) {
+    const nextBtn = document.getElementById(`${PREFIX}-next`);
+    if (!nextBtn) return;
+    const def = nextBtn.querySelector('[data-wizard-next-icon="default"]');
+    const ed = nextBtn.querySelector('[data-wizard-next-icon="edit"]');
+    if (def) def.hidden = kind === "edit";
+    if (ed) ed.hidden = kind !== "edit";
+  }
+
+  async function archiveCurrentView() {
+    if (!dom.back || dom.back.disabled) return;
+    dom.back.disabled = true;
+    try {
+      await auth.apiFetch(`/api/me/battleplans/${encodeURIComponent(state.viewId)}/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "archived" }),
+      });
+      window.location.href = `${basePath()}/`;
+    } catch { dom.back.disabled = false; }
+  }
+
+  function openDeleteDialog() {
+    const sheet = window.huuperActionSheet;
+    const dlg = ((window.huuperCopy || {}).battleplan || {}).view || {};
+    const dialog = dlg.deleteDialog || {};
+    if (!sheet || typeof sheet.open !== "function") return;
+    sheet.open({
+      title: dialog.title || "Delete this battleplan?",
+      meta: dialog.meta,
+      actions: [],
+      footerAction: {
+        label: dialog.confirmLabel || "Delete",
+        tone: "danger",
+        onSelect: async () => {
+          await auth.apiFetch(`/api/me/battleplans/${encodeURIComponent(state.viewId)}`, { method: "DELETE" });
+          window.location.href = `${basePath()}/`;
+        },
+      },
+    });
+  }
+
+  async function duplicateCurrentView() {
+    const createDraft = async () => {
+      const payload = buildPayload();
+      payload.status = "draft";
+      const created = await auth.apiFetch("/api/me/battleplans", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (created && created.id) {
+        window.location.href = `${basePath()}/edit/${encodeURIComponent(created.id)}/`;
+      }
+    };
+    let existingDraft = null;
+    try {
+      const list = await auth.apiFetch("/api/me/battleplans?per_page=200");
+      const items = (list && Array.isArray(list.items)) ? list.items : [];
+      existingDraft = items.find((it) => it && it.status === "draft" && it.id !== state.viewId) || null;
+    } catch {
+      /* if list fetch fails, attempt direct create */
+    }
+    if (existingDraft) {
+      const sheet = window.huuperActionSheet;
+      const cfg = ((window.huuperCopy || {}).battleplan || {}).list || {};
+      const dlg = cfg.overwriteDraftDialog || {};
+      if (sheet && typeof sheet.open === "function") {
+        sheet.open({
+          title: dlg.title || "Overwrite existing draft?",
+          actions: [],
+          footerAction: {
+            label: dlg.confirmLabel || "Yes",
+            tone: "danger",
+            onSelect: async () => {
+              await auth.apiFetch(`/api/me/battleplans/${encodeURIComponent(existingDraft.id)}`, { method: "DELETE" });
+              await createDraft();
+            },
+          },
+        });
+        return;
+      }
+    }
+    await createDraft();
+  }
+
+  function configureViewActions() {
+    const bpCopy = (window.huuperCopy && window.huuperCopy.battleplan) || {};
+    const viewCopy = bpCopy.view || {};
+    const listCopy = bpCopy.list || {};
+    const status = state.viewedStatus || "";
+
+    if (dom.back) {
+      if (status === "archived") {
+        dom.back.textContent = (viewCopy.deleteLabel || "Delete").toUpperCase();
+        dom.back.onclick = (event) => { event.preventDefault(); openDeleteDialog(); };
+      } else {
+        dom.back.textContent = (bpCopy.archiveLabel || "Archive").toUpperCase();
+        dom.back.onclick = (event) => { event.preventDefault(); archiveCurrentView(); };
+      }
+    }
+
+    const nextBtn = document.getElementById(`${PREFIX}-next`);
+    const nextLabel = document.getElementById(`${PREFIX}-next-label`);
+    if (!nextBtn || !nextLabel) return;
+    nextBtn.setAttribute("type", "button");
+    nextBtn.removeAttribute("form");
+    if (status === "active") {
+      nextLabel.textContent = (viewCopy.editLabel || "Edit").toUpperCase();
+      setNextIcon("edit");
+      nextBtn.onclick = () => {
+        window.location.href = `${basePath()}/edit/${encodeURIComponent(state.viewId)}/?step=1`;
+      };
+    } else {
+      nextLabel.textContent = (listCopy.duplicateLabel || "Duplicate").toUpperCase();
+      setNextIcon("default");
+      nextBtn.onclick = () => duplicateCurrentView();
+    }
   }
 
   const params = new URLSearchParams(window.location.search);
@@ -116,10 +241,10 @@
   }
 
   async function pulseNextLoading(ms = 220) {
-    if (!dom.nextLabel) return;
-    dom.nextLabel.classList.add("request-action-loading");
+    if (!dom.next) return;
+    dom.next.classList.add("wizard-btn-loading");
     await sleep(ms);
-    dom.nextLabel.classList.remove("request-action-loading");
+    dom.next.classList.remove("wizard-btn-loading");
   }
 
   function showWizard() {
@@ -166,7 +291,8 @@
 
   function minStep() {
     if (state.viewId) return totalSteps() - 1;
-    if (state.editId) return 2; // pillars only; priority not editable via edit page
+    // Drafts behave like a fresh new plan: start from intro/priority, allow editing all steps.
+    if (state.editId && state.viewedStatus !== "draft") return 2;
     return shouldShowIntro() ? 0 : 1;
   }
 
@@ -241,10 +367,13 @@
     dom.progressState.textContent = stateLabel();
     dom.progressFill.style.width = `${(cur / n) * 100}%`;
     if (isConfirm()) {
-      dom.nextLabel.textContent = state.cfg.wizard.confirmation.button.toUpperCase();
+      const isDraft = state.editId && state.viewedStatus === "draft";
+      dom.nextLabel.textContent = (isDraft ? copy.saveDraftLabel : copy.confirmLabel).toUpperCase();
+      setNextIcon("edit");
       return;
     }
     dom.nextLabel.textContent = state.step === 0 ? state.cfg.wizard.intro.button.toUpperCase() : copy.nextLabel.toUpperCase();
+    setNextIcon("default");
   }
 
   function ensurePillar(key) {
@@ -317,7 +446,7 @@
 
         <div>
           <label class="field-label">${esc(labels.priorityField)}</label>
-          <input class="field-input" type="text" name="priority_title" value="${esc(state.input.data.priority.title)}" placeholder="${esc(labels.priorityPlaceholder)}" />
+          <input class="field-input${state.fieldErrors.priorityTitle ? " field-input-error" : ""}" type="text" name="priority_title" value="${esc(state.input.data.priority.title)}" placeholder="${esc(labels.priorityPlaceholder)}" />
         </div>
 
         <div>
@@ -589,6 +718,25 @@
       `;
     }).join("");
 
+    let topErrorMessage = "";
+    if (state.confirmAttempted) {
+      if (priorityMissing) {
+        topErrorMessage = copy.errors.priorityRequired;
+      } else {
+        for (const def of state.cfg.pillars) {
+          const v = state.input.data.pillars[def.key] || { objective: "", routines: [] };
+          const obj = (v.objective || "").trim();
+          const validRoutine = (v.routines || []).some((r) => isRoutineComplete(r));
+          if (!obj && !validRoutine) continue;
+          if (!obj) { topErrorMessage = copy.errors.pillarObjectiveRequired; break; }
+          if (!validRoutine) { topErrorMessage = copy.errors.pillarRoutineRequired; break; }
+        }
+        if (!topErrorMessage && !hasCompletePillar) {
+          topErrorMessage = copy.errors.completePillarRequired;
+        }
+      }
+    }
+
     if (dom.aside) {
       dom.aside.classList.add("step-progress-aside-badges");
       dom.aside.classList.remove("step-progress-aside-controls");
@@ -606,11 +754,14 @@
     const priorityBodyHTML = summaryView
       ? (priorityWhy ? `<p class="wizard-view-why">${esc(priorityWhy)}</p>` : "")
       : (priorityMissing
-          ? `<p class="wizard-missing-line${state.confirmAttempted ? " is-error" : ""}">${state.confirmAttempted ? "Error: Missing Priority" : "Missing Priority"}</p>`
+          ? `<p class="wizard-missing-line">Missing Priority</p>`
           : `<p class="wizard-summary-value">${esc(priorityText)}</p>${priorityWhy ? `<p class="wizard-summary-muted-card wizard-summary-why">${esc(priorityWhy)}</p>` : ""}`);
     const priorityTargetAttrs = summaryView
       ? ""
       : ` class="wizard-summary-edit-target" data-action="go-step" data-step="1"`;
+
+    const topErrorSlot = document.getElementById(`${PREFIX}-top-error`);
+    if (topErrorSlot) topErrorSlot.textContent = topErrorMessage ? `Error: ${topErrorMessage}` : "";
 
     dom.stage.innerHTML = `
       <section class="wizard-step wizard-step-confirm${summaryView ? " wizard-step-view" : ""}">
@@ -624,12 +775,12 @@
               <label class="field-label wizard-summary-tag">${esc(copy.labels.summaryPriority)}</label>
               <label class="field-label wizard-summary-tag wizard-summary-tag-outline">${state.input.duration_days} days</label>
               <label class="field-label wizard-summary-tag wizard-summary-tag-outline">${esc(visibilityLabel(state.input.visibility)).toUpperCase()}</label>
+              ${state.viewedStatus === "draft" ? `<label class="field-label wizard-summary-tag wizard-summary-tag-draft">DRAFT</label>` : ""}
             </div>
             ${priorityBodyHTML}
           </div>
           <div class="wizard-summary-pillars-block">
             <label class="field-label wizard-summary-tag">${esc(copy.labels.summaryPillars)}</label>
-            ${state.confirmAttempted && !hasCompletePillar ? `<p class="wizard-missing-line is-error">Error: ${esc(copy.errors.completePillarRequired)}</p>` : ""}
             <ul class="wizard-pillars-summary">${pillarsSummary}</ul>
           </div>
         </div>
@@ -656,6 +807,8 @@
     syncProgress();
     writeStepToURL();
     setStatus("");
+    const errSlot = document.getElementById(`${PREFIX}-top-error`);
+    if (errSlot) errSlot.textContent = "";
     if (state.step === 0) {
       renderIntro();
     } else if (state.step === 1) {
@@ -723,7 +876,6 @@
         }
       });
     }
-    if (!state.editId) saveDraft();
   }
 
   function validateStep() {
@@ -732,7 +884,10 @@
       return "";
     }
     if (state.step === 1) {
-      if (!state.input.data.priority.title) return copy.errors.priorityRequired;
+      if (!state.input.data.priority.title) {
+        state.fieldErrors.priorityTitle = true;
+        return copy.errors.priorityRequired;
+      }
       if (!state.input.data.priority.why) {
         state.fieldErrors.priorityWhy = true;
         return copy.errors.priorityWhyRequired;
@@ -823,7 +978,7 @@
   }
 
   function cancelEdit() {
-    window.location.href = "/admin/battleplan/";
+    window.location.href = `${basePath()}/`;
   }
 
   function confirmCancelEdit() {
@@ -855,13 +1010,18 @@
       const url = state.editId
         ? `/api/me/battleplans/${encodeURIComponent(state.editId)}`
         : "/api/me/battleplans";
+      const payload = buildPayload();
+      // New plan + active already exists → save as draft (active is unique per user).
+      if (!state.editId && state.hasExistingActive) {
+        payload.status = "draft";
+      }
       await auth.apiFetch(url, {
         method: state.editId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildPayload()),
+        body: JSON.stringify(payload),
       });
       clearDraft();
-      window.location.href = "/admin/battleplan/";
+      window.location.href = `${basePath()}/`;
     } catch (err) {
       if (isConfirm()) {
         state.confirmAttempted = true;
@@ -877,17 +1037,19 @@
 
   dom.back.addEventListener("click", () => {
     syncFromDOM();
-    if (state.editId && isPillarStep()) {
+    // Non-draft edits jump back to /view/ once they hit the pillar boundary.
+    // Drafts and new plans walk back step-by-step to the list.
+    if (state.editId && state.viewedStatus !== "draft" && isPillarStep()) {
       if (state.step > 2) {
         state.step -= 1;
         render();
         return;
       }
-      window.location.href = `/admin/battleplan/view/${encodeURIComponent(state.editId)}/`;
+      window.location.href = `${basePath()}/view/${encodeURIComponent(state.editId)}/`;
       return;
     }
     if (state.step <= 0 || (!shouldShowIntro() && state.step <= 1)) {
-      window.location.href = "/admin/battleplan/";
+      window.location.href = `${basePath()}/`;
       return;
     }
     state.step -= 1;
@@ -917,6 +1079,10 @@
     if (err) {
       render();
       setStatus(err);
+      const errorEl = dom.stage.querySelector(".field-input-error");
+      if (errorEl && typeof errorEl.scrollIntoView === "function") {
+        errorEl.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
       return;
     }
     if (isConfirm()) {
@@ -996,7 +1162,7 @@
       const step = Number(target.dataset.step);
       const id = state.viewId || state.editId;
       if (!id || !Number.isFinite(step)) return;
-      window.location.href = `/admin/battleplan/edit/${encodeURIComponent(id)}/?step=${encodeURIComponent(String(step))}`;
+      window.location.href = `${basePath()}/edit/${encodeURIComponent(id)}/?step=${encodeURIComponent(String(step))}`;
     }
   });
 
@@ -1009,6 +1175,10 @@
   dom.form.addEventListener("input", (e) => {
     if (e.target && e.target.name === "priority_why") {
       state.fieldErrors.priorityWhy = false;
+      e.target.classList.remove("field-input-error");
+    }
+    if (e.target && e.target.name === "priority_title") {
+      state.fieldErrors.priorityTitle = false;
       e.target.classList.remove("field-input-error");
     }
     syncFromDOM();
@@ -1056,6 +1226,8 @@
     if (!c.errors.priorityRequired) throw new Error("battleplan copy missing errors.priorityRequired");
     if (!c.errors.priorityWhyRequired) throw new Error("battleplan copy missing errors.priorityWhyRequired");
     if (!c.errors.completePillarRequired) throw new Error("battleplan copy missing errors.completePillarRequired");
+    if (!c.confirmLabel) throw new Error("battleplan copy missing confirmLabel");
+    if (!c.saveDraftLabel) throw new Error("battleplan copy missing saveDraftLabel");
   }
 
   function validateSettings(cfg) {
@@ -1085,7 +1257,7 @@
       const activeId = state.editId || state.viewId;
       const fetchList = activeId
         ? auth.apiFetch(`/api/me/battleplans/${encodeURIComponent(activeId)}`)
-        : auth.apiFetch("/api/me/battleplans?per_page=1");
+        : auth.apiFetch("/api/me/battleplans?per_page=200");
       const [settings, existingOrBp] = await Promise.all([
         auth.apiFetch("/api/me/settings/battleplan"),
         fetchList,
@@ -1094,6 +1266,7 @@
       if (state.editId || state.viewId) {
         state.hasExistingBattleplan = true;
         const bp = existingOrBp;
+        state.viewedStatus = bp.status || "";
         if (bp.visibility) state.input.visibility = bp.visibility;
         if (bp.start_date) state.input.start_date = bp.start_date.slice(0, 10);
         const bpData = bp.data || {};
@@ -1117,7 +1290,9 @@
           }
         }
       } else {
-        state.hasExistingBattleplan = !!(existingOrBp && Array.isArray(existingOrBp.items) && existingOrBp.items.length > 0);
+        const itms = (existingOrBp && Array.isArray(existingOrBp.items)) ? existingOrBp.items : [];
+        state.hasExistingBattleplan = itms.length > 0;
+        state.hasExistingActive = itms.some((it) => it && it.status === "active");
       }
       validateSettings(state.cfg);
       state.input.visibility = state.input.visibility || defaultVisibilityValue();
@@ -1125,37 +1300,12 @@
         ensurePillar(p.key);
       }
       if (dom.back) dom.back.textContent = copy.backLabel.toUpperCase();
-      if (!state.editId && !state.viewId) state.input.duration_days = defaultDurationValue();
-      const draft = (state.editId || state.viewId) ? null : loadDraft();
-      if (draft && draft.input && typeof draft.input === "object") {
-        if (typeof draft.input.start_date === "string") state.input.start_date = draft.input.start_date;
-        if (Number.isFinite(draft.input.duration_days) && state.cfg.durations.some((item) => item.value === draft.input.duration_days)) {
-          state.input.duration_days = draft.input.duration_days;
-        }
-        if (typeof draft.input.visibility === "string" && state.cfg.visibility.some((v) => v.value === draft.input.visibility)) {
-          state.input.visibility = draft.input.visibility;
-        }
-        if (draft.input.data && typeof draft.input.data === "object") {
-          if (draft.input.data.priority && typeof draft.input.data.priority === "object") {
-            state.input.data.priority.title = String(draft.input.data.priority.title || "");
-            state.input.data.priority.why = String(draft.input.data.priority.why || "");
-          }
-          if (draft.input.data.pillars && typeof draft.input.data.pillars === "object") {
-            for (const def of state.cfg.pillars) {
-              const src = draft.input.data.pillars[def.key];
-              if (!src || typeof src !== "object") continue;
-              const target = ensurePillar(def.key);
-              target.objective = String(src.objective || "");
-              if (Array.isArray(src.routines)) {
-                target.routines = src.routines.map((r) => ({
-                  title: String((r && r.title) || ""),
-                  trigger: String((r && r.trigger) || ""),
-                  cadence: (r && r.cadence && typeof r.cadence === "object") ? r.cadence : { type: defaultCadenceType() },
-                }));
-              }
-            }
-          }
-        }
+      if (!state.editId && !state.viewId) {
+        state.input.duration_days = defaultDurationValue();
+        // /new/ always starts fresh — server-side drafts replace the old
+        // localStorage auto-resume behaviour, which would silently re-populate
+        // fields the user did not expect.
+        clearDraft();
       }
       const stepFromURL = readStepFromURL();
       if (stepFromURL === null) {
@@ -1167,38 +1317,10 @@
         dom.progress.appendChild(dom.status);
         dom.status.classList.add("wizard-progress-status");
       }
-      if (!state.editId && !state.viewId) saveDraft();
       showWizard();
       renderVisibilityAside();
       render();
-      if (state.viewId) {
-        const bpCopy = (window.huuperCopy && window.huuperCopy.battleplan) || {};
-        if (dom.back) {
-          dom.back.textContent = (bpCopy.archiveLabel || "Archive").toUpperCase();
-          dom.back.addEventListener("click", async () => {
-            if (dom.back.disabled) return;
-            dom.back.disabled = true;
-            try {
-              await auth.apiFetch(`/api/me/battleplans/${encodeURIComponent(state.viewId)}/status`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: "archived" }),
-              });
-              window.location.href = "/admin/battleplan/";
-            } catch { dom.back.disabled = false; }
-          });
-        }
-        const nextBtn = document.getElementById(`${PREFIX}-next`);
-        const nextLabel = document.getElementById(`${PREFIX}-next-label`);
-        if (nextLabel) nextLabel.textContent = "EDIT";
-        if (nextBtn) {
-          nextBtn.setAttribute("type", "button");
-          nextBtn.removeAttribute("form");
-          nextBtn.onclick = () => {
-            window.location.href = `/admin/battleplan/edit/${encodeURIComponent(state.viewId)}/?step=1`;
-          };
-        }
-      }
+      if (state.viewId) configureViewActions();
     } catch (err) {
       dom.loading.hidden = true;
       dom.stage.innerHTML = `

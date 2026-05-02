@@ -3,9 +3,43 @@
     return;
   }
 
+  (() => {
+    const fab = document.querySelector('[data-battleplan-new]');
+    if (!fab) return;
+    const aria = window.huuperCopy
+      && window.huuperCopy.battleplan
+      && window.huuperCopy.battleplan.fab
+      && window.huuperCopy.battleplan.fab.newAria;
+    if (aria) fab.setAttribute("aria-label", aria);
+  })();
+
+  function showPlaceholder() {
+    const placeholder = document.getElementById("battleplan-placeholder");
+    if (!placeholder) return;
+    const labelEl = document.getElementById("battleplan-placeholder-label");
+    const labelText = window.huuperCopy
+      && window.huuperCopy.battleplan
+      && window.huuperCopy.battleplan.placeholder
+      && window.huuperCopy.battleplan.placeholder.label;
+    if (labelEl && labelText) labelEl.textContent = labelText;
+    placeholder.hidden = false;
+    const fab = document.querySelector('[data-battleplan-new]');
+    if (fab) fab.hidden = true;
+  }
+
+  function isAdminUser() {
+    try {
+      const raw = localStorage.getItem("huuper.auth");
+      const auth = raw ? JSON.parse(raw) : null;
+      return !!(auth && auth.model && auth.model.admin === true);
+    } catch (_) {
+      return false;
+    }
+  }
+
   (async () => {
     try {
-      const settings = await window.huuperAuth.apiFetch("/api/admin/settings/battleplan");
+      const settings = await window.huuperAuth.apiFetch("/api/me/settings/battleplan");
       const title = settings && settings.data && settings.data.title;
       if (!title) return;
       const hero = document.getElementById("battleplan-hero");
@@ -20,6 +54,7 @@
 
   const STATUS_LABELS = {
     active: "Active",
+    draft: "Draft",
     completed: "Completed",
     archived: "Archived",
   };
@@ -60,7 +95,7 @@
   }
 
   function orderedItems(items) {
-    const statusRank = { active: 0, completed: 1, archived: 2 };
+    const statusRank = { active: 0, draft: 1, completed: 2, archived: 3 };
     return [...items].sort((a, b) => {
       const ar = Object.prototype.hasOwnProperty.call(statusRank, a.status) ? statusRank[a.status] : 3;
       const br = Object.prototype.hasOwnProperty.call(statusRank, b.status) ? statusRank[b.status] : 3;
@@ -73,41 +108,100 @@
     return items.find((item) => item && item.status === "active") || null;
   }
 
-  function wireNewButton(items) {
-    const trigger = document.querySelector('[data-battleplan-new]');
-    if (!trigger) return;
-    const active = activeBattleplan(items);
-    trigger.onclick = (event) => {
-      if (!active) return;
-      event.preventDefault();
-      const sheet = window.huuperActionSheet;
-      if (!sheet || typeof sheet.open !== "function") return;
-      sheet.open({
-        title: "Vuoi abbandonare il tuo attuale battleplan?",
-        actions: [],
-        footerAction: {
-          label: "YES",
-          onSelect: async () => {
-            await window.huuperAuth.apiFetch(`/api/me/battleplans/${encodeURIComponent(active.id)}/status`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ status: "archived" }),
-            });
-            window.location.href = "/admin/battleplan/new/";
-          },
+  function basePath() {
+    return window.location.pathname.startsWith("/me/") ? "/me/battleplan" : "/admin/battleplan";
+  }
+
+  function findDraft(items) {
+    return (items || []).find((it) => it && it.status === "draft") || null;
+  }
+
+  function confirmOverwriteDraft(draft, onConfirm) {
+    const sheet = window.huuperActionSheet;
+    const dlg = ((window.huuperCopy || {}).battleplan || {}).list || {};
+    const cfg = dlg.overwriteDraftDialog || {};
+    if (!sheet || typeof sheet.open !== "function") return;
+    sheet.open({
+      title: cfg.title || "Overwrite existing draft?",
+      actions: [],
+      footerAction: {
+        label: cfg.confirmLabel || "Yes",
+        tone: "danger",
+        onSelect: async () => {
+          await window.huuperAuth.apiFetch(`/api/me/battleplans/${encodeURIComponent(draft.id)}`, { method: "DELETE" });
+          await onConfirm();
         },
-      });
+      },
+    });
+  }
+
+  function bindNewPlanTrigger(trigger, draft) {
+    if (!trigger) return;
+    trigger.onclick = (event) => {
+      const go = () => { window.location.href = `${basePath()}/new/`; };
+      if (draft) {
+        event.preventDefault();
+        confirmOverwriteDraft(draft, go);
+        return;
+      }
+      if (trigger.tagName !== "A") {
+        event.preventDefault();
+        go();
+      }
     };
+  }
+
+  function wireNewButton(items) {
+    const active = activeBattleplan(items);
+    const draft = findDraft(items);
+    bindNewPlanTrigger(document.querySelector('[data-battleplan-new]'), draft);
+    bindNewPlanTrigger(document.getElementById("battleplan-active-new"), draft);
+
+    const dupBtn = document.getElementById("battleplan-active-duplicate");
+    if (dupBtn) {
+      dupBtn.onclick = async (event) => {
+        event.preventDefault();
+        if (!active) return;
+        const createDraft = async () => {
+          const payload = {
+            start_date: (active.start_date || "").slice(0, 10),
+            duration_days: durationDays(active),
+            visibility: active.visibility,
+            status: "draft",
+            data: active.data || {},
+          };
+          const created = await window.huuperAuth.apiFetch("/api/me/battleplans", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (created && created.id) {
+            window.location.href = `${basePath()}/edit/${encodeURIComponent(created.id)}/`;
+          }
+        };
+        if (draft) {
+          confirmOverwriteDraft(draft, createDraft);
+        } else {
+          await createDraft();
+        }
+      };
+    }
   }
 
   function arrangeSections(listNode, items) {
     if (!listNode) return;
     const copy = (window.huuperCopy && window.huuperCopy.battleplan && window.huuperCopy.battleplan.list) || {};
     const activeSection = document.getElementById("battleplan-active-section");
+    const draftSection = document.getElementById("battleplan-draft-section");
     const archiveSection = document.getElementById("battleplan-archive-section");
     const activeContainer = document.getElementById("battleplan-active");
+    const draftContainer = document.getElementById("battleplan-draft");
     const activeLabel = document.getElementById("battleplan-active-label");
+    const draftLabel = document.getElementById("battleplan-draft-label");
     const archiveLabel = document.getElementById("battleplan-archive-label");
+    const activeActions = document.getElementById("battleplan-active-actions");
+    const dupBtn = document.getElementById("battleplan-active-duplicate");
+    const newBtn = document.getElementById("battleplan-active-new");
 
     const activeEl = listNode.querySelector(".battleplan-list-item-active");
     if (activeContainer) {
@@ -120,18 +214,34 @@
       }
     }
 
+    const draftEls = Array.from(listNode.querySelectorAll(".battleplan-list-item-draft"));
+    if (draftContainer) {
+      draftContainer.innerHTML = "";
+      draftEls.forEach((el) => draftContainer.appendChild(el));
+      draftContainer.hidden = draftEls.length === 0;
+    }
+
     const hasActive = items.some((it) => it.status === "active");
-    const hasOther = items.some((it) => it.status !== "active");
+    const hasDraft = items.some((it) => it.status === "draft");
+    const hasOther = items.some((it) => it.status !== "active" && it.status !== "draft");
 
     if (activeLabel) {
       activeLabel.textContent = copy.activeSectionLabel || "";
       activeLabel.hidden = !(hasActive && copy.activeSectionLabel);
     }
+    if (draftLabel) {
+      draftLabel.textContent = copy.draftSectionLabel || "";
+      draftLabel.hidden = !(hasDraft && copy.draftSectionLabel);
+    }
     if (archiveLabel) {
       archiveLabel.textContent = copy.archiveSectionLabel || "";
       archiveLabel.hidden = !(hasOther && copy.archiveSectionLabel);
     }
+    if (dupBtn) dupBtn.textContent = copy.duplicateLabel || "";
+    if (newBtn) newBtn.textContent = copy.newPlanLabel || "";
+    if (activeActions) activeActions.hidden = !hasActive;
     if (activeSection) activeSection.hidden = !hasActive;
+    if (draftSection) draftSection.hidden = !hasDraft;
     if (archiveSection) archiveSection.hidden = !hasOther;
   }
 
@@ -144,7 +254,23 @@
     `;
   }
 
-  window.huuperEntityList.init({
+  (async () => {
+    let access = false;
+    try {
+      const payload = await window.huuperAuth.apiFetch("/api/me/access/battleplan");
+      access = !!(payload && payload.access === true);
+    } catch (_) {
+      access = false;
+    }
+    if (!access) {
+      showPlaceholder();
+      return;
+    }
+    initList();
+  })();
+
+  function initList() {
+    window.huuperEntityList.init({
     statusSelector: "#battleplan-status",
     listSelector: "#battleplan-list",
     requiresAuth: true,
@@ -158,23 +284,29 @@
     renderItem: (item) => {
       const lp = window.huuperListPage;
       const title = (item.data && item.data.priority && item.data.priority.title) || "Battleplan";
-      const href = `/admin/battleplan/view/${encodeURIComponent(item.id)}/`;
+      const href = `${basePath()}/view/${encodeURIComponent(item.id)}/`;
       const status = STATUS_LABELS[item.status] || item.status || "";
       const meta = metaHTML(item, lp.escapeHTML);
       const activeArrow = `<svg class="battleplan-list-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" aria-hidden="true"><rect x="0" y="0" width="32" height="32" rx="6" fill="#0c0c0c"/><g fill="none" stroke="#f2cc0d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="9" y1="16" x2="22" y2="16"/><polyline points="17,11 22,16 17,21"/></g></svg>`;
-      const sideContent = item.status === "active"
-        ? activeArrow
-        : (status ? `<span class="list-item-side-title request-item-status">${lp.escapeHTML(status)}</span>` : "");
+      let sideContent = "";
+      if (item.status === "active") {
+        sideContent = activeArrow;
+      } else if (item.status !== "draft" && status) {
+        sideContent = `<span class="list-item-side-title request-item-status">${lp.escapeHTML(status)}</span>`;
+      }
       const side = sideContent ? `<span class="list-item-side">${sideContent}</span>` : "";
       const activeClass = item.status === "active" ? " battleplan-list-item-active" : "";
+      const draftClass = item.status === "draft" ? " battleplan-list-item-draft" : "";
       const archivedClass = item.status === "archived" ? " battleplan-list-item-archived" : "";
-      return `
-        <a href="${lp.escapeHTML(href)}" class="list-item request-item battleplan-list-item${activeClass}${archivedClass}">
+      const inner = `
           <span class="list-item-copy request-item-copy">
             <strong>${lp.escapeHTML(title)}</strong>
             <span class="list-item-meta request-item-meta">${meta}</span>
           </span>
-          ${side}
+          ${side}`;
+      const className = `list-item request-item battleplan-list-item${activeClass}${draftClass}${archivedClass}`;
+      return `
+        <a href="${lp.escapeHTML(href)}" class="${className}">${inner}
         </a>
       `;
     },
@@ -182,5 +314,6 @@
       wireNewButton(items);
       arrangeSections(node, items);
     },
-  });
+    });
+  }
 })();

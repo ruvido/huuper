@@ -38,6 +38,10 @@
     {{ template "icon-requests" . }}
     <span>Requests</span>
   </a>
+  <a id="me-nav-battleplan" class="nav-item{{ if eq .ActiveNav "battleplan" }} nav-item-current{{ end }}" href="/me/battleplan/">
+    {{ template "icon-battleplan" . }}
+    <span>Battleplan</span>
+  </a>
 </nav>
 {{ end }}
 

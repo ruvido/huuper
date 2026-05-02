@@ -16,6 +16,7 @@ type Input struct {
 	StartDate    string `json:"start_date"`
 	DurationDays int    `json:"duration_days"`
 	Visibility   string `json:"visibility"`
+	Status       string `json:"status,omitempty"`
 	Data         Data   `json:"data"`
 }
 
@@ -121,11 +122,19 @@ func Create(app *pocketbase.PocketBase, userID string, in Input) (*core.Record, 
 		return nil, err
 	}
 
+	status := strings.TrimSpace(in.Status)
+	if status == "" {
+		status = StatusActive
+	}
+	if !IsValidStatus(status) {
+		return nil, fmt.Errorf("invalid status %q", status)
+	}
+
 	record := core.NewRecord(collection)
 	record.Set("user", userID)
 	record.Set("start_date", start)
 	record.Set("end_date", end)
-	record.Set("status", StatusActive)
+	record.Set("status", status)
 	record.Set("visibility", in.Visibility)
 	record.Set("data", stampNewRoutines(Data{Pillars: map[string]Pillar{}}, in.Data, types.NowDateTime().String()))
 
@@ -136,8 +145,9 @@ func Create(app *pocketbase.PocketBase, userID string, in Input) (*core.Record, 
 }
 
 func Update(app *pocketbase.PocketBase, record *core.Record, in Input) error {
-	if record.GetString("status") != StatusActive {
-		return fmt.Errorf("only active battleplans can be edited")
+	status := record.GetString("status")
+	if status != StatusActive && status != StatusDraft {
+		return fmt.Errorf("only active or draft battleplans can be edited")
 	}
 	cfg, err := LoadConfig(app)
 	if err != nil {
@@ -165,6 +175,13 @@ func SetStatus(app *pocketbase.PocketBase, record *core.Record, status string) e
 	}
 	record.Set("status", status)
 	return app.Save(record)
+}
+
+func Delete(app *pocketbase.PocketBase, record *core.Record) error {
+	if record == nil {
+		return fmt.Errorf("missing battleplan")
+	}
+	return app.Delete(record)
 }
 
 func ListForUser(app *pocketbase.PocketBase, userID string, perPage, offset int) ([]ListItem, error) {

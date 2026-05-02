@@ -13,6 +13,7 @@ const (
 	StatusActive   = "active"
 	StatusCompleted = "completed"
 	StatusArchived  = "archived"
+	StatusDraft    = "draft"
 
 	CadenceDaily        = "daily"
 	CadencePaused       = "paused"
@@ -64,7 +65,7 @@ type ListItem struct {
 }
 
 func IsValidStatus(s string) bool {
-	return s == StatusActive || s == StatusCompleted || s == StatusArchived
+	return s == StatusActive || s == StatusCompleted || s == StatusArchived || s == StatusDraft
 }
 
 func IsValidCadence(c Cadence) bool {

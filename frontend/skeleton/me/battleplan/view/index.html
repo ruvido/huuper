@@ -1,0 +1,4 @@
+{{ define "content" }}
+{{ template "wizard-shell" (dict "Prefix" "battleplan-wizard") }}
+{{ end }}
+{{ define "page" }}{{ template "layout-me" (dict "Title" "Huuper / Me / Battleplan" "TopbarTitle" "Battleplan" "BackHref" "/me/battleplan/" "BodyClass" "wizard-page-body" "HideBottomNav" true "Scripts" (list "/assets/js/core/auth.js" "/assets/js/core/guard-me.js" "/assets/js/components/action-sheet.js" "/copy/battleplan.js" "/assets/js/admin/battleplan-wizard.js")) }}{{ end }}

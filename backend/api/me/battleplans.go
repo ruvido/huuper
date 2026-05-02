@@ -13,9 +13,24 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
+func requireBattleplanActor(app *pocketbase.PocketBase, e *core.RequestEvent) (*core.Record, error) {
+	actor, err := backendinternal.RequireAuthenticatedActor(e)
+	if err != nil {
+		return nil, err
+	}
+	allowed, err := backendinternal.HasBattleplanAccess(app, actor)
+	if err != nil {
+		return nil, apis.NewBadRequestError("failed_battleplan_access", err)
+	}
+	if !allowed {
+		return nil, apis.NewForbiddenError("forbidden_battleplan", nil)
+	}
+	return actor, nil
+}
+
 func ListBattleplansHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		actor, err := backendinternal.RequireAuthenticatedActor(e)
+		actor, err := requireBattleplanActor(app, e)
 		if err != nil {
 			return err
 		}
@@ -31,7 +46,7 @@ func ListBattleplansHandler(app *pocketbase.PocketBase) func(e *core.RequestEven
 
 func GetBattleplanHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		actor, err := backendinternal.RequireAuthenticatedActor(e)
+		actor, err := requireBattleplanActor(app, e)
 		if err != nil {
 			return err
 		}
@@ -52,7 +67,7 @@ func GetBattleplanHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 
 func CreateBattleplanHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		actor, err := backendinternal.RequireAuthenticatedActor(e)
+		actor, err := requireBattleplanActor(app, e)
 		if err != nil {
 			return err
 		}
@@ -70,7 +85,7 @@ func CreateBattleplanHandler(app *pocketbase.PocketBase) func(e *core.RequestEve
 
 func UpdateBattleplanHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		actor, err := backendinternal.RequireAuthenticatedActor(e)
+		actor, err := requireBattleplanActor(app, e)
 		if err != nil {
 			return err
 		}
@@ -94,7 +109,7 @@ func UpdateBattleplanHandler(app *pocketbase.PocketBase) func(e *core.RequestEve
 
 func BattleplanStatusHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		actor, err := backendinternal.RequireAuthenticatedActor(e)
+		actor, err := requireBattleplanActor(app, e)
 		if err != nil {
 			return err
 		}
@@ -113,16 +128,33 @@ func BattleplanStatusHandler(app *pocketbase.PocketBase) func(e *core.RequestEve
 			return apis.NewBadRequestError("invalid_payload", err)
 		}
 		next := strings.TrimSpace(payload.Status)
-		if next != battleplans.StatusCompleted && next != battleplans.StatusArchived {
+		if !battleplans.IsValidStatus(next) {
 			return apis.NewBadRequestError("invalid_status_transition", nil)
-		}
-		if record.GetString("status") != battleplans.StatusActive {
-			return apis.NewBadRequestError("battleplan_not_active", nil)
 		}
 		if err := battleplans.SetStatus(app, record, next); err != nil {
 			return apis.NewBadRequestError("failed_battleplan_status", err)
 		}
 		return e.JSON(http.StatusOK, battleplans.MapItem(record))
+	}
+}
+
+func DeleteBattleplanHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		actor, err := requireBattleplanActor(app, e)
+		if err != nil {
+			return err
+		}
+		record, err := loadBattleplan(app, e.Request.PathValue("id"))
+		if err != nil {
+			return err
+		}
+		if record.GetString("user") != actor.Id {
+			return apis.NewForbiddenError("forbidden_battleplan", nil)
+		}
+		if err := battleplans.Delete(app, record); err != nil {
+			return apis.NewBadRequestError("failed_battleplan_delete", err)
+		}
+		return e.JSON(http.StatusOK, map[string]any{"deleted": true})
 	}
 }
 
@@ -153,4 +185,18 @@ func paginationFromQuery(e *core.RequestEvent) (int, int) {
 		}
 	}
 	return page, perPage
+}
+
+func BattleplanAccessHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		actor, err := backendinternal.RequireAuthenticatedActor(e)
+		if err != nil {
+			return err
+		}
+		access, err := backendinternal.HasBattleplanAccess(app, actor)
+		if err != nil {
+			return apis.NewBadRequestError("failed_battleplan_access", err)
+		}
+		return e.JSON(http.StatusOK, map[string]any{"access": access})
+	}
 }

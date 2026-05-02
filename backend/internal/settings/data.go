@@ -57,7 +57,13 @@ func GetVisible(app *pocketbase.PocketBase, name string) (*core.Record, map[stri
 		return nil, nil, apis.NewNotFoundError("Setting not found", err)
 	}
 
-	return record, sanitize(rawName, Unwrap(record.Get("data"))), nil
+	data := sanitize(rawName, Unwrap(record.Get("data")))
+	if title, ok := data["title"].(string); ok {
+		if html, rendered := backendinternal.RenderInlineMarkdown(title); rendered {
+			data["title"] = html
+		}
+	}
+	return record, data, nil
 }
 
 func GetVisibleForScope(app *pocketbase.PocketBase, name string, scope Scope) (*core.Record, map[string]any, error) {
