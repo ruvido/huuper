@@ -1538,14 +1538,16 @@ body:has(.top-bar-detail-page) .bottom-nav {
 }
 
 #battleplan-active,
+#battleplan-draft,
 #battleplan-list {
   padding-inline: 0;
   padding-top: 0;
 }
 
-/* Drop the first archive item's top padding so the visual gap from "Archive:"
-   to the first row of text matches the gap from the active label to the yellow
-   card edge (no padding adds up since the active card has visible bg). */
+/* Drop the first item's top padding in each section so the visual gap from
+   the section label to the first row of text matches the gap from the
+   active label to the yellow card edge. */
+#battleplan-draft > :first-child,
 #battleplan-list > :first-child {
   padding-top: 0;
 }
