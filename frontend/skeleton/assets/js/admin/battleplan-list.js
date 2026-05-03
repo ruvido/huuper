@@ -135,11 +135,11 @@
     });
   }
 
-  function bindNewPlanTrigger(trigger, draft) {
+  function bindNewPlanTrigger(trigger, needsOverwrite, draft) {
     if (!trigger) return;
     trigger.onclick = (event) => {
       const go = () => { window.location.href = `${basePath()}/new/`; };
-      if (draft) {
+      if (needsOverwrite && draft) {
         event.preventDefault();
         confirmOverwriteDraft(draft, go);
         return;
@@ -154,8 +154,12 @@
   function wireNewButton(items) {
     const active = activeBattleplan(items);
     const draft = findDraft(items);
-    bindNewPlanTrigger(document.querySelector('[data-battleplan-new]'), draft);
-    bindNewPlanTrigger(document.getElementById("battleplan-active-new"), draft);
+    // Overwrite dialog only when BOTH active and draft already exist —
+    // creating "new" with active present saves as draft, which would
+    // otherwise collide with the existing draft.
+    const needsOverwrite = !!(active && draft);
+    bindNewPlanTrigger(document.querySelector('[data-battleplan-new]'), needsOverwrite, draft);
+    bindNewPlanTrigger(document.getElementById("battleplan-active-new"), needsOverwrite, draft);
 
     const dupBtn = document.getElementById("battleplan-active-duplicate");
     if (dupBtn) {
@@ -194,6 +198,7 @@
     const activeSection = document.getElementById("battleplan-active-section");
     const draftSection = document.getElementById("battleplan-draft-section");
     const archiveSection = document.getElementById("battleplan-archive-section");
+    const emptyNew = document.getElementById("battleplan-empty-new");
     const activeContainer = document.getElementById("battleplan-active");
     const draftContainer = document.getElementById("battleplan-draft");
     const activeLabel = document.getElementById("battleplan-active-label");
@@ -243,6 +248,13 @@
     if (activeSection) activeSection.hidden = !hasActive;
     if (draftSection) draftSection.hidden = !hasDraft;
     if (archiveSection) archiveSection.hidden = !hasOther;
+    // Standalone "New Plan" CTA only when no active exists (active section
+    // already exposes its own New Plan button).
+    if (emptyNew) {
+      emptyNew.hidden = hasActive;
+      emptyNew.textContent = copy.newPlanLabel || "New Plan";
+      emptyNew.setAttribute("href", `${basePath()}/new/`);
+    }
   }
 
   function renderEmpty() {

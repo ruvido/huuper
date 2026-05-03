@@ -18,8 +18,13 @@ type Config struct {
 }
 
 type PriorityDef struct {
-	Label       string `json:"label"`
-	Description string `json:"description"`
+	New  PriorityCopy `json:"new"`
+	Edit PriorityCopy `json:"edit"`
+}
+
+type PriorityCopy struct {
+	Title string `json:"title"`
+	Text  string `json:"text"`
 }
 
 type DurationDef struct {

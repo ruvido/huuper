@@ -143,11 +143,11 @@
     if (!nextBtn || !nextLabel) return;
     nextBtn.setAttribute("type", "button");
     nextBtn.removeAttribute("form");
-    if (status === "active") {
+    if (status === "active" || status === "draft") {
       nextLabel.textContent = (viewCopy.editLabel || "Edit").toUpperCase();
       setNextIcon("edit");
       nextBtn.onclick = () => {
-        window.location.href = `${basePath()}/edit/${encodeURIComponent(state.viewId)}/?step=1`;
+        window.location.href = `${basePath()}/edit/${encodeURIComponent(state.viewId)}/`;
       };
     } else {
       nextLabel.textContent = (listCopy.duplicateLabel || "Duplicate").toUpperCase();
@@ -191,6 +191,11 @@
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#39;");
+  }
+
+  function priorityCopy() {
+    const p = (state.cfg && state.cfg.priority) || {};
+    return (state.editId || state.viewId) ? (p.edit || {}) : (p.new || {});
   }
 
   function saveDraft() {
@@ -355,7 +360,7 @@
   function stateLabel() {
     if (isConfirm()) return state.cfg.wizard.confirmation.title.toUpperCase();
     if (state.step === 0) return state.cfg.wizard.intro.title.toUpperCase();
-    if (state.step === 1) return state.cfg.priority.label.toUpperCase();
+    if (state.step === 1) return String(priorityCopy().title || "").toUpperCase();
     const def = state.cfg.pillars[state.step - 2];
     return def ? def.label.toUpperCase() : "";
   }
@@ -423,15 +428,15 @@
   }
 
   function renderPriority() {
-    const priority = state.cfg.priority;
+    const priority = priorityCopy();
     const labels = {
-      title: priority.label,
+      title: priority.title || "",
       priorityField: copy.labels.priorityField,
       whyField: copy.labels.whyField,
       priorityPlaceholder: copy.placeholders.priorityTitle,
       whyPlaceholder: copy.placeholders.priorityWhy,
     };
-    const descriptionHTML = esc(priority.description || "").replaceAll("\n", "<br>");
+    const descriptionHTML = esc(priority.text || "").replaceAll("\n", "<br>");
     const introBlock = `
       <div class="intro-quote">
         <p>${descriptionHTML}</p>
@@ -1240,8 +1245,12 @@
     }
     if (!cfg.wizard.confirmation.title) throw new Error("battleplan settings missing wizard.confirmation.title");
     if (!cfg.wizard.confirmation.button) throw new Error("battleplan settings missing wizard.confirmation.button");
-    if (!cfg.priority.label) throw new Error("battleplan settings missing priority.label");
-    if (!cfg.priority.description) throw new Error("battleplan settings missing priority.description");
+    if (!cfg.priority.new || typeof cfg.priority.new !== "object") throw new Error("battleplan settings missing priority.new");
+    if (!cfg.priority.new.title) throw new Error("battleplan settings missing priority.new.title");
+    if (!cfg.priority.new.text) throw new Error("battleplan settings missing priority.new.text");
+    if (!cfg.priority.edit || typeof cfg.priority.edit !== "object") throw new Error("battleplan settings missing priority.edit");
+    if (!cfg.priority.edit.title) throw new Error("battleplan settings missing priority.edit.title");
+    if (!cfg.priority.edit.text) throw new Error("battleplan settings missing priority.edit.text");
     if (!Array.isArray(cfg.durations) || cfg.durations.length === 0) throw new Error("battleplan settings missing durations");
     if (!cfg.durations.some((item) => item.default)) throw new Error("battleplan settings missing default duration");
     for (const item of cfg.durations) {

@@ -3814,7 +3814,7 @@ textarea.field-input {
 }
 
 .wizard-form-view#battleplan-wizard-form {
-  min-height: calc(100dvh - var(--topbar-height) - (var(--sticky-actions-height) + env(safe-area-inset-bottom)));
+  min-height: 0;
 }
 
 .wizard-form-confirm {
@@ -3863,10 +3863,6 @@ textarea.field-input {
   gap: var(--space-1);
 }
 
-.wizard-step-confirm .display-hero {
-  font-size: calc(var(--font-ui-xl) * 1.15);
-  line-height: 1.02;
-}
 
 .wizard-confirm-badge {
   display: inline-flex;
