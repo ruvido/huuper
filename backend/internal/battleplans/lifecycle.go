@@ -145,8 +145,7 @@ func Create(app *pocketbase.PocketBase, userID string, in Input) (*core.Record, 
 }
 
 func Update(app *pocketbase.PocketBase, record *core.Record, in Input) error {
-	status := record.GetString("status")
-	if status != StatusActive && status != StatusDraft {
+	if !IsEditable(record.GetString("status")) {
 		return fmt.Errorf("only active or draft battleplans can be edited")
 	}
 	cfg, err := LoadConfig(app)

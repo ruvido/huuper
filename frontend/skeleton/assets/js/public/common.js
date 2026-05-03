@@ -1,4 +1,4 @@
-window.huuperPublicCommon = (() => {
+window.appPublicCommon = (() => {
   let tabsInitialized = false;
 
   function text(value) {

@@ -1,6 +1,6 @@
 (() => {
-  const publicFields = window.huuperPublicFields;
-  const publicCommon = window.huuperPublicCommon;
+  const publicFields = window.appPublicFields;
+  const publicCommon = window.appPublicCommon;
 
   const signupSettingsURL = "/api/public/settings/signup";
   const profileSchemaURL = "/api/public/settings/profile_schema";
@@ -34,7 +34,7 @@
     !requestActionsNode ||
     !publicFields ||
     !publicCommon ||
-    !window.huuperAuth
+    !window.appAuth
   ) {
     return;
   }
@@ -43,9 +43,9 @@
     requestActionsNode.insertAdjacentElement("afterend", requestStatusNode);
   }
 
-  const auth = window.huuperAuth.read();
+  const auth = window.appAuth.read();
   if (auth && auth.token) {
-    window.location.replace(window.huuperAuth.redirectAfterLogin(auth.model && auth.model.admin === true ? "admin" : "me"));
+    window.location.replace(window.appAuth.redirectAfterLogin(auth.model && auth.model.admin === true ? "admin" : "me"));
     return;
   }
 
@@ -206,8 +206,8 @@
 
   function renderStartScreen() {
     requestFieldStatusNode = null;
-    if (window.huuperOnboardingComponent) {
-      window.huuperOnboardingComponent.renderStartScreen({
+    if (window.appOnboardingComponent) {
+      window.appOnboardingComponent.renderStartScreen({
         stepNode: requestStepNode,
         startButton: requestStartButton,
         page: requestState.startPage || {},
@@ -218,8 +218,8 @@
 
   function renderConfirmationScreen() {
     requestFieldStatusNode = null;
-    if (window.huuperOnboardingComponent) {
-      window.huuperOnboardingComponent.renderCenteredScreen({
+    if (window.appOnboardingComponent) {
+      window.appOnboardingComponent.renderCenteredScreen({
         stepNode: requestStepNode,
         page: requestState.confirmation || {},
         titleClass: "public-request-title public-request-title-start",
@@ -230,8 +230,8 @@
 
   function renderSuccessScreen() {
     requestFieldStatusNode = null;
-    if (window.huuperOnboardingComponent) {
-      window.huuperOnboardingComponent.renderCenteredScreen({
+    if (window.appOnboardingComponent) {
+      window.appOnboardingComponent.renderCenteredScreen({
         stepNode: requestStepNode,
         page: requestState.success || {},
         titleClass: "public-request-title public-request-title-start",

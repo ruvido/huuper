@@ -1,11 +1,11 @@
 (() => {
   const button = document.querySelector("[data-logout]");
-  if (!button || !window.huuperAuth) {
+  if (!button || !window.appAuth) {
     return;
   }
 
   button.addEventListener("click", () => {
-    window.huuperAuth.clear();
+    window.appAuth.clear();
     window.location.href = "/";
   });
 })();

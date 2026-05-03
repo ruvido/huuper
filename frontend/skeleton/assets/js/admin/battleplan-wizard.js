@@ -1,11 +1,26 @@
+// Battleplan wizard orchestrator. Owns `state` and the DOM event wiring;
+// delegates pure helpers to ns.config, render fns to ns.render, and view-page
+// action wiring to ns.actions. Each split file publishes onto
+// window.appBattleplanWizard; we read from it here.
 (() => {
-  const auth = window.huuperAuth;
+  const auth = window.appAuth;
   if (!auth) return;
-  const copy = window.huuperCopy && window.huuperCopy.battleplan && window.huuperCopy.battleplan.wizard;
+  const copy = window.appCopy && window.appCopy.battleplan && window.appCopy.battleplan.wizard;
   if (!copy) return;
 
+  window.appBattleplanWizard = window.appBattleplanWizard || {};
+  const ns = window.appBattleplanWizard;
+  if (!ns.config || !ns.render || !ns.actions) return; // split modules required
+
+  const cfgmod = ns.config;
+  const rndmod = ns.render;
+  const actmod = ns.actions;
+  const esc = rndmod.esc;
+
   const PREFIX = "battleplan-wizard";
-  const DRAFT_STORAGE_KEY = "battleplan-wizard-draft-v1";
+  // Legacy localStorage draft key — only used by clearDraft() to wipe stale
+  // entries from earlier auto-resume behaviour. No new drafts are written here.
+  const LEGACY_DRAFT_STORAGE_KEY = "battleplan-wizard-draft-v1";
   const $ = (suffix) => document.getElementById(`${PREFIX}-${suffix}`);
 
   const dom = {
@@ -24,7 +39,7 @@
     next: $("next"),
     nextLabel: $("next-label"),
   };
-  const cancelEditButton = document.querySelector("[data-battleplan-cancel-edit]");
+  const cancelEditButton = document.querySelector("[data-wizard-cancel-edit]");
 
   function idFromPath(kind) {
     const parts = window.location.pathname.split("/").filter(Boolean);
@@ -32,144 +47,7 @@
     return idx >= 0 && parts[idx + 1] ? decodeURIComponent(parts[idx + 1]) : null;
   }
 
-  function basePath() {
-    return window.location.pathname.startsWith("/me/") ? "/me/battleplan" : "/admin/battleplan";
-  }
-
-  function setNextIcon(kind) {
-    const nextBtn = document.getElementById(`${PREFIX}-next`);
-    if (!nextBtn) return;
-    const def = nextBtn.querySelector('[data-wizard-next-icon="default"]');
-    const ed = nextBtn.querySelector('[data-wizard-next-icon="edit"]');
-    if (def) def.hidden = kind === "edit";
-    if (ed) ed.hidden = kind !== "edit";
-  }
-
-  async function archiveCurrentView() {
-    if (!dom.back || dom.back.disabled) return;
-    dom.back.disabled = true;
-    try {
-      await auth.apiFetch(`/api/me/battleplans/${encodeURIComponent(state.viewId)}/status`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "archived" }),
-      });
-      window.location.href = `${basePath()}/`;
-    } catch { dom.back.disabled = false; }
-  }
-
-  function openDeleteDialog() {
-    const sheet = window.huuperActionSheet;
-    const dlg = ((window.huuperCopy || {}).battleplan || {}).view || {};
-    const dialog = dlg.deleteDialog || {};
-    if (!sheet || typeof sheet.open !== "function") return;
-    sheet.open({
-      title: dialog.title || "Delete this battleplan?",
-      meta: dialog.meta,
-      actions: [],
-      footerAction: {
-        label: dialog.confirmLabel || "Delete",
-        tone: "danger",
-        onSelect: async () => {
-          await auth.apiFetch(`/api/me/battleplans/${encodeURIComponent(state.viewId)}`, { method: "DELETE" });
-          window.location.href = `${basePath()}/`;
-        },
-      },
-    });
-  }
-
-  async function duplicateCurrentView() {
-    const createDraft = async () => {
-      const payload = buildPayload();
-      payload.status = "draft";
-      const created = await auth.apiFetch("/api/me/battleplans", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (created && created.id) {
-        window.location.href = `${basePath()}/edit/${encodeURIComponent(created.id)}/`;
-      }
-    };
-    let existingDraft = null;
-    try {
-      const list = await auth.apiFetch("/api/me/battleplans?per_page=200");
-      const items = (list && Array.isArray(list.items)) ? list.items : [];
-      existingDraft = items.find((it) => it && it.status === "draft" && it.id !== state.viewId) || null;
-    } catch {
-      /* if list fetch fails, attempt direct create */
-    }
-    if (existingDraft) {
-      const sheet = window.huuperActionSheet;
-      const cfg = ((window.huuperCopy || {}).battleplan || {}).list || {};
-      const dlg = cfg.overwriteDraftDialog || {};
-      if (sheet && typeof sheet.open === "function") {
-        sheet.open({
-          title: dlg.title || "Overwrite existing draft?",
-          actions: [],
-          footerAction: {
-            label: dlg.confirmLabel || "Yes",
-            tone: "danger",
-            onSelect: async () => {
-              await auth.apiFetch(`/api/me/battleplans/${encodeURIComponent(existingDraft.id)}`, { method: "DELETE" });
-              await createDraft();
-            },
-          },
-        });
-        return;
-      }
-    }
-    await createDraft();
-  }
-
-  function configureViewActions() {
-    const bpCopy = (window.huuperCopy && window.huuperCopy.battleplan) || {};
-    const viewCopy = bpCopy.view || {};
-    const listCopy = bpCopy.list || {};
-    const status = state.viewedStatus || "";
-
-    if (dom.back) {
-      if (status === "archived") {
-        dom.back.textContent = (viewCopy.deleteLabel || "Delete").toUpperCase();
-        dom.back.onclick = (event) => { event.preventDefault(); openDeleteDialog(); };
-      } else {
-        dom.back.textContent = (bpCopy.archiveLabel || "Archive").toUpperCase();
-        dom.back.onclick = (event) => { event.preventDefault(); archiveCurrentView(); };
-      }
-    }
-
-    const nextBtn = document.getElementById(`${PREFIX}-next`);
-    const nextLabel = document.getElementById(`${PREFIX}-next-label`);
-    if (!nextBtn || !nextLabel) return;
-    nextBtn.setAttribute("type", "button");
-    nextBtn.removeAttribute("form");
-    if (status === "draft" && !state.hasExistingActive) {
-      nextLabel.textContent = (viewCopy.activateLabel || "Activate").toUpperCase();
-      setNextIcon("edit");
-      nextBtn.onclick = async () => {
-        if (nextBtn.disabled) return;
-        nextBtn.disabled = true;
-        try {
-          await auth.apiFetch(`/api/me/battleplans/${encodeURIComponent(state.viewId)}/status`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status: "active" }),
-          });
-          window.location.href = `${basePath()}/`;
-        } catch { nextBtn.disabled = false; }
-      };
-    } else if (status === "active" || status === "draft") {
-      nextLabel.textContent = (viewCopy.editLabel || "Edit").toUpperCase();
-      setNextIcon("edit");
-      nextBtn.onclick = () => {
-        window.location.href = `${basePath()}/edit/${encodeURIComponent(state.viewId)}/`;
-      };
-    } else {
-      nextLabel.textContent = (listCopy.duplicateLabel || "Duplicate").toUpperCase();
-      setNextIcon("default");
-      nextBtn.onclick = () => duplicateCurrentView();
-    }
-  }
+  const basePath = () => window.appBattleplan.basePath();
 
   const params = new URLSearchParams(window.location.search);
   const editId = idFromPath("edit") || params.get("edit") || null;
@@ -199,57 +77,11 @@
     },
   };
 
-  function esc(value) {
-    return String(value || "")
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#39;");
-  }
-
-  function priorityCopy() {
-    const p = (state.cfg && state.cfg.priority) || {};
-    return (state.editId || state.viewId) ? (p.edit || {}) : (p.new || {});
-  }
-
-  // True when the next save will create/keep a draft record:
-  //  - editing an existing draft, or
-  //  - creating a brand-new plan while an active one already exists.
-  function willSaveAsDraft() {
-    if (state.editId) return state.viewedStatus === "draft";
-    return !!state.hasExistingActive;
-  }
-
-  function saveDraft() {
-    try {
-      const payload = {
-        input: state.input,
-        step: state.step,
-      };
-      window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(payload));
-    } catch (_) {
-      // no-op: localStorage unavailable
-    }
-  }
-
   function clearDraft() {
     try {
-      window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+      window.localStorage.removeItem(LEGACY_DRAFT_STORAGE_KEY);
     } catch (_) {
       // no-op: localStorage unavailable
-    }
-  }
-
-  function loadDraft() {
-    try {
-      const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== "object") return null;
-      return parsed;
-    } catch (_) {
-      return null;
     }
   }
 
@@ -260,19 +92,17 @@
     dom.status.classList.toggle("is-error", !!msg);
   }
 
+  // Format the "removed N incomplete routine(s)" status from copy templates.
+  // Reads from appCopy each call so a copy update takes effect immediately.
+  function formatRemovedStatus(count) {
+    const shared = (window.appCopy && window.appCopy.battleplan && window.appCopy.battleplan.wizardShared) || {};
+    const tmpl = shared.removedRoutinesStatus || {};
+    if (count === 1) return tmpl.singular || "";
+    return (tmpl.plural || "").replace("{count}", String(count));
+  }
+
   function setLoading(visible) {
     dom.loading.hidden = !visible;
-  }
-
-  function sleep(ms) {
-    return new Promise((resolve) => window.setTimeout(resolve, ms));
-  }
-
-  async function pulseNextLoading(ms = 220) {
-    if (!dom.next) return;
-    dom.next.classList.add("wizard-btn-loading");
-    await sleep(ms);
-    dom.next.classList.remove("wizard-btn-loading");
   }
 
   function showWizard() {
@@ -285,43 +115,11 @@
     return 3 + state.cfg.pillars.length; // intro + priority + N pillars + confirm
   }
 
-  function introEnabledBySettings() {
-    const intro = state.cfg && state.cfg.wizard && state.cfg.wizard.intro;
-    if (!intro || typeof intro !== "object") return true;
-    if (typeof intro.show === "boolean") return intro.show;
-    return true;
-  }
-
-  function shouldShowIntro() {
-    return introEnabledBySettings() && !state.hasExistingBattleplan;
-  }
-
-  function defaultDurationValue() {
-    const byDefault = state.cfg.durations.find((item) => item && item.default);
-    if (byDefault && Number.isFinite(byDefault.value)) return Number(byDefault.value);
-    const first = state.cfg.durations.find((item) => item && Number.isFinite(item.value));
-    return first ? Number(first.value) : 0;
-  }
-
-  function defaultVisibilityValue() {
-    const byDefault = state.cfg.visibility.find((item) => item && item.default);
-    if (byDefault && byDefault.value) return byDefault.value;
-    const first = state.cfg.visibility.find((item) => item && item.value);
-    return first ? first.value : "";
-  }
-
-  function defaultCadenceType() {
-    const byDefault = state.cfg.cadences.find((item) => item && item.default && item.type);
-    if (byDefault) return byDefault.type;
-    const first = state.cfg.cadences.find((item) => item && item.type);
-    return first ? first.type : "daily";
-  }
-
   function minStep() {
     if (state.viewId) return totalSteps() - 1;
     // Drafts behave like a fresh new plan: start from intro/priority, allow editing all steps.
-    if (state.editId && state.viewedStatus !== "draft") return 2;
-    return shouldShowIntro() ? 0 : 1;
+    if (state.editId && !cfgmod.isEditingDraft(state)) return 2;
+    return cfgmod.shouldShowIntro(state) ? 0 : 1;
   }
 
   function maxStep() {
@@ -370,8 +168,6 @@
     window.history.replaceState({}, "", url.toString());
   }
 
-  function pad2(n) { return String(n).padStart(2, "0"); }
-
   function isConfirm() {
     return state.step === totalSteps() - 1;
   }
@@ -383,7 +179,7 @@
   function stateLabel() {
     if (isConfirm()) return state.cfg.wizard.confirmation.title.toUpperCase();
     if (state.step === 0) return state.cfg.wizard.intro.title.toUpperCase();
-    if (state.step === 1) return String(priorityCopy().title || "").toUpperCase();
+    if (state.step === 1) return String(cfgmod.priorityCopy(state).title || "").toUpperCase();
     const def = state.cfg.pillars[state.step - 2];
     return def ? def.label.toUpperCase() : "";
   }
@@ -391,16 +187,16 @@
   function syncProgress() {
     const n = state.cfg.pillars.length;
     const cur = isPillarStep() ? state.step - 1 : 0;
-    dom.progressLabel.textContent = `${copy.progressPrefix}: ${pad2(cur)}/${pad2(n)}`;
+    dom.progressLabel.textContent = `${copy.progressPrefix}: ${cfgmod.pad2(cur)}/${cfgmod.pad2(n)}`;
     dom.progressState.textContent = stateLabel();
     dom.progressFill.style.width = `${(cur / n) * 100}%`;
     if (isConfirm()) {
-      dom.nextLabel.textContent = (willSaveAsDraft() ? copy.saveDraftLabel : copy.confirmLabel).toUpperCase();
-      setNextIcon("edit");
+      dom.nextLabel.textContent = (cfgmod.willSaveAsDraft(state) ? copy.saveDraftLabel : copy.confirmLabel).toUpperCase();
+      rndmod.setNextIcon("edit", PREFIX);
       return;
     }
     dom.nextLabel.textContent = state.step === 0 ? state.cfg.wizard.intro.button.toUpperCase() : copy.nextLabel.toUpperCase();
-    setNextIcon("default");
+    rndmod.setNextIcon("default", PREFIX);
   }
 
   function ensurePillar(key) {
@@ -411,11 +207,11 @@
   }
 
   function newRoutine() {
-    return { title: "", trigger: "", cadence: { type: defaultCadenceType() } };
+    return { title: "", trigger: "", cadence: { type: cfgmod.defaultCadenceType(state.cfg) } };
   }
 
   function syncChrome() {
-    const onIntro = state.step === 0 && shouldShowIntro();
+    const onIntro = state.step === 0 && cfgmod.shouldShowIntro(state);
     const onConfirm = isConfirm();
     const onSummaryView = isSummaryView();
     if (dom.page) dom.page.classList.toggle("wizard-page-intro", onIntro);
@@ -434,399 +230,17 @@
     if (dom.sticky) dom.sticky.classList.toggle("sticky-actions-intro", onIntro);
   }
 
-  // ---------- Step rendering ----------
-
-  function renderIntro() {
-    const intro = state.cfg.wizard.intro;
-    const introText = esc(intro.text).replaceAll("\n", "<br>");
-    dom.stage.innerHTML = `
-      <section class="wizard-step wizard-step-intro">
-        <div class="public-request-start-stack wizard-intro-stack">
-          <h2 class="public-request-title public-request-title-start public-request-title-start-lg wizard-intro-title">${esc(intro.title)}</h2>
-          <p class="public-request-copy wizard-intro-copy">${introText}</p>
-        </div>
-      </section>
-    `;
-  }
-
-  function renderPriority() {
-    const priority = priorityCopy();
-    const labels = {
-      title: priority.title || "",
-      priorityField: copy.labels.priorityField,
-      whyField: copy.labels.whyField,
-      priorityPlaceholder: copy.placeholders.priorityTitle,
-      whyPlaceholder: copy.placeholders.priorityWhy,
+  // Build the rendering context object passed to render module functions.
+  // Built fresh per render so split renderers never close over stale data.
+  function makeRenderCtx() {
+    return {
+      state,
+      copy,
+      dom,
+      PREFIX,
+      ensurePillar,
+      isSummaryView,
     };
-    const descriptionHTML = esc(priority.text || "").replaceAll("\n", "<br>");
-    const introBlock = `
-      <div class="intro-quote">
-        <p>${descriptionHTML}</p>
-      </div>
-    `;
-    dom.stage.innerHTML = `
-      <section class="wizard-step wizard-step-priority">
-        <header class="wizard-step-header">
-          <h2 class="display-hero">${esc(labels.title)}</h2>
-          ${introBlock}
-        </header>
-
-        <div>
-          <label class="field-label">${esc(labels.priorityField)}</label>
-          <input class="field-input${state.fieldErrors.priorityTitle ? " field-input-error" : ""}" type="text" name="priority_title" value="${esc(state.input.data.priority.title)}" placeholder="${esc(labels.priorityPlaceholder)}" />
-        </div>
-
-        <div>
-          <label class="field-label">${esc(labels.whyField)}</label>
-          <textarea class="field-input${state.fieldErrors.priorityWhy ? " field-input-error" : ""}" name="priority_why" rows="4" placeholder="${esc(labels.whyPlaceholder)}">${esc(state.input.data.priority.why)}</textarea>
-        </div>
-      </section>
-    `;
-  }
-
-  function renderVisibilityAside() {
-    if (!dom.aside) return;
-    dom.aside.classList.remove("step-progress-aside-badges");
-    dom.aside.classList.add("step-progress-aside-controls");
-    const items = [...state.cfg.visibility].sort((a, b) => {
-      if (a.value === "group" && b.value !== "group") return 1;
-      if (b.value === "group" && a.value !== "group") return -1;
-      return 0;
-    });
-    const opts = items.map((item) => `
-      <label class="segmented-option">
-        <input type="radio" name="visibility_aside" value="${esc(item.value)}" ${state.input.visibility === item.value ? "checked" : ""} />
-        <span>${esc(item.label)}</span>
-      </label>
-    `).join("");
-    const durationOpts = state.cfg.durations.map((item) => `
-      <label class="segmented-option">
-        <input type="radio" name="duration_aside" value="${item.value}" ${state.input.duration_days === item.value ? "checked" : ""} />
-        <span>${item.value}${esc(copy.daysSuffix || "D")}</span>
-      </label>
-    `).join("");
-    dom.aside.innerHTML = `
-      <div class="segmented step-progress-duration-options">${durationOpts}</div>
-      <div class="segmented step-progress-visibility-options">${opts}</div>
-    `;
-    dom.aside.hidden = false;
-  }
-
-  function highlightCurrentRoutines() {
-    const box = dom.stage && dom.stage.querySelector(".wizard-routines");
-    if (!box) return;
-    box.classList.add("wizard-routines-highlight");
-    window.setTimeout(() => box.classList.remove("wizard-routines-highlight"), 1400);
-  }
-
-  function routineChevronSVG(collapsed) {
-    if (collapsed) {
-      return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="wizard-routine-chevron" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708"/></svg>`;
-    }
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="wizard-routine-chevron" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M7.646 4.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1-.708.708L8 5.707l-5.646 5.647a.5.5 0 0 1-.708-.708z"/></svg>`;
-  }
-
-  function animateCollapseOtherRoutines(pillarKey, keepIdx) {
-    if (!dom.stage) return;
-    const cards = dom.stage.querySelectorAll(`.wizard-routine[data-pillar="${pillarKey}"]`);
-    cards.forEach((card) => {
-      const idx = Number(card.getAttribute("data-routine-idx"));
-      if (!Number.isFinite(idx) || idx === keepIdx) return;
-      card.classList.add("is-collapsed");
-      state.ui.collapsedRoutines[`${pillarKey}:${idx}`] = true;
-      const trash = card.querySelector(".wizard-routine-delete");
-      if (trash) trash.remove();
-      const toggle = card.querySelector(".wizard-routine-toggle");
-      if (toggle) {
-        toggle.setAttribute("aria-label", copy.actions.expandRoutineAria);
-        toggle.innerHTML = routineChevronSVG(true);
-      }
-    });
-  }
-
-  function renderRoutine(pillarKey, idx, routine) {
-    const collapseKey = `${pillarKey}:${idx}`;
-    const collapsed = Object.prototype.hasOwnProperty.call(state.ui.collapsedRoutines, collapseKey)
-      ? !!state.ui.collapsedRoutines[collapseKey]
-      : true;
-    const routineTitle = String((routine && routine.title) || "").trim();
-    const cadenceOpts = state.cfg.cadences.filter((c) => c && c.type !== "paused").map((c) => `
-      <label class="segmented-option">
-        <input type="radio" name="cadence_type_${pillarKey}_${idx}" value="${esc(c.type)}" ${routine.cadence.type === c.type ? "checked" : ""} />
-        <span>${esc(c.label)}</span>
-      </label>
-    `).join("");
-    const cadenceReset = `
-      <button type="button" class="segmented-option segmented-reset${routine.cadence.type === "paused" ? " is-selected" : ""}" data-action="pause-cadence" data-pillar="${esc(pillarKey)}" data-idx="${idx}" aria-label="Routine in pausa">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
-          <path d="M6 3.5a.5.5 0 0 1 .5.5v8a.5.5 0 0 1-1 0V4a.5.5 0 0 1 .5-.5m4 0a.5.5 0 0 1 .5.5v8a.5.5 0 0 1-1 0V4a.5.5 0 0 1 .5-.5"/>
-        </svg>
-      </button>
-    `;
-
-    let extra = "";
-    if (routine.cadence.type === "specific_days") {
-      const days = routine.cadence.days || [];
-      const dayLabels = [
-        ["mon", copy.dayShort.mon],
-        ["tue", copy.dayShort.tue],
-        ["wed", copy.dayShort.wed],
-        ["thu", copy.dayShort.thu],
-        ["fri", copy.dayShort.fri],
-        ["sat", copy.dayShort.sat],
-        ["sun", copy.dayShort.sun],
-      ];
-      extra = `
-        <div class="day-toggles">
-          ${dayLabels.map(([key, label]) => `
-            <label class="segmented-option day-toggle">
-              <input type="checkbox" name="cadence_day_${pillarKey}_${idx}" value="${key}" ${days.includes(key) ? "checked" : ""} />
-              <span>${label}</span>
-            </label>
-          `).join("")}
-        </div>
-      `;
-    } else if (routine.cadence.type === "times_per_week") {
-      extra = `
-        <div class="day-toggles cadence-times-card">
-          <label class="segmented-option day-toggle cadence-times-box">
-            <input class="cadence-times-input" type="number" min="1" max="7" name="cadence_times_${pillarKey}_${idx}" value="${routine.cadence.times || 1}" />
-          </label>
-        </div>
-      `;
-    }
-
-    return `
-      <article class="wizard-routine${collapsed ? " is-collapsed" : ""}${routine.cadence.type === "paused" ? " is-paused" : ""}" data-routine-idx="${idx}" data-pillar="${esc(pillarKey)}">
-        <header class="wizard-routine-hdr" data-action="toggle-routine" data-pillar="${esc(pillarKey)}" data-idx="${idx}">
-          <div class="wizard-routine-left">
-            <button type="button" class="wizard-routine-collapse" data-action="toggle-routine" data-pillar="${esc(pillarKey)}" data-idx="${idx}" aria-expanded="${collapsed ? "false" : "true"}">
-              <span>${routine.cadence.type === "paused" ? "⏸ " : ""}${esc(copy.routineWord)} ${idx + 1}</span>
-              ${collapsed && routineTitle ? `<span class="wizard-routine-collapsed-title">${esc(routineTitle)}</span>` : ""}
-            </button>
-          </div>
-          <button type="button" class="wizard-routine-toggle" data-action="toggle-routine" data-pillar="${esc(pillarKey)}" data-idx="${idx}" aria-label="${collapsed ? esc(copy.actions.expandRoutineAria) : esc(copy.actions.collapseRoutineAria)}">
-            ${routineChevronSVG(collapsed)}
-          </button>
-        </header>
-        <div class="wizard-routine-body">
-          <div>
-            <label class="field-label">${esc(copy.labels.titleField)}</label>
-            <input class="field-input" type="text" name="routine_title_${pillarKey}_${idx}" value="${esc(routine.title)}" placeholder="${esc(copy.placeholders.routineTitle)}" />
-          </div>
-          <div>
-            <label class="field-label">${esc(copy.labels.triggerField)}</label>
-            <input class="field-input" type="text" name="routine_trigger_${pillarKey}_${idx}" value="${esc(routine.trigger)}" placeholder="${esc(copy.placeholders.routineTrigger)}" />
-          </div>
-          <div>
-            <label class="field-label">${esc(copy.labels.cadenceField)}</label>
-            <div class="segmented segmented-cadence">${cadenceReset}${cadenceOpts}</div>
-          </div>
-          ${extra}
-          <button type="button" class="wizard-btn wizard-btn-danger" data-action="remove-routine" data-pillar="${esc(pillarKey)}" data-idx="${idx}">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293z"/>
-            </svg>
-            <span>delete</span>
-          </button>
-        </div>
-      </article>
-    `;
-  }
-
-  function renderPillar(pillarIndex) {
-    const def = state.cfg.pillars[pillarIndex];
-    const value = ensurePillar(def.key);
-    const routinesHTML = value.routines.map((r, idx) => renderRoutine(def.key, idx, r)).join("");
-    const heroTitle = def.label || "Interiorita";
-    const introBlock = def.description ? `<cite class="intro-quote">${esc(def.description)}</cite>` : "";
-
-    dom.stage.innerHTML = `
-      <section class="wizard-step wizard-step-priority">
-        <header class="wizard-step-header">
-          <h2 class="display-hero">${esc(heroTitle)}</h2>
-          ${introBlock}
-        </header>
-
-        <div>
-          <label class="field-label">${esc(copy.labels.objectiveField)}</label>
-          <textarea class="field-input" name="pillar_objective_${def.key}" rows="3" placeholder="${esc(copy.placeholders.objective)}">${esc(value.objective)}</textarea>
-        </div>
-
-        <div class="wizard-routines">${routinesHTML}</div>
-
-        <button type="button" class="inline-add" data-action="add-routine" data-pillar="${esc(def.key)}">${esc(copy.actions.addRoutine)}</button>
-      </section>
-    `;
-  }
-
-  function visibilityLabel(value) {
-    const def = state.cfg.visibility.find((v) => v.value === value);
-    return def ? def.label : value;
-  }
-
-  function routineCadenceLabel(cadence) {
-    if (!cadence || !cadence.type) return "";
-    if (cadence.type === "paused") return "";
-    const cadenceTimes = Number(cadence.times);
-    if (cadence.type === "times_per_week" && Number.isFinite(cadenceTimes) && cadenceTimes > 0) {
-      return `${cadenceTimes}X`;
-    }
-    if (cadence.type === "specific_days") {
-      const dayLabels = {
-        mon: "M",
-        tue: "T",
-        wed: "W",
-        thu: "T",
-        fri: "F",
-        sat: "S",
-        sun: "S",
-      };
-      const days = Array.isArray(cadence.days) ? cadence.days : [];
-      const ordered = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
-        .filter((day) => days.includes(day))
-        .map((day) => dayLabels[day]);
-      return ordered.length ? `(${ordered.join(",")})` : "";
-    }
-    if (cadence.type === "daily") return "W";
-    return "";
-  }
-
-  function isRoutineComplete(routine) {
-    if (!routine) return false;
-    if (!(routine.title || "").trim()) return false;
-    if (!(routine.trigger || "").trim()) return false;
-    const cadence = routine.cadence || {};
-    if (!cadence.type || cadence.type === "paused") return false;
-    if (cadence.type === "specific_days") return Array.isArray(cadence.days) && cadence.days.length > 0;
-    if (cadence.type === "times_per_week") {
-      const times = Number(cadence.times);
-      return Number.isFinite(times) && times >= 1 && times <= 7;
-    }
-    return true;
-  }
-
-  function isPillarComplete(value) {
-    if (!value || !(value.objective || "").trim()) return false;
-    return (value.routines || []).some((r) => isRoutineComplete(r));
-  }
-
-  function renderConfirm() {
-    const c = state.cfg.wizard.confirmation;
-    const priorityText = (state.input.data.priority.title || "").trim();
-    const priorityWhy = (state.input.data.priority.why || "").trim();
-    const priorityMissing = !priorityText;
-    const summaryEditId = state.viewId || state.editId;
-    const hasCompletePillar = state.cfg.pillars.some((def) => isPillarComplete(state.input.data.pillars[def.key]));
-    const pillarsSummary = state.cfg.pillars.map((def, pillarIndex) => {
-      const value = state.input.data.pillars[def.key] || { objective: "", routines: [] };
-      const objective = (value.objective || "").trim();
-      const routines = (value.routines || []);
-      const routineItems = routines
-        .map((r) => {
-          if (!r || !r.title) return "";
-          if ((r.cadence || {}).type === "paused") return "";
-          const title = String(r.title).trim();
-          if (!title) return "";
-          const cadence = r.cadence || {};
-          const cadenceLabel = routineCadenceLabel(cadence);
-          return `<li><span>${esc(title)}</span>${cadenceLabel ? ` <span class="wizard-routine-count-label">${esc(cadenceLabel)}</span>` : ""}</li>`;
-        })
-        .filter((line) => !!line)
-        .join("");
-      return `
-        <li class="wizard-pillars-item wizard-summary-edit-target" data-action="${summaryEditId ? "edit-pillar" : "go-step"}" data-step="${summaryEditId ? pillarIndex + 1 : pillarIndex + 2}">
-          <div class="wizard-pillars-col wizard-pillars-col-label"><strong>${esc(def.label)}</strong></div>
-          <div class="wizard-pillars-col wizard-pillars-col-content">
-            ${objective ? `<p class="wizard-pillars-objective-inline">${esc(objective)}</p>` : ""}
-            ${routineItems ? `<ul class="wizard-summary-muted-card wizard-pillars-routines">${routineItems}</ul>` : ""}
-          </div>
-        </li>
-      `;
-    }).join("");
-
-    let topErrorMessage = "";
-    if (state.confirmAttempted) {
-      if (priorityMissing) {
-        topErrorMessage = copy.errors.priorityRequired;
-      } else {
-        for (const def of state.cfg.pillars) {
-          const v = state.input.data.pillars[def.key] || { objective: "", routines: [] };
-          const obj = (v.objective || "").trim();
-          const validRoutine = (v.routines || []).some((r) => isRoutineComplete(r));
-          if (!obj && !validRoutine) continue;
-          if (!obj) { topErrorMessage = copy.errors.pillarObjectiveRequired; break; }
-          if (!validRoutine) { topErrorMessage = copy.errors.pillarRoutineRequired; break; }
-        }
-        if (!topErrorMessage && !hasCompletePillar) {
-          topErrorMessage = copy.errors.completePillarRequired;
-        }
-      }
-    }
-
-    if (dom.aside) {
-      dom.aside.classList.add("step-progress-aside-badges");
-      dom.aside.classList.remove("step-progress-aside-controls");
-      dom.aside.innerHTML = `
-        <span class="wizard-confirm-badge">${state.input.duration_days}${esc(copy.daysSuffix)}</span>
-        <span class="wizard-confirm-badge">${esc(visibilityLabel(state.input.visibility)).toUpperCase()}</span>
-      `;
-      dom.aside.hidden = false;
-    }
-
-    const summaryView = isSummaryView();
-    const heroHTML = summaryView
-      ? `<h2 class="display-hero">${esc(priorityText)}</h2>`
-      : (c.text ? `<h2 class="display-hero">${esc(c.text)}</h2>` : "");
-    const priorityBodyHTML = summaryView
-      ? (priorityWhy ? `<p class="wizard-view-why">${esc(priorityWhy)}</p>` : "")
-      : (priorityMissing
-          ? `<p class="wizard-missing-line">Missing Priority</p>`
-          : `<p class="wizard-summary-value">${esc(priorityText)}</p>${priorityWhy ? `<p class="wizard-summary-muted-card wizard-summary-why">${esc(priorityWhy)}</p>` : ""}`);
-    const priorityTargetAttrs = summaryView
-      ? ""
-      : ` class="wizard-summary-edit-target" data-action="go-step" data-step="1"`;
-
-    const topErrorSlot = document.getElementById(`${PREFIX}-top-error`);
-    if (topErrorSlot) topErrorSlot.textContent = topErrorMessage ? `Error: ${topErrorMessage}` : "";
-
-    dom.stage.innerHTML = `
-      <section class="wizard-step wizard-step-confirm${summaryView ? " wizard-step-view" : ""}">
-        <header class="wizard-step-header">
-          ${heroHTML}
-        </header>
-
-        <div class="wizard-summary">
-          <div${priorityTargetAttrs}>
-            <div class="wizard-summary-tags">
-              <label class="field-label wizard-summary-tag">${esc(copy.labels.summaryPriority)}</label>
-              <label class="field-label wizard-summary-tag wizard-summary-tag-outline">${state.input.duration_days} days</label>
-              <label class="field-label wizard-summary-tag wizard-summary-tag-outline">${esc(visibilityLabel(state.input.visibility)).toUpperCase()}</label>
-              ${willSaveAsDraft() ? `<label class="field-label wizard-summary-tag wizard-summary-tag-draft">DRAFT</label>` : ""}
-            </div>
-            ${priorityBodyHTML}
-          </div>
-          <div class="wizard-summary-pillars-block">
-            <label class="field-label wizard-summary-tag">${esc(copy.labels.summaryPillars)}</label>
-            <ul class="wizard-pillars-summary">${pillarsSummary}</ul>
-          </div>
-        </div>
-      </section>
-    `;
-  }
-
-  function hasConfirmMissing() {
-    const priorityMissing = !(state.input.data.priority.title || "").trim();
-    if (priorityMissing) return true;
-    let hasCompletePillar = false;
-    for (const def of state.cfg.pillars) {
-      const value = state.input.data.pillars[def.key] || { objective: "", routines: [] };
-      if (isPillarComplete(value)) {
-        hasCompletePillar = true;
-        break;
-      }
-    }
-    return !hasCompletePillar;
   }
 
   function render() {
@@ -836,16 +250,17 @@
     setStatus("");
     const errSlot = document.getElementById(`${PREFIX}-top-error`);
     if (errSlot) errSlot.textContent = "";
+    const ctx = makeRenderCtx();
     if (state.step === 0) {
-      renderIntro();
+      rndmod.renderIntro(ctx);
     } else if (state.step === 1) {
-      renderVisibilityAside();
-      renderPriority();
+      rndmod.renderVisibilityAside(ctx);
+      rndmod.renderPriority(ctx);
     } else if (state.step <= state.cfg.pillars.length + 1) {
-      renderVisibilityAside();
-      renderPillar(state.step - 2);
+      rndmod.renderVisibilityAside(ctx);
+      rndmod.renderPillar(ctx, state.step - 2);
     } else {
-      renderConfirm();
+      rndmod.renderConfirm(ctx);
     }
     if (state.ui.focusRoutine && dom.stage) {
       const { pillarKey, idx } = state.ui.focusRoutine;
@@ -982,7 +397,7 @@
   }
 
   function confirmRoutineRemoval(pillarKey, idx) {
-    const sheet = window.huuperActionSheet;
+    const sheet = window.appActionSheet;
     if (!sheet || typeof sheet.open !== "function") {
       removeRoutineAt(pillarKey, idx);
       return;
@@ -1009,7 +424,7 @@
   }
 
   function confirmCancelEdit() {
-    const sheet = window.huuperActionSheet;
+    const sheet = window.appActionSheet;
     const cancelCopy = copy.actions.cancelEdit;
     if (!sheet || typeof sheet.open !== "function") {
       cancelEdit();
@@ -1027,6 +442,20 @@
         },
       },
     });
+  }
+
+  function hasConfirmMissing() {
+    const priorityMissing = !(state.input.data.priority.title || "").trim();
+    if (priorityMissing) return true;
+    let hasCompletePillar = false;
+    for (const def of state.cfg.pillars) {
+      const value = state.input.data.pillars[def.key] || { objective: "", routines: [] };
+      if (cfgmod.isPillarComplete(value)) {
+        hasCompletePillar = true;
+        break;
+      }
+    }
+    return !hasCompletePillar;
   }
 
   async function submit() {
@@ -1060,13 +489,19 @@
     }
   }
 
+  // Build the deps object for the actions module. Frozen per call so view-page
+  // buttons always read the latest state through closure on `state` itself.
+  function makeActionDeps() {
+    return { auth, state, dom, basePath, PREFIX, buildPayload };
+  }
+
   // ---------- Wiring ----------
 
   dom.back.addEventListener("click", () => {
     syncFromDOM();
     // Non-draft edits jump back to /view/ once they hit the pillar boundary.
     // Drafts and new plans walk back step-by-step to the list.
-    if (state.editId && state.viewedStatus !== "draft" && isPillarStep()) {
+    if (state.editId && !cfgmod.isEditingDraft(state) && isPillarStep()) {
       if (state.step > 2) {
         state.step -= 1;
         render();
@@ -1075,7 +510,7 @@
       window.location.href = `${basePath()}/view/${encodeURIComponent(state.editId)}/`;
       return;
     }
-    if (state.step <= 0 || (!shouldShowIntro() && state.step <= 1)) {
+    if (state.step <= 0 || (!cfgmod.shouldShowIntro(state) && state.step <= 1)) {
       window.location.href = `${basePath()}/`;
       return;
     }
@@ -1091,15 +526,14 @@
 
   dom.form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    await pulseNextLoading();
     syncFromDOM();
     if (state.step >= 2 && state.step <= state.cfg.pillars.length + 1) {
       const def = state.cfg.pillars[state.step - 2];
       const removed = pruneIncompleteRoutinesForPillar(def.key);
       if (removed > 0) {
-        setStatus(`Removed ${removed} incomplete routine${removed > 1 ? "s" : ""} (missing title or trigger).`);
+        setStatus(formatRemovedStatus(removed));
         render();
-        highlightCurrentRoutines();
+        rndmod.highlightCurrentRoutines(dom);
       }
     }
     const err = validateStep();
@@ -1131,7 +565,6 @@
     if (!target) return;
     const action = target.dataset.action;
     if (action === "add-routine") {
-      await pulseNextLoading();
       syncFromDOM();
       const key = target.dataset.pillar;
       const removed = pruneIncompleteRoutinesForPillar(key);
@@ -1142,10 +575,10 @@
       state.ui.focusRoutine = { pillarKey: key, idx: newIdx };
       render();
       if (removed > 0) {
-        setStatus(`Removed ${removed} incomplete routine${removed > 1 ? "s" : ""} (missing title or trigger).`);
-        highlightCurrentRoutines();
+        setStatus(formatRemovedStatus(removed));
+        rndmod.highlightCurrentRoutines(dom);
       }
-      animateCollapseOtherRoutines(key, newIdx);
+      rndmod.animateCollapseOtherRoutines(makeRenderCtx(), key, newIdx);
     } else if (action === "toggle-routine") {
       syncFromDOM();
       const key = target.dataset.pillar;
@@ -1234,57 +667,9 @@
 
   // ---------- Init ----------
 
-  function validateCopy(c) {
-    if (!c || !c.labels || !c.placeholders || !c.actions || !c.errors || !c.dayShort) {
-      throw new Error("battleplan copy incomplete");
-    }
-    if (!c.actions.removeRoutineAria) throw new Error("battleplan copy missing actions.removeRoutineAria");
-    if (!c.actions.expandRoutineAria) throw new Error("battleplan copy missing actions.expandRoutineAria");
-    if (!c.actions.collapseRoutineAria) throw new Error("battleplan copy missing actions.collapseRoutineAria");
-    if (!c.actions.deleteRoutine || typeof c.actions.deleteRoutine !== "object") throw new Error("battleplan copy missing actions.deleteRoutine");
-    if (!c.actions.deleteRoutine.title) throw new Error("battleplan copy missing actions.deleteRoutine.title");
-    if (!c.actions.deleteRoutine.meta) throw new Error("battleplan copy missing actions.deleteRoutine.meta");
-    if (!c.actions.deleteRoutine.cancelLabel) throw new Error("battleplan copy missing actions.deleteRoutine.cancelLabel");
-    if (!c.actions.deleteRoutine.confirmLabel) throw new Error("battleplan copy missing actions.deleteRoutine.confirmLabel");
-    if (!c.actions.cancelEdit || typeof c.actions.cancelEdit !== "object") throw new Error("battleplan copy missing actions.cancelEdit");
-    if (!c.actions.cancelEdit.title) throw new Error("battleplan copy missing actions.cancelEdit.title");
-    if (!c.actions.cancelEdit.keepLabel) throw new Error("battleplan copy missing actions.cancelEdit.keepLabel");
-    if (!c.actions.cancelEdit.confirmLabel) throw new Error("battleplan copy missing actions.cancelEdit.confirmLabel");
-    if (!c.errors.priorityRequired) throw new Error("battleplan copy missing errors.priorityRequired");
-    if (!c.errors.priorityWhyRequired) throw new Error("battleplan copy missing errors.priorityWhyRequired");
-    if (!c.errors.completePillarRequired) throw new Error("battleplan copy missing errors.completePillarRequired");
-    if (!c.confirmLabel) throw new Error("battleplan copy missing confirmLabel");
-    if (!c.saveDraftLabel) throw new Error("battleplan copy missing saveDraftLabel");
-  }
-
-  function validateSettings(cfg) {
-    if (!cfg || !cfg.priority || !cfg.wizard || !cfg.wizard.intro || !cfg.wizard.confirmation) {
-      throw new Error("battleplan settings incomplete");
-    }
-    if (introEnabledBySettings()) {
-      if (!cfg.wizard.intro.title) throw new Error("battleplan settings missing wizard.intro.title");
-    if (!cfg.wizard.intro.button) throw new Error("battleplan settings missing wizard.intro.button");
-    }
-    if (!cfg.wizard.confirmation.title) throw new Error("battleplan settings missing wizard.confirmation.title");
-    if (!cfg.wizard.confirmation.button) throw new Error("battleplan settings missing wizard.confirmation.button");
-    if (!cfg.priority.new || typeof cfg.priority.new !== "object") throw new Error("battleplan settings missing priority.new");
-    if (!cfg.priority.new.title) throw new Error("battleplan settings missing priority.new.title");
-    if (!cfg.priority.new.text) throw new Error("battleplan settings missing priority.new.text");
-    if (!cfg.priority.edit || typeof cfg.priority.edit !== "object") throw new Error("battleplan settings missing priority.edit");
-    if (!cfg.priority.edit.title) throw new Error("battleplan settings missing priority.edit.title");
-    if (!cfg.priority.edit.text) throw new Error("battleplan settings missing priority.edit.text");
-    if (!Array.isArray(cfg.durations) || cfg.durations.length === 0) throw new Error("battleplan settings missing durations");
-    if (!cfg.durations.some((item) => item.default)) throw new Error("battleplan settings missing default duration");
-    for (const item of cfg.durations) {
-      if (!Number.isFinite(item.value)) throw new Error("battleplan settings invalid durations.value");
-    }
-    if (!Array.isArray(cfg.visibility) || cfg.visibility.length === 0) throw new Error("battleplan settings missing visibility");
-    if (!cfg.visibility.some((item) => item.default)) throw new Error("battleplan settings missing default visibility");
-  }
-
   async function init() {
     try {
-      validateCopy(copy);
+      cfgmod.validateCopy(copy);
       const [settings, list] = await Promise.all([
         auth.apiFetch("/api/me/settings/battleplan"),
         auth.apiFetch("/api/me/battleplans?per_page=200"),
@@ -1297,7 +682,7 @@
         const id = state.editId || state.viewId;
         const bp = items.find((it) => it && it.id === id);
         if (!bp) throw new Error("battleplan not found");
-        state.viewedStatus = bp.status || "";
+        state.loadedStatus = bp.status || "";
         if (bp.visibility) state.input.visibility = bp.visibility;
         if (bp.start_date) state.input.start_date = bp.start_date.slice(0, 10);
         const bpData = bp.data || {};
@@ -1315,20 +700,20 @@
               target.routines = src.routines.map((r) => ({
                 title: String((r && r.title) || ""),
                 trigger: String((r && r.trigger) || ""),
-                cadence: (r && r.cadence && typeof r.cadence === "object") ? r.cadence : { type: defaultCadenceType() },
+                cadence: (r && r.cadence && typeof r.cadence === "object") ? r.cadence : { type: cfgmod.defaultCadenceType(state.cfg) },
               }));
             }
           }
         }
       }
-      validateSettings(state.cfg);
-      state.input.visibility = state.input.visibility || defaultVisibilityValue();
+      cfgmod.validateSettings(state.cfg);
+      state.input.visibility = state.input.visibility || cfgmod.defaultVisibilityValue(state.cfg);
       for (const p of state.cfg.pillars) {
         ensurePillar(p.key);
       }
       if (dom.back) dom.back.textContent = copy.backLabel.toUpperCase();
       if (!state.editId && !state.viewId) {
-        state.input.duration_days = defaultDurationValue();
+        state.input.duration_days = cfgmod.defaultDurationValue(state.cfg);
         // /new/ always starts fresh — server-side drafts replace the old
         // localStorage auto-resume behaviour, which would silently re-populate
         // fields the user did not expect.
@@ -1345,13 +730,14 @@
         dom.status.classList.add("wizard-progress-status");
       }
       showWizard();
-      renderVisibilityAside();
+      rndmod.renderVisibilityAside(makeRenderCtx());
       render();
-      if (state.viewId) configureViewActions();
+      if (state.viewId) actmod.configureViewActions(makeActionDeps());
     } catch (err) {
       dom.loading.hidden = true;
+      const ariaLabel = (window.appCopy && window.appCopy.battleplan && window.appCopy.battleplan.titleBattleplan) || "";
       dom.stage.innerHTML = `
-        <section class="empty-state empty-state-icon-only" aria-label="Battleplan">
+        <section class="empty-state empty-state-icon-only" aria-label="${esc(ariaLabel)}">
           <svg class="empty-state-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/><path d="M8 13A5 5 0 1 1 8 3a5 5 0 0 1 0 10m0 1A6 6 0 1 0 8 2a6 6 0 0 0 0 12"/><path d="M8 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6m0 1a4 4 0 1 0 0-8 4 4 0 0 0 0 8"/><path d="M9.5 8a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0"/></svg>
           <p class="empty-state-label">${esc(copy.emptyStateLabel)}</p>
         </section>

@@ -1,8 +1,8 @@
 (() => {
-  if (!window.huuperGroupDetail) {
+  if (!window.appGroupDetail) {
     return;
   }
-  window.huuperGroupDetail.init({
+  window.appGroupDetail.init({
     scope: "admin",
     detailURL: (id) => `/api/admin/groups/${encodeURIComponent(id)}`,
     manageAssistant: true,

@@ -1,4 +1,4 @@
-window.huuperListPage = (() => {
+window.appListPage = (() => {
   function text(value) {
     const raw = String(value || "").trim();
     return raw;

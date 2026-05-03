@@ -1,5 +1,5 @@
 (() => {
-  if (!window.huuperAuth || !window.huuperListPage) {
+  if (!window.appAuth || !window.appListPage) {
     return;
   }
 
@@ -116,8 +116,8 @@
       chips
         .map(
           (c) => `<span class="filter-chip">
-        <span class="filter-chip-label">${window.huuperListPage.escapeHTML(c.label)}</span>
-        <span class="filter-chip-value">${window.huuperListPage.escapeHTML(c.value)}</span>
+        <span class="filter-chip-label">${window.appListPage.escapeHTML(c.label)}</span>
+        <span class="filter-chip-value">${window.appListPage.escapeHTML(c.value)}</span>
       </span>`
         )
         .join("") +
@@ -126,20 +126,20 @@
 
   function renderItem(item) {
     const href = `/admin/user/?id=${encodeURIComponent(item.id)}`;
-    if (window.huuperListItem && window.huuperListItem.renderMember) {
-      return window.huuperListItem.renderMember(item, href);
+    if (window.appListItem && window.appListItem.renderMember) {
+      return window.appListItem.renderMember(item, href);
     }
-    const status = window.huuperListPage.text(item.status);
+    const status = window.appListPage.text(item.status);
     const role = item && item.admin === true ? "admin" : "";
     const meta = [status, role].filter(Boolean).join(" • ");
-    const title = window.huuperListPage.text(item.full_name) || window.huuperListPage.text(item.email) || item.id;
-    return window.huuperListPage.renderListItemLink(href, title, meta);
+    const title = window.appListPage.text(item.full_name) || window.appListPage.text(item.email) || item.id;
+    return window.appListPage.renderListItemLink(href, title, meta);
   }
 
   function render() {
     const filtered = allItems.filter(matchesFilters);
-    const approved = filtered.filter((u) => window.huuperListPage.text(u.status) !== "cancelled");
-    const cancelled = filtered.filter((u) => window.huuperListPage.text(u.status) === "cancelled");
+    const approved = filtered.filter((u) => window.appListPage.text(u.status) !== "cancelled");
+    const cancelled = filtered.filter((u) => window.appListPage.text(u.status) === "cancelled");
 
     approvedCountNode.textContent = String(approved.length);
     cancelledCountNode.textContent = String(cancelled.length);
@@ -153,13 +153,13 @@
     if (visibleItems.length === 0) {
       listNode.hidden = true;
       const emptyMessage = activeTab === "cancelled" ? "No cancelled users." : "No users.";
-      window.huuperListPage.setStatus(statusNode, emptyMessage);
+      window.appListPage.setStatus(statusNode, emptyMessage);
       return;
     }
 
-    window.huuperListPage.renderList(listNode, visibleItems, renderItem);
+    window.appListPage.renderList(listNode, visibleItems, renderItem);
     listNode.hidden = false;
-    window.huuperListPage.setStatus(statusNode, "");
+    window.appListPage.setStatus(statusNode, "");
   }
 
   approvedTabNode.addEventListener("click", () => {
@@ -173,12 +173,12 @@
   });
 
   function load() {
-    window.huuperAuth.apiFetch("/api/admin/users").then((payload) => {
+    window.appAuth.apiFetch("/api/admin/users").then((payload) => {
       allItems = Array.isArray(payload.items) ? payload.items : [];
       renderFilterBar();
       render();
     }).catch(() => {
-      window.huuperListPage.setStatus(statusNode, "Users unavailable.");
+      window.appListPage.setStatus(statusNode, "Users unavailable.");
     });
   }
 

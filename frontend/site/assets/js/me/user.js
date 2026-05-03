@@ -1,8 +1,8 @@
 (() => {
-  if (!window.huuperUserDetail) {
+  if (!window.appUserDetail) {
     return;
   }
-  window.huuperUserDetail.init({
+  window.appUserDetail.init({
     scope: "me",
     detailURL: (id) => `/api/me/users/${encodeURIComponent(id)}`,
     includeStatus: false,

@@ -6,24 +6,25 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Huuper / Me / Assign Guardian</title>
-  <link rel="icon" type="image/png" href="/assets/favicon/realmen-logo.png?v=1777805515" />
-  <link rel="shortcut icon" href="/assets/images/favicon/favicon.ico?v=1777805515" sizes="any" />
-  <link rel="apple-touch-icon" href="/assets/images/favicon/apple-touch-icon.png?v=1777805515" />
-  <script src="/copy/brand.js?v=1777805515"></script>
-  <script src="/copy/ui.js?v=1777805515"></script>
-  <script src="/copy/battleplan.js?v=1777805515"></script>
-  <link rel="stylesheet" href="/assets/css/app.css?v=1777805515" />
-  <script src="/assets/js/core/topbar.js?v=1777805515" defer></script>
-  <script src="/assets/js/core/auth.js?v=1777805515" defer></script>
-  <script src="/assets/js/core/guard-me.js?v=1777805515" defer></script>
-  <script src="/assets/js/core/back.js?v=1777805515" defer></script>
-  <script src="/assets/js/core/list-page.js?v=1777805515" defer></script>
-  <script src="/assets/js/core/request-actions.js?v=1777805515" defer></script>
-  <script src="/assets/js/components/action-sheet.js?v=1777805515" defer></script>
-  <script src="/assets/js/components/group-meta.js?v=1777805515" defer></script>
-  <script src="/assets/js/components/list-item.js?v=1777805515" defer></script>
-  <script src="/assets/js/components/request-assignment.js?v=1777805515" defer></script>
-  <script src="/assets/js/components/request-assign-mode.js?v=1777805515" defer></script>
+  <link rel="icon" type="image/png" href="/assets/favicon/realmen-logo.png?v=1777831459" />
+  <link rel="shortcut icon" href="/assets/images/favicon/favicon.ico?v=1777831459" sizes="any" />
+  <link rel="apple-touch-icon" href="/assets/images/favicon/apple-touch-icon.png?v=1777831459" />
+  <script src="/copy/brand.js?v=1777831459"></script>
+  <script src="/copy/ui.js?v=1777831459"></script>
+  <script src="/copy/battleplan.js?v=1777831459"></script>
+  <script src="/copy/events.js?v=1777831459"></script>
+  <link rel="stylesheet" href="/assets/css/app.css?v=1777831459" />
+  <script src="/assets/js/core/topbar.js?v=1777831459" defer></script>
+  <script src="/assets/js/core/auth.js?v=1777831459" defer></script>
+  <script src="/assets/js/core/guard-me.js?v=1777831459" defer></script>
+  <script src="/assets/js/core/back.js?v=1777831459" defer></script>
+  <script src="/assets/js/core/list-page.js?v=1777831459" defer></script>
+  <script src="/assets/js/core/request-actions.js?v=1777831459" defer></script>
+  <script src="/assets/js/components/action-sheet.js?v=1777831459" defer></script>
+  <script src="/assets/js/components/group-meta.js?v=1777831459" defer></script>
+  <script src="/assets/js/components/list-item.js?v=1777831459" defer></script>
+  <script src="/assets/js/components/request-assignment.js?v=1777831459" defer></script>
+  <script src="/assets/js/components/request-assign-mode.js?v=1777831459" defer></script>
 </head>
 
   <body>
@@ -31,7 +32,7 @@
 <script>
   (() => {
     const expectedScope = "me";
-    const storageKey = "huuper.auth";
+    const storageKey = "app.auth";
     const currentPath = window.location.pathname + window.location.search + window.location.hash;
 
     function scopeRedirectPath(scope, next) {

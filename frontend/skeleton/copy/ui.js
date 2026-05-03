@@ -1,4 +1,4 @@
-window.huuperCopy = Object.assign({}, window.huuperCopy || {}, {
+window.appCopy = Object.assign({}, window.appCopy || {}, {
   ui: {
     admin: {
       dashboard: {

@@ -1,8 +1,8 @@
 (() => {
-  if (!window.huuperGroupDetail) {
+  if (!window.appGroupDetail) {
     return;
   }
-  window.huuperGroupDetail.init({
+  window.appGroupDetail.init({
     scope: "me",
     detailURL: (id) => `/api/me/groups/${encodeURIComponent(id)}`,
     assistantURL: (id) => `/api/me/groups/${encodeURIComponent(id)}/assistant`,

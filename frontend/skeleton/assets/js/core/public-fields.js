@@ -190,7 +190,7 @@
     return { root, statusNode, labelNode };
   }
 
-  window.huuperPublicFields = {
+  window.appPublicFields = {
     createFieldComponent,
     validateFieldOnAdvance,
     normalizePhoneDisplay,

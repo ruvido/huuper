@@ -1,7 +1,7 @@
-window.huuperRequestActions = (() => {
+window.appRequestActions = (() => {
   function text(value) {
-    if (window.huuperListPage && typeof window.huuperListPage.text === "function") {
-      return window.huuperListPage.text(value);
+    if (window.appListPage && typeof window.appListPage.text === "function") {
+      return window.appListPage.text(value);
     }
     return String(value || "").trim();
   }
@@ -45,7 +45,7 @@ window.huuperRequestActions = (() => {
     }
 
     try {
-      await window.huuperAuth.apiFetch(config.actionURL, {
+      await window.appAuth.apiFetch(config.actionURL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(config.body || {}),

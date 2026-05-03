@@ -1,4 +1,4 @@
-window.huuperCopy = Object.assign({}, window.huuperCopy || {}, {
+window.appCopy = Object.assign({}, window.appCopy || {}, {
   battleplan: {
     titleBattleplan: "Battleplan",
     archiveLabel: "Archive",
@@ -8,6 +8,15 @@ window.huuperCopy = Object.assign({}, window.huuperCopy || {}, {
       archiveSectionLabel: "Archive",
       duplicateLabel: "Duplicate",
       newPlanLabel: "New Plan",
+      emptyLabel: "No battleplan yet",
+      errorMessage: "Battleplan unavailable.",
+      sectionAriaLabel: "Battleplan",
+      statusLabels: {
+        active: "Active",
+        draft: "Draft",
+        completed: "Completed",
+        archived: "Archived",
+      },
       overwriteDraftDialog: {
         title: "You already have an active plan and a draft. Overwrite the draft?",
         cancelLabel: "No",
@@ -23,6 +32,19 @@ window.huuperCopy = Object.assign({}, window.huuperCopy || {}, {
         cancelLabel: "Cancel",
         confirmLabel: "Delete",
       },
+    },
+    wizardShared: {
+      pillarFallbackLabel: "Pillar",
+      pauseRoutineAria: "Pause routine",
+      deleteRoutineButtonLabel: "Delete",
+      missingPriorityLabel: "Missing Priority",
+      errorPrefix: "Error",
+      removedRoutinesStatus: {
+        singular: "Removed 1 incomplete routine (missing title or trigger).",
+        plural: "Removed {count} incomplete routines (missing title or trigger).",
+      },
+      summaryDurationDays: "{count} days",
+      summaryDraftBadge: "DRAFT",
     },
     placeholder: {
       label: "sharpening the blades",

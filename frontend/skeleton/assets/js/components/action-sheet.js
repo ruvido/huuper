@@ -1,4 +1,4 @@
-window.huuperActionSheet = (() => {
+window.appActionSheet = (() => {
   let root;
   let headerNode;
   let bodyNode;

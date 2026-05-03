@@ -1,17 +1,17 @@
-window.huuperUserDetail = (() => {
+window.appUserDetail = (() => {
   function renderGroups(node, groups, scope) {
     if (!node || groups.length === 0) {
       return;
     }
     node.hidden = false;
-    window.huuperListPage.renderList(node, groups, (group) => {
-      const sideHTML = window.huuperGroupMeta && window.huuperGroupMeta.assistantMissing(group)
-        ? window.huuperGroupMeta.assistantWarningBadge()
+    window.appListPage.renderList(node, groups, (group) => {
+      const sideHTML = window.appGroupMeta && window.appGroupMeta.assistantMissing(group)
+        ? window.appGroupMeta.assistantWarningBadge()
         : "";
-      return window.huuperListPage.renderListItemLink(
+      return window.appListPage.renderListItemLink(
         `/${scope}/group/?id=${encodeURIComponent(group.id)}`,
         group.name || group.id,
-        window.huuperListPage.text(group.type),
+        window.appListPage.text(group.type),
         { sideHTML },
       );
     });
@@ -27,45 +27,45 @@ window.huuperUserDetail = (() => {
     const groupsLabelNode = document.querySelector("#user-groups-label");
     const groupsDividerNode = groupsLabelNode ? groupsLabelNode.previousElementSibling : null;
     const groupsNode = document.querySelector("#user-groups");
-    if (!statusNode || !summaryNode || !requestsNode || !window.huuperAuth || !window.huuperListPage || !window.huuperRequestItem || !window.huuperUserSummary) {
+    if (!statusNode || !summaryNode || !requestsNode || !window.appAuth || !window.appListPage || !window.appRequestItem || !window.appUserSummary) {
       return;
     }
 
-    const id = window.huuperListPage.queryParam("id");
+    const id = window.appListPage.queryParam("id");
     if (!id) {
-      window.huuperListPage.setStatus(statusNode, "Missing user.");
+      window.appListPage.setStatus(statusNode, "Missing user.");
       return;
     }
 
-    const cancelCopy = (((window.huuperCopy || {}).ui || {}).admin || {}).user || {};
+    const cancelCopy = (((window.appCopy || {}).ui || {}).admin || {}).user || {};
     const cancelDialogCopy = cancelCopy.cancelDialog || {};
-    const cancelDialogTitle = window.huuperListPage.text(cancelDialogCopy.title) || "Set user as cancelled?";
-    const cancelDialogDescription = window.huuperListPage.text(cancelDialogCopy.description) || "The user will not be visible anymore in groups.";
-    const cancelDialogConfirmLabel = window.huuperListPage.text(cancelDialogCopy.confirmLabel) || "Cancel user";
-    const cancelDialogFallbackError = window.huuperListPage.text(cancelDialogCopy.fallbackError) || "Cancel unavailable.";
+    const cancelDialogTitle = window.appListPage.text(cancelDialogCopy.title) || "Set user as cancelled?";
+    const cancelDialogDescription = window.appListPage.text(cancelDialogCopy.description) || "The user will not be visible anymore in groups.";
+    const cancelDialogConfirmLabel = window.appListPage.text(cancelDialogCopy.confirmLabel) || "Cancel user";
+    const cancelDialogFallbackError = window.appListPage.text(cancelDialogCopy.fallbackError) || "Cancel unavailable.";
 
-    if (deleteButtonNode && typeof config.cancelURL === "function" && window.huuperActionSheet) {
+    if (deleteButtonNode && typeof config.cancelURL === "function" && window.appActionSheet) {
       deleteButtonNode.addEventListener("click", () => {
-        window.huuperActionSheet.open({
+        window.appActionSheet.open({
           title: cancelDialogTitle,
-          contentHTML: `<p class="meta-text">${window.huuperListPage.escapeHTML(cancelDialogDescription)}</p>`,
+          contentHTML: `<p class="meta-text">${window.appListPage.escapeHTML(cancelDialogDescription)}</p>`,
           footerAction: {
             label: cancelDialogConfirmLabel,
             tone: "danger",
             onSelect: async () => {
               try {
-                window.huuperListPage.setStatus(statusNode, "");
+                window.appListPage.setStatus(statusNode, "");
                 await Promise.all([
-                  window.huuperAuth.apiFetch(config.cancelURL(id), { method: "POST" }),
+                  window.appAuth.apiFetch(config.cancelURL(id), { method: "POST" }),
                   new Promise((resolve) => setTimeout(resolve, 800)),
                 ]);
                 window.location.href = `/${config.scope}/users/`;
                 await new Promise(() => {});
               } catch (error) {
-                const message = window.huuperRequestActions && typeof window.huuperRequestActions.errorMessage === "function"
-                  ? window.huuperRequestActions.errorMessage(error, cancelDialogFallbackError)
+                const message = window.appRequestActions && typeof window.appRequestActions.errorMessage === "function"
+                  ? window.appRequestActions.errorMessage(error, cancelDialogFallbackError)
                   : cancelDialogFallbackError;
-                window.huuperListPage.setStatus(statusNode, message);
+                window.appListPage.setStatus(statusNode, message);
                 throw error;
               }
             },
@@ -74,9 +74,9 @@ window.huuperUserDetail = (() => {
       });
     }
 
-    window.huuperAuth.apiFetch(config.detailURL(id)).then((payload) => {
+    window.appAuth.apiFetch(config.detailURL(id)).then((payload) => {
       summaryNode.hidden = false;
-      summaryNode.innerHTML = window.huuperUserSummary.render(payload, {
+      summaryNode.innerHTML = window.appUserSummary.render(payload, {
         includeStatus: config.includeStatus === true,
         includeAdminFlag: config.includeAdminFlag === true,
       });
@@ -89,8 +89,8 @@ window.huuperUserDetail = (() => {
           guardianDividerNode.hidden = false;
         }
         requestsNode.hidden = false;
-        window.huuperListPage.renderList(requestsNode, guardianRequests, (request) => {
-          return window.huuperRequestItem.renderListItem(request, `/${config.scope}/request/?id=${encodeURIComponent(request.id)}`);
+        window.appListPage.renderList(requestsNode, guardianRequests, (request) => {
+          return window.appRequestItem.renderListItem(request, `/${config.scope}/request/?id=${encodeURIComponent(request.id)}`);
         });
       } else {
         if (guardianLabelNode) {
@@ -114,9 +114,9 @@ window.huuperUserDetail = (() => {
         renderGroups(groupsNode, groups, config.scope);
       }
 
-      window.huuperListPage.setStatus(statusNode, "");
+      window.appListPage.setStatus(statusNode, "");
     }).catch(() => {
-      window.huuperListPage.setStatus(statusNode, "User unavailable.");
+      window.appListPage.setStatus(statusNode, "User unavailable.");
     });
   }
 

@@ -1,13 +1,13 @@
-window.huuperCopy = {
+window.appCopy = {
   brandName: "Il Branco Realmen",
   shortName: "Il Branco Realmen",
 };
 
 (() => {
   const titleNode = document.querySelector("title");
-  if (!titleNode || !window.huuperCopy) {
+  if (!titleNode || !window.appCopy) {
     return;
   }
 
-  titleNode.textContent = window.huuperCopy.brandName;
+  titleNode.textContent = window.appCopy.brandName;
 })();

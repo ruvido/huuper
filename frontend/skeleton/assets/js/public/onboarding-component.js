@@ -1,13 +1,13 @@
-window.huuperOnboardingComponent = (() => {
+window.appOnboardingComponent = (() => {
   function text(value) {
-    return window.huuperPublicCommon.text(value);
+    return window.appPublicCommon.text(value);
   }
 
   function renderStartScreen(options) {
     const stepNode = options.stepNode;
     const startButton = options.startButton;
     const page = options.page || {};
-    if (!stepNode || !startButton || !window.huuperPublicCommon) {
+    if (!stepNode || !startButton || !window.appPublicCommon) {
       return;
     }
 
@@ -27,7 +27,7 @@ window.huuperOnboardingComponent = (() => {
 
     const copyNode = document.createElement("p");
     copyNode.className = "public-request-copy";
-    copyNode.innerHTML = window.huuperPublicCommon.escapeHTML(copy).replace(/\n/g, "<br>");
+    copyNode.innerHTML = window.appPublicCommon.escapeHTML(copy).replace(/\n/g, "<br>");
     wrapper.appendChild(copyNode);
 
     const actionRow = document.createElement("div");
@@ -41,7 +41,7 @@ window.huuperOnboardingComponent = (() => {
     const stepNode = options.stepNode;
     const page = options.page || {};
     const titleClass = text(options.titleClass) || "public-request-title public-request-title-start";
-    if (!stepNode || !window.huuperPublicCommon) {
+    if (!stepNode || !window.appPublicCommon) {
       return;
     }
 
@@ -61,7 +61,7 @@ window.huuperOnboardingComponent = (() => {
 
     const copyNode = document.createElement("p");
     copyNode.className = "public-request-copy";
-    copyNode.innerHTML = window.huuperPublicCommon.escapeHTML(copy).replace(/\n/g, "<br>");
+    copyNode.innerHTML = window.appPublicCommon.escapeHTML(copy).replace(/\n/g, "<br>");
     wrapper.appendChild(copyNode);
 
     stepNode.appendChild(wrapper);

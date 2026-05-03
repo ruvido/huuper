@@ -1,8 +1,8 @@
 (() => {
-  if (!window.huuperUserDetail) {
+  if (!window.appUserDetail) {
     return;
   }
-  window.huuperUserDetail.init({
+  window.appUserDetail.init({
     scope: "admin",
     detailURL: (id) => `/api/admin/users/${encodeURIComponent(id)}`,
     cancelURL: (id) => `/api/admin/users/${encodeURIComponent(id)}/cancel`,

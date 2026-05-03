@@ -1,10 +1,10 @@
-window.huuperListItem = (() => {
+window.appListItem = (() => {
   function text(value) {
-    return window.huuperListPage ? window.huuperListPage.text(value) : String(value || "").trim();
+    return window.appListPage ? window.appListPage.text(value) : String(value || "").trim();
   }
 
   function escapeHTML(value) {
-    return window.huuperListPage ? window.huuperListPage.escapeHTML(value) : text(value);
+    return window.appListPage ? window.appListPage.escapeHTML(value) : text(value);
   }
 
   function initials(value) {

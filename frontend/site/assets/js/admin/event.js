@@ -1,8 +1,8 @@
 (() => {
-  if (!window.huuperEventDetail) {
+  if (!window.appEventDetail) {
     return;
   }
-  window.huuperEventDetail.init({
+  window.appEventDetail.init({
     detailURL: (id) => `/api/admin/events/${encodeURIComponent(id)}`,
     includeRegistrationState: false,
     includeRegistrations: true,

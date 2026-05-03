@@ -1,4 +1,4 @@
-window.huuperAvatarCropper = (() => {
+window.appAvatarCropper = (() => {
   const OUTPUT_SIZE = 512;
   const OUTPUT_TYPE = "image/webp";
   const OUTPUT_QUALITY = 0.85;

@@ -1,4 +1,4 @@
-window.huuperRequestListPage = (() => {
+window.appRequestListPage = (() => {
   function renderEmptyState(label) {
     return `
       <section class="empty-state empty-state-icon-only" aria-label="${label}">
@@ -26,9 +26,9 @@ window.huuperRequestListPage = (() => {
       !allCountNode ||
       !urgentCountNode ||
       !listNode ||
-      !window.huuperAuth ||
-      !window.huuperListPage ||
-      !window.huuperRequestItem
+      !window.appAuth ||
+      !window.appListPage ||
+      !window.appRequestItem
     ) {
       return;
     }
@@ -67,8 +67,8 @@ window.huuperRequestListPage = (() => {
         return;
       }
 
-      window.huuperListPage.renderList(listNode, visibleItems, (item) => {
-        return window.huuperRequestItem.renderListItem(item, config.itemHref(item.id));
+      window.appListPage.renderList(listNode, visibleItems, (item) => {
+        return window.appRequestItem.renderListItem(item, config.itemHref(item.id));
       });
       listNode.hidden = false;
       statusNode.hidden = true;
@@ -84,11 +84,11 @@ window.huuperRequestListPage = (() => {
       render();
     });
 
-    window.huuperAuth.apiFetch(config.loadURL).then((payload) => {
+    window.appAuth.apiFetch(config.loadURL).then((payload) => {
       allItems = Array.isArray(payload.items) ? payload.items : [];
       render();
     }).catch(() => {
-      window.huuperListPage.setStatus(statusNode, config.errorMessage || "Requests unavailable.");
+      window.appListPage.setStatus(statusNode, config.errorMessage || "Requests unavailable.");
     });
   }
 

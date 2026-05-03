@@ -1,10 +1,10 @@
-window.huuperRequestAssignmentSheet = (() => {
+window.appRequestAssignmentSheet = (() => {
   function text(value) {
-    return window.huuperListPage.text(value);
+    return window.appListPage.text(value);
   }
 
   function escapeHTML(value) {
-    return window.huuperListPage.escapeHTML(value);
+    return window.appListPage.escapeHTML(value);
   }
 
   function initials(value) {
@@ -20,7 +20,7 @@ window.huuperRequestAssignmentSheet = (() => {
   }
 
   function groupMeta(item) {
-    return window.huuperGroupMeta.groupMeta(item, { requestsVisible: false });
+    return window.appGroupMeta.groupMeta(item, { requestsVisible: false });
   }
 
   function guardianMeta(item) {
@@ -70,13 +70,13 @@ window.huuperRequestAssignmentSheet = (() => {
   }
 
   function open(config) {
-    if (!window.huuperActionSheet || !window.huuperAuth || !window.huuperListPage || !window.huuperGroupMeta || !window.huuperRequestActions) {
+    if (!window.appActionSheet || !window.appAuth || !window.appListPage || !window.appGroupMeta || !window.appRequestActions) {
       return;
     }
 
     const payloadPromise = config.payload
       ? Promise.resolve(config.payload)
-      : window.huuperAuth.apiFetch(config.detailURL(config.requestID));
+      : window.appAuth.apiFetch(config.detailURL(config.requestID));
 
     payloadPromise.then((payload) => {
       const workflow = payload && typeof payload.workflow === "object" ? payload.workflow : {};
@@ -95,7 +95,7 @@ window.huuperRequestAssignmentSheet = (() => {
       let selectedLabel = "";
       const actionLabel = text(workflow.pending_action_label || (mode === "guardian" ? "Assign guardian" : "Assign group"));
 
-      window.huuperActionSheet.open({
+      window.appActionSheet.open({
         title: actionLabel,
         contentHTML: `<div class="sheet-option-list">${items.map((item) => optionRow(item, mode)).join("")}</div>`,
         footerAction: {
@@ -111,7 +111,7 @@ window.huuperRequestAssignmentSheet = (() => {
             } else {
               body.group = selectedID;
             }
-            await window.huuperRequestActions.submitAndRedirect({
+            await window.appRequestActions.submitAndRedirect({
               actionURL: config.actionURL(config.requestID),
               body,
               redirectURL: config.requestsURL,

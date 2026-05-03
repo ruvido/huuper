@@ -1,6 +1,6 @@
 (() => {
-  const publicFields = window.huuperPublicFields;
-  const publicCommon = window.huuperPublicCommon;
+  const publicFields = window.appPublicFields;
+  const publicCommon = window.appPublicCommon;
 
   const form = document.querySelector("#public-request-form");
   const stepNode = document.querySelector("#public-request-fields");
@@ -31,7 +31,7 @@
     !startButton ||
     !publicFields ||
     !publicCommon ||
-    !window.huuperAuth
+    !window.appAuth
   ) {
     return;
   }
@@ -317,8 +317,8 @@
     clearFieldStatus();
     currentFieldErrorNode = null;
     const page = state.onboarding && state.onboarding.start_page ? state.onboarding.start_page : {};
-    if (window.huuperOnboardingComponent) {
-      window.huuperOnboardingComponent.renderStartScreen({
+    if (window.appOnboardingComponent) {
+      window.appOnboardingComponent.renderStartScreen({
         stepNode,
         startButton,
         page,
@@ -481,7 +481,7 @@
       if (!selected) {
         return;
       }
-      if (!window.huuperAvatarCropper) {
+      if (!window.appAvatarCropper) {
         fieldErrorNode.textContent = "Editor immagine non disponibile.";
         fieldErrorNode.hidden = false;
         return;
@@ -490,7 +490,7 @@
       clearFieldStatus();
 
       try {
-        const cropped = await window.huuperAvatarCropper.open(selected);
+        const cropped = await window.appAvatarCropper.open(selected);
         if (!(cropped instanceof File)) {
           return;
         }
@@ -660,7 +660,7 @@
       if (!email) {
         throw new Error("missing_email");
       }
-      await window.huuperAuth.login(email, password);
+      await window.appAuth.login(email, password);
       state.stepIndex = 0;
       state.submitting = false;
       setStatus("", true);
@@ -675,7 +675,7 @@
   }
 
   async function finalizeOnboarding() {
-    const auth = window.huuperAuth.read();
+    const auth = window.appAuth.read();
     if (!auth || !auth.token) {
       throw new Error("missing_auth");
     }

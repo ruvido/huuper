@@ -1,5 +1,5 @@
 (() => {
-  const publicFields = window.huuperPublicFields;
+  const publicFields = window.appPublicFields;
   const loginForm = document.querySelector("#login-form");
   const loginEmailField = document.querySelector("#login-email");
   const loginEmailErrorNode = document.querySelector("#login-email-error");
@@ -17,14 +17,14 @@
     !loginErrorNode ||
     !loginRequestLink ||
     !publicFields ||
-    !window.huuperAuth
+    !window.appAuth
   ) {
     return;
   }
 
-  const auth = window.huuperAuth.read();
+  const auth = window.appAuth.read();
   if (auth && auth.token) {
-    window.location.replace(window.huuperAuth.redirectAfterLogin(auth.model && auth.model.admin === true ? "admin" : "me"));
+    window.location.replace(window.appAuth.redirectAfterLogin(auth.model && auth.model.admin === true ? "admin" : "me"));
     return;
   }
 
@@ -69,8 +69,8 @@
     }
 
     try {
-      const result = await window.huuperAuth.login(email, password);
-      window.location.href = window.huuperAuth.redirectAfterLogin(result.scope);
+      const result = await window.appAuth.login(email, password);
+      window.location.href = window.appAuth.redirectAfterLogin(result.scope);
     } catch (_) {
       setStatus(loginErrorNode, "Invalid credentials.", true);
     }

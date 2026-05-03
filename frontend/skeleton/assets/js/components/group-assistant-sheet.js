@@ -1,10 +1,10 @@
-window.huuperGroupAssistantSheet = (() => {
+window.appGroupAssistantSheet = (() => {
   function text(value) {
-    return window.huuperListPage.text(value);
+    return window.appListPage.text(value);
   }
 
   function escapeHTML(value) {
-    return window.huuperListPage.escapeHTML(value);
+    return window.appListPage.escapeHTML(value);
   }
 
   function initials(value) {
@@ -56,7 +56,7 @@ window.huuperGroupAssistantSheet = (() => {
   }
 
   function open(config) {
-    if (!window.huuperActionSheet || !window.huuperAuth || !window.huuperListPage) {
+    if (!window.appActionSheet || !window.appAuth || !window.appListPage) {
       return;
     }
 
@@ -70,7 +70,7 @@ window.huuperGroupAssistantSheet = (() => {
     let selectedID = "";
     let selectedLabel = "";
 
-    window.huuperActionSheet.open({
+    window.appActionSheet.open({
       title: "Assign assistant",
       meta: groupName,
       contentHTML: `<div class="sheet-option-list">${members.map((item) => renderChoice(item)).join("")}</div>`,
@@ -84,7 +84,7 @@ window.huuperGroupAssistantSheet = (() => {
 
           button.disabled = true;
           try {
-            await window.huuperAuth.apiFetch(assistantURL, {
+            await window.appAuth.apiFetch(assistantURL, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ assistant: selectedID }),

@@ -1,7 +1,7 @@
 (() => {
-  if (!window.huuperAuth) {
+  if (!window.appAuth) {
     return;
   }
 
-  window.huuperAuth.requireScope("me");
+  window.appAuth.requireScope("me");
 })();

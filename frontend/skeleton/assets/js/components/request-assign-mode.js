@@ -1,5 +1,5 @@
 (() => {
-  if (!window.huuperRequestAssignment) {
+  if (!window.appRequestAssignment) {
     return;
   }
 
@@ -8,7 +8,7 @@
   const base = scope === "admin" ? "/api/admin/requests" : "/api/me/requests";
   const requestsURL = scope === "admin" ? "/admin/requests/" : "/me/requests/";
 
-  window.huuperRequestAssignment.init({
+  window.appRequestAssignment.init({
     mode,
     statusSelector: "#request-assignment-status",
     listSelector: "#request-assignment-list",

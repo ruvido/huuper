@@ -1,5 +1,5 @@
 (() => {
-  const publicFields = window.huuperPublicFields;
+  const publicFields = window.appPublicFields;
   const form = document.querySelector("#password-reset-form");
   const emailField = document.querySelector("#password-reset-email");
   const emailErrorNode = document.querySelector("#password-reset-email-error");

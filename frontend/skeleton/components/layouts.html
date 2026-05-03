@@ -9,6 +9,7 @@
   <script src="{{ asset "/copy/brand.js" }}"></script>
   <script src="{{ asset "/copy/ui.js" }}"></script>
   <script src="{{ asset "/copy/battleplan.js" }}"></script>
+  <script src="{{ asset "/copy/events.js" }}"></script>
   <link rel="stylesheet" href="{{ asset "/assets/css/app.css" }}" />
   <script src="{{ asset "/assets/js/core/topbar.js" }}" defer></script>
   {{- range .Scripts }}
@@ -21,7 +22,7 @@
 <script>
   (() => {
     const expectedScope = "{{ . }}";
-    const storageKey = "huuper.auth";
+    const storageKey = "app.auth";
     const currentPath = window.location.pathname + window.location.search + window.location.hash;
 
     function scopeRedirectPath(scope, next) {

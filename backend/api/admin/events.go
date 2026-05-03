@@ -46,8 +46,13 @@ func EventDetailsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) 
 		return e.JSON(http.StatusOK, map[string]any{
 			"event": map[string]any{
 				"id":         event.Id,
+				"type":       event.GetString("type"),
+				"slug":       event.GetString("slug"),
 				"title":      event.GetString("title"),
 				"event_date": event.GetString("event_date"),
+				"url":        event.GetString("url"),
+				"group":      event.GetString("group"),
+				"series":     event.GetString("series"),
 				"data":       eventData,
 			},
 			"registrations":           attendees,

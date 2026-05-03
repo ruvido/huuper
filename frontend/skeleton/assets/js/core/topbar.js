@@ -1,5 +1,5 @@
 (() => {
-  const storageKey = "huuper.auth";
+  const storageKey = "app.auth";
   const profileNode = document.querySelector("[data-topbar-profile]");
   if (!profileNode) {
     return;
@@ -43,7 +43,7 @@
 
   render(readModel());
 
-  window.addEventListener("huuper:auth", (event) => {
+  window.addEventListener("app:auth", (event) => {
     const model = event && event.detail && event.detail.model ? event.detail.model : readModel();
     render(model);
   });

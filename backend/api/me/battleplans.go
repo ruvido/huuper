@@ -28,6 +28,24 @@ func requireBattleplanActor(app *pocketbase.PocketBase, e *core.RequestEvent) (*
 	return actor, nil
 }
 
+// requireOwnedBattleplan resolves the authenticated actor, loads the battleplan
+// referenced by the request path, and verifies the actor owns it. Used by the
+// mutation endpoints (update / status / delete).
+func requireOwnedBattleplan(app *pocketbase.PocketBase, e *core.RequestEvent) (*core.Record, *core.Record, error) {
+	actor, err := requireBattleplanActor(app, e)
+	if err != nil {
+		return nil, nil, err
+	}
+	record, err := loadBattleplan(app, e.Request.PathValue("id"))
+	if err != nil {
+		return nil, nil, err
+	}
+	if record.GetString("user") != actor.Id {
+		return nil, nil, apis.NewForbiddenError("forbidden_battleplan", nil)
+	}
+	return actor, record, nil
+}
+
 func ListBattleplansHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		actor, err := requireBattleplanActor(app, e)
@@ -85,16 +103,9 @@ func CreateBattleplanHandler(app *pocketbase.PocketBase) func(e *core.RequestEve
 
 func UpdateBattleplanHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		actor, err := requireBattleplanActor(app, e)
+		_, record, err := requireOwnedBattleplan(app, e)
 		if err != nil {
 			return err
-		}
-		record, err := loadBattleplan(app, e.Request.PathValue("id"))
-		if err != nil {
-			return err
-		}
-		if record.GetString("user") != actor.Id {
-			return apis.NewForbiddenError("forbidden_battleplan", nil)
 		}
 		var input battleplans.Input
 		if err := e.BindBody(&input); err != nil {
@@ -109,16 +120,9 @@ func UpdateBattleplanHandler(app *pocketbase.PocketBase) func(e *core.RequestEve
 
 func BattleplanStatusHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		actor, err := requireBattleplanActor(app, e)
+		_, record, err := requireOwnedBattleplan(app, e)
 		if err != nil {
 			return err
-		}
-		record, err := loadBattleplan(app, e.Request.PathValue("id"))
-		if err != nil {
-			return err
-		}
-		if record.GetString("user") != actor.Id {
-			return apis.NewForbiddenError("forbidden_battleplan", nil)
 		}
 
 		var payload struct {
@@ -131,6 +135,9 @@ func BattleplanStatusHandler(app *pocketbase.PocketBase) func(e *core.RequestEve
 		if !battleplans.IsValidStatus(next) {
 			return apis.NewBadRequestError("invalid_status_transition", nil)
 		}
+		if !battleplans.CanTransition(record.GetString("status"), next) {
+			return apis.NewBadRequestError("invalid_status_transition", nil)
+		}
 		if err := battleplans.SetStatus(app, record, next); err != nil {
 			return apis.NewBadRequestError("failed_battleplan_status", err)
 		}
@@ -140,16 +147,9 @@ func BattleplanStatusHandler(app *pocketbase.PocketBase) func(e *core.RequestEve
 
 func DeleteBattleplanHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		actor, err := requireBattleplanActor(app, e)
+		_, record, err := requireOwnedBattleplan(app, e)
 		if err != nil {
 			return err
-		}
-		record, err := loadBattleplan(app, e.Request.PathValue("id"))
-		if err != nil {
-			return err
-		}
-		if record.GetString("user") != actor.Id {
-			return apis.NewForbiddenError("forbidden_battleplan", nil)
 		}
 		if err := battleplans.Delete(app, record); err != nil {
 			return apis.NewBadRequestError("failed_battleplan_delete", err)

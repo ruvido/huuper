@@ -1514,113 +1514,13 @@ body:has(.top-bar-detail-page) .bottom-nav {
   font-weight: 600;
 }
 
-/* Hide empty status placeholder so it doesn't occupy a grid row before the list. */
+/* Hide empty status placeholder so it doesn't occupy a grid row before the list.
+   Note: `.battleplan-section` shares the rule rather than living in the
+   battleplan block at the bottom of the file because the empty-collapse
+   behaviour belongs to the broader page-status pattern. */
 .app-shell > .meta-text:empty,
 .battleplan-section > .meta-text:empty {
   display: none;
-}
-
-/* Battleplan page owns its own vertical rhythm; .app-shell gap is bypassed
-   by wrapping all blocks under .battleplan-page (single grid child). */
-.battleplan-page {
-  display: grid;
-  gap: var(--space-5);
-}
-
-.battleplan-section {
-  display: grid;
-  gap: var(--space-2);
-}
-
-#battleplan-hero {
-  margin-top: var(--space-5);
-  padding-inline: 0;
-}
-
-#battleplan-active,
-#battleplan-draft,
-#battleplan-list {
-  padding-inline: 0;
-  padding-top: 0;
-}
-
-/* Drop the first item's top padding in each section so the visual gap from
-   the section label to the first row of text matches the gap from the
-   active label to the yellow card edge. */
-#battleplan-draft > :first-child,
-#battleplan-list > :first-child {
-  padding-top: 0;
-}
-
-#battleplan-active-label {
-  margin-bottom: var(--space-2);
-}
-
-/* All battleplan list items share the same internal padding so titles/meta/tags
-   align across every status. The active state only adds yellow bg + inverted text. */
-.battleplan-list-item {
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius);
-  margin: 0 0 var(--space-2);
-}
-
-.battleplan-list-item-active {
-  background: var(--accent);
-  color: var(--button-primary-text);
-  border: 0;
-  border-radius: 0;
-  padding-top: var(--space-8);
-  padding-bottom: var(--space-4);
-}
-
-.battleplan-list-item-active .list-item-copy strong,
-.battleplan-list-item-active .list-item-meta,
-.battleplan-list-item-active .battleplan-list-date,
-.battleplan-list-item-active .wizard-summary-tag-outline {
-  color: var(--button-primary-text);
-}
-
-.battleplan-list-item-active .list-item-copy strong {
-  white-space: normal;
-  overflow: visible;
-  text-overflow: clip;
-  font-weight: 900;
-  text-transform: uppercase;
-  line-height: 1.2;
-}
-
-.battleplan-list-item-active .wizard-summary-tag-outline {
-  border-color: currentColor;
-}
-
-.battleplan-list-item-active .request-item-status {
-  background: var(--button-primary-text);
-  color: var(--accent);
-}
-
-.battleplan-list-item-archived {
-  opacity: 0.6;
-}
-
-.battleplan-active-actions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--space-2);
-}
-
-.battleplan-list-section-label {
-  margin: 0;
-  padding: 0;
-  color: var(--text);
-  font-family: var(--font-family-ui);
-  font-size: var(--font-ui-md);
-  font-weight: 700;
-}
-
-
-.battleplan-list-arrow {
-  width: var(--space-8);
-  height: var(--space-8);
 }
 
 .group-warning-badge {
@@ -2026,25 +1926,6 @@ body.action-sheet-lock {
   font-size: var(--font-ui-xs);
   font-weight: 700;
   line-height: 1.1;
-}
-
-.battleplan-list-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.battleplan-list-date {
-  color: var(--text-muted);
-  font-size: var(--font-ui-xs);
-  font-weight: 500;
-  font-family: var(--font-family-ui);
-}
-
-.battleplan-list-tags {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 4px;
 }
 
 .action-row {
@@ -3779,44 +3660,6 @@ textarea.field-input {
   min-height: 0;
 }
 
-#battleplan-view-form {
-  margin-top: var(--topbar-height);
-  height: calc(100dvh - var(--topbar-height));
-  overflow-y: auto;
-}
-
-#battleplan-view-stage {
-  padding: 0;
-  margin: 0;
-  padding-bottom: calc(var(--sticky-actions-height) + env(safe-area-inset-bottom));
-  justify-content: flex-start;
-}
-
-#battleplan-view-stage .wizard-summary-edit-target {
-  cursor: default;
-}
-
-#battleplan-view-stage .wizard-summary {
-  gap: 0;
-}
-
-#battleplan-view-stage .display-hero {
-  margin-top: var(--space-2);
-  margin-bottom: var(--space-2);
-}
-
-#battleplan-view-stage .wizard-view-why {
-  margin-bottom: var(--space-4);
-}
-
-#battleplan-wizard-form {
-  min-height: calc(100dvh - 260px);
-}
-
-.wizard-form-view#battleplan-wizard-form {
-  min-height: 0;
-}
-
 .wizard-form-confirm {
   height: calc(100dvh - 88px - (var(--sticky-actions-height) + env(safe-area-inset-bottom)));
   margin-top: 88px;
@@ -3934,18 +3777,6 @@ textarea.field-input {
   display: flex;
   flex-direction: column;
   gap: 0;
-}
-
-.wizard-page.wizard-page-intro #battleplan-wizard-form {
-  flex: 1;
-  display: grid;
-}
-
-.wizard-page.wizard-page-intro #battleplan-wizard-stage {
-  min-height: 100%;
-  display: grid;
-  align-content: center;
-  justify-items: stretch;
 }
 
 .wizard-page.wizard-page-intro .wizard-step-intro {
@@ -4405,3 +4236,286 @@ textarea.field-input {
   text-transform: uppercase;
   cursor: pointer;
 }
+
+/* ============================================================
+   BATTLEPLAN PAGE — list / view / wizard / draft
+   ============================================================ */
+
+/* ---- Page shell ---- */
+
+/* Battleplan page owns its own vertical rhythm; .app-shell gap is bypassed
+   by wrapping all blocks under .battleplan-page (single grid child). */
+.battleplan-page {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.battleplan-section {
+  display: grid;
+  gap: var(--space-2);
+}
+
+/* Per-instance: there is exactly one hero block on the battleplan list page
+   and these tweaks reset the page-level inline padding for the hero only. */
+#battleplan-hero {
+  margin-top: var(--space-5);
+  padding-inline: 0;
+}
+
+/* ---- List (containers + section labels) ---- */
+
+/* Shared overrides for every battleplan list-card (active, draft, archive
+   sections). Strips the default list-card padding so titles/meta align with
+   the section label baseline. */
+.battleplan-list-card {
+  padding-inline: 0;
+  padding-top: 0;
+}
+
+/* Drop the first item's top padding in non-active sections so the visual gap
+   from the section label to the first row of text matches the gap from the
+   active label to the yellow card edge. The active card uses its own
+   internal padding rules and skips this. */
+.battleplan-list-card-flush-first > :first-child {
+  padding-top: 0;
+}
+
+/* Modifier for the active section label only — wider gap before the yellow
+   card so the hero badge breathes. Other section labels keep the default
+   tight rhythm from .battleplan-section's gap. */
+.battleplan-list-section-label-active {
+  margin-bottom: var(--space-2);
+}
+
+.battleplan-list-section-label {
+  margin: 0;
+  padding: 0;
+  color: var(--text);
+  font-family: var(--font-family-ui);
+  font-size: var(--font-ui-md);
+  font-weight: 700;
+}
+
+.battleplan-active-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-2);
+}
+
+/* ---- List item (base + variants) ---- */
+
+/* All battleplan list items share the same internal padding so titles/meta/tags
+   align across every status. The active state only adds yellow bg + inverted text. */
+.battleplan-list-item {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  margin: 0 0 var(--space-2);
+}
+
+.battleplan-list-item-active {
+  background: var(--accent);
+  color: var(--button-primary-text);
+  border: 0;
+  border-radius: 0;
+  padding-top: var(--space-8);
+  padding-bottom: var(--space-4);
+}
+
+.battleplan-list-item-active .list-item-copy strong,
+.battleplan-list-item-active .list-item-meta,
+.battleplan-list-item-active .battleplan-list-date,
+.battleplan-list-item-active .wizard-summary-tag-outline {
+  color: var(--button-primary-text);
+}
+
+.battleplan-list-item-active .list-item-copy strong {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  font-weight: 900;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+.battleplan-list-item-active .wizard-summary-tag-outline {
+  border-color: currentColor;
+}
+
+.battleplan-list-item-active .request-item-status {
+  background: var(--button-primary-text);
+  color: var(--accent);
+}
+
+.battleplan-list-item-archived {
+  opacity: 0.6;
+}
+
+.battleplan-list-arrow {
+  width: var(--space-8);
+  height: var(--space-8);
+}
+
+/* ---- List meta (date / tags) ---- */
+
+.battleplan-list-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.battleplan-list-date {
+  color: var(--text-muted);
+  font-size: var(--font-ui-xs);
+  font-weight: 500;
+  font-family: var(--font-family-ui);
+}
+
+.battleplan-list-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* ---- Wizard form (intro + general) ---- */
+
+#battleplan-wizard-form {
+  min-height: calc(100dvh - 260px);
+}
+
+.wizard-form-view#battleplan-wizard-form {
+  min-height: 0;
+}
+
+.wizard-page.wizard-page-intro #battleplan-wizard-form {
+  flex: 1;
+  display: grid;
+}
+
+.wizard-page.wizard-page-intro #battleplan-wizard-stage {
+  min-height: 100%;
+  display: grid;
+  align-content: center;
+  justify-items: stretch;
+}
+
+/* === EVENTS PAGE === */
+.events-window-tabs {
+  margin-bottom: var(--space-3);
+}
+
+.events-list-item .events-list-meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.events-list-tags {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 4px;
+}
+
+.events-tag {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.events-tag-rally {
+  background: var(--accent);
+  color: var(--button-primary-text);
+  border-color: var(--accent);
+}
+
+.events-tag-call {
+  background: transparent;
+  color: #4cd2c1;
+  border-color: rgba(76, 210, 193, 0.7);
+}
+
+.events-tag-meetup {
+  background: transparent;
+  color: var(--text-muted);
+  border-color: rgba(200, 200, 200, 0.4);
+}
+
+.event-rsvp {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+}
+
+.event-rsvp-state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.event-rsvp-status {
+  margin: 0;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.event-rsvp-error,
+.event-attendance-error {
+  margin: 0;
+  color: var(--danger-muted);
+  font-size: var(--font-ui-s);
+}
+
+.event-attendance {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+}
+
+.event-attendance-title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-ui-base);
+  font-weight: 800;
+  color: var(--text-muted);
+  font-variant-caps: all-small-caps;
+}
+
+.event-attendance-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.event-attendance-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.event-attendance-name {
+  font-weight: 600;
+}
+
+.event-attendance-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.event-attendance-actions .wizard-btn.is-active {
+  background: var(--accent);
+  color: var(--button-primary-text);
+  border-color: var(--accent);
+}
+
+.event-attendance-readonly {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+

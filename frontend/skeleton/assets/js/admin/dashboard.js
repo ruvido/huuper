@@ -1,11 +1,11 @@
 (() => {
   const statusNode = document.getElementById("admin-status");
-  if (!statusNode || !window.huuperAuth || !window.huuperListPage) {
+  if (!statusNode || !window.appAuth || !window.appListPage) {
     return;
   }
 
-  const esc = window.huuperListPage.escapeHTML;
-  const setStatus = (msg) => window.huuperListPage.setStatus(statusNode, msg);
+  const esc = window.appListPage.escapeHTML;
+  const setStatus = (msg) => window.appListPage.setStatus(statusNode, msg);
 
   const nodes = {
     hero: document.getElementById("admin-hero"),
@@ -40,7 +40,7 @@
   };
 
   const copy =
-    (window.huuperCopy && window.huuperCopy.ui && window.huuperCopy.ui.admin && window.huuperCopy.ui.admin.dashboard) || {};
+    (window.appCopy && window.appCopy.ui && window.appCopy.ui.admin && window.appCopy.ui.admin.dashboard) || {};
   const metricLabels = copy.metrics || {};
 
   const METRICS = [
@@ -362,7 +362,7 @@
 
   async function load() {
     try {
-      payload = await window.huuperAuth.apiFetch("/api/admin/summary");
+      payload = await window.appAuth.apiFetch("/api/admin/summary");
       const users = payload.users || {};
       const events = payload.events || { total: 0 };
 

@@ -1,10 +1,10 @@
-window.huuperGroupDetail = (() => {
+window.appGroupDetail = (() => {
   function tabLabel(label, count) {
-    return `<span class="section-tab-text">${window.huuperListPage.escapeHTML(label)}</span><span class="section-tab-count">${window.huuperListPage.escapeHTML(String(count))}</span>`;
+    return `<span class="section-tab-text">${window.appListPage.escapeHTML(label)}</span><span class="section-tab-count">${window.appListPage.escapeHTML(String(count))}</span>`;
   }
 
   function currentAuth() {
-    return window.huuperAuth && typeof window.huuperAuth.read === "function" ? window.huuperAuth.read() : null;
+    return window.appAuth && typeof window.appAuth.read === "function" ? window.appAuth.read() : null;
   }
 
   function canChangeAssistant(group) {
@@ -16,7 +16,7 @@ window.huuperGroupDetail = (() => {
     if (model.admin === true) {
       return true;
     }
-    return window.huuperListPage.text(model.id) !== "" && window.huuperListPage.text(group && group.assistant) === window.huuperListPage.text(model.id);
+    return window.appListPage.text(model.id) !== "" && window.appListPage.text(group && group.assistant) === window.appListPage.text(model.id);
   }
 
   function init(config) {
@@ -32,7 +32,7 @@ window.huuperGroupDetail = (() => {
     const pendingNode = document.querySelector("#group-pending");
     const membersSectionNode = document.querySelector("#group-members-section");
     const membersNode = document.querySelector("#group-members");
-    if (!statusNode || !assistantSectionNode || !tabsNode || !tabMembersNode || !tabPendingNode || !pendingSectionNode || !pendingNode || !membersSectionNode || !membersNode || !window.huuperAuth || !window.huuperListPage || !window.huuperRequestItem || !window.huuperListItem) {
+    if (!statusNode || !assistantSectionNode || !tabsNode || !tabMembersNode || !tabPendingNode || !pendingSectionNode || !pendingNode || !membersSectionNode || !membersNode || !window.appAuth || !window.appListPage || !window.appRequestItem || !window.appListItem) {
       return;
     }
 
@@ -44,14 +44,14 @@ window.huuperGroupDetail = (() => {
       tabPendingNode.classList.toggle("section-tab-current", showingPending);
     }
 
-    const id = window.huuperListPage.queryParam("id");
+    const id = window.appListPage.queryParam("id");
     if (!id) {
-      window.huuperListPage.setStatus(statusNode, "Missing group.");
+      window.appListPage.setStatus(statusNode, "Missing group.");
       return;
     }
 
-    window.huuperAuth.apiFetch(config.detailURL(id)).then((group) => {
-      window.huuperListPage.setStatus(statusNode, "");
+    window.appAuth.apiFetch(config.detailURL(id)).then((group) => {
+      window.appListPage.setStatus(statusNode, "");
       if (topbarNode) {
         topbarNode.classList.add("top-bar-flat");
       }
@@ -61,11 +61,11 @@ window.huuperGroupDetail = (() => {
         if (assistantAllowed && config.assistantURL && !topbarAssistantActionNode.dataset.bound) {
           topbarAssistantActionNode.dataset.bound = "1";
           topbarAssistantActionNode.addEventListener("click", () => {
-            if (!window.huuperGroupAssistantSheet || typeof window.huuperGroupAssistantSheet.open !== "function") {
+            if (!window.appGroupAssistantSheet || typeof window.appGroupAssistantSheet.open !== "function") {
               return;
             }
 
-            window.huuperGroupAssistantSheet.open({
+            window.appGroupAssistantSheet.open({
               groupID: id,
               groupName: group.name || id,
               members: Array.isArray(group.members) ? group.members : [],
@@ -88,14 +88,14 @@ window.huuperGroupDetail = (() => {
       tabMembersNode.innerHTML = tabLabel("Members", Array.isArray(group.members) ? group.members.length : 0);
       tabPendingNode.innerHTML = tabLabel("Pending", pendingItems.length);
       if (pendingItems.length > 0) {
-        window.huuperListPage.renderList(pendingNode, pendingItems, (item) => {
+        window.appListPage.renderList(pendingNode, pendingItems, (item) => {
           const href = `/${config.scope}/request/?id=${encodeURIComponent(item.id)}`;
-          return window.huuperRequestItem.renderListItem(item, href);
+          return window.appRequestItem.renderListItem(item, href);
         });
       }
 
       const memberItems = Array.isArray(group.members) ? group.members : [];
-      const canManageAssistant = config.manageAssistant === true && window.huuperGroupMeta && window.huuperGroupMeta.assistantMissing(group);
+      const canManageAssistant = config.manageAssistant === true && window.appGroupMeta && window.appGroupMeta.assistantMissing(group);
       if (canManageAssistant && memberItems.length > 0) {
         assistantSectionNode.hidden = false;
         assistantSectionNode.innerHTML = `
@@ -104,10 +104,10 @@ window.huuperGroupDetail = (() => {
         const button = assistantSectionNode.querySelector("#group-assistant-button");
         if (button) {
           button.addEventListener("click", () => {
-            if (!window.huuperGroupAssistantSheet || typeof window.huuperGroupAssistantSheet.open !== "function") {
+            if (!window.appGroupAssistantSheet || typeof window.appGroupAssistantSheet.open !== "function") {
               return;
             }
-            window.huuperGroupAssistantSheet.open({
+            window.appGroupAssistantSheet.open({
               groupID: id,
               groupName: group.name || id,
               members: memberItems,
@@ -124,8 +124,8 @@ window.huuperGroupDetail = (() => {
       }
 
       if (memberItems.length > 0) {
-        window.huuperListPage.renderList(membersNode, memberItems, (item) => {
-          return window.huuperListItem.renderMember(item, `/${config.scope}/user/?id=${encodeURIComponent(item.id)}`);
+        window.appListPage.renderList(membersNode, memberItems, (item) => {
+          return window.appListItem.renderMember(item, `/${config.scope}/user/?id=${encodeURIComponent(item.id)}`);
         });
       }
 
@@ -138,7 +138,7 @@ window.huuperGroupDetail = (() => {
       tabMembersNode.addEventListener("click", () => showTab("members", hasPending));
       tabPendingNode.addEventListener("click", () => showTab("pending", hasPending));
     }).catch(() => {
-      window.huuperListPage.setStatus(statusNode, "Group unavailable.");
+      window.appListPage.setStatus(statusNode, "Group unavailable.");
     });
   }
 

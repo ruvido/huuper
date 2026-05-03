@@ -1,11 +1,11 @@
 (() => {
   const emailNode = document.querySelector("#profile-email");
   const telegramNode = document.querySelector("#profile-telegram");
-  if (!emailNode || !telegramNode || !window.huuperAuth) {
+  if (!emailNode || !telegramNode || !window.appAuth) {
     return;
   }
 
-  const auth = window.huuperAuth.read();
+  const auth = window.appAuth.read();
   const model = auth && auth.model ? auth.model : {};
   const telegram = model.telegram || {};
 

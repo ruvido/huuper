@@ -1,9 +1,9 @@
 (() => {
-  if (!window.huuperRequestListPage) {
+  if (!window.appRequestListPage) {
     return;
   }
 
-  window.huuperRequestListPage.init({
+  window.appRequestListPage.init({
     statusSelector: "#admin-requests-status",
     tabsSelector: "#admin-requests-tabs",
     allTabSelector: "#admin-requests-tab-all",

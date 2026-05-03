@@ -1,10 +1,10 @@
-window.huuperGroupMeta = (() => {
+window.appGroupMeta = (() => {
   function text(value) {
-    return window.huuperListPage.text(value);
+    return window.appListPage.text(value);
   }
 
   function escapeHTML(value) {
-    return window.huuperListPage.escapeHTML(value);
+    return window.appListPage.escapeHTML(value);
   }
 
   function groupMeta(group, options = {}) {

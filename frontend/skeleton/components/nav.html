@@ -11,7 +11,7 @@
   {{ if .RightActionTrash }}
     <button class="topbar-action topbar-action-danger" type="button" aria-label="{{ if .RightActionTrashAria }}{{ .RightActionTrashAria }}{{ else }}Reject candidate{{ end }}" data-request-reject>{{ template "icon-trash-fill" . }}</button>
   {{ else if .RightActionCancel }}
-    <button class="topbar-action topbar-action-cancel" type="button" aria-label="Cancel" data-battleplan-cancel-edit>{{ template "icon-x" . }}</button>
+    <button class="topbar-action topbar-action-cancel" type="button" aria-label="Cancel" data-wizard-cancel-edit>{{ template "icon-x" . }}</button>
   {{ else if .RightActionShuffle }}
     <button class="topbar-action topbar-action-accent" type="button" aria-label="Change assistant" data-group-assistant-action hidden>{{ template "icon-shuffle" . }}</button>
   {{ else if .ProfileHref }}
@@ -46,7 +46,7 @@
 {{ end }}
 
 {{ define "fab" }}
-<a class="fab" href="{{ .Href }}" aria-label="{{ .Aria }}"{{ if .BattleplanNew }} data-battleplan-new{{ end }}>{{ template "icon-plus" . }}</a>
+<a class="fab" href="{{ .Href }}" aria-label="{{ .Aria }}"{{ if .BattleplanNew }} data-wizard-new{{ end }}>{{ template "icon-plus" . }}</a>
 {{ end }}
 
 {{ define "bottomnav-admin" }}

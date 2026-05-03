@@ -1,18 +1,18 @@
-window.huuperRequestDetail = (() => {
+window.appRequestDetail = (() => {
   function text(value) {
-    return window.huuperListPage.text(value);
+    return window.appListPage.text(value);
   }
 
   function escapeHTML(value) {
-    return window.huuperListPage.escapeHTML(value);
+    return window.appListPage.escapeHTML(value);
   }
 
   function requestAgeDaysLabel(value) {
-    return window.huuperRequestItem.requestAgeDays(value);
+    return window.appRequestItem.requestAgeDays(value);
   }
 
   function actionText(value) {
-    return window.huuperRequestItem.actionText(value);
+    return window.appRequestItem.actionText(value);
   }
 
   function row(label, value) {
@@ -369,27 +369,27 @@ window.huuperRequestDetail = (() => {
     const workflowNode = document.querySelector("#request-workflow");
     const topbarMetaNode = document.querySelector("#request-topbar-meta");
     const rejectButtonNode = document.querySelector("[data-request-reject]");
-    if (!statusNode || !summaryNode || !workflowNode || !window.huuperAuth || !window.huuperListPage || !window.huuperRequestItem || !window.huuperActionSheet || !window.huuperRequestActions || !window.huuperRequestNoteSheet) {
+    if (!statusNode || !summaryNode || !workflowNode || !window.appAuth || !window.appListPage || !window.appRequestItem || !window.appActionSheet || !window.appRequestActions || !window.appRequestNoteSheet) {
       return;
     }
 
     document.body.classList.add("request-page");
-    const id = window.huuperListPage.queryParam("id");
+    const id = window.appListPage.queryParam("id");
     if (!id) {
-      window.huuperListPage.setStatus(statusNode, "Missing request.");
+      window.appListPage.setStatus(statusNode, "Missing request.");
       return;
     }
 
     if (rejectButtonNode) {
       rejectButtonNode.addEventListener("click", () => {
-        window.huuperRequestNoteSheet.open({
+        window.appRequestNoteSheet.open({
           title: "Are you sure you want to reject candidate?",
           submitLabel: "Reject",
           submitTone: "danger",
           emptyStatus: "Write reason.",
           statusNode,
           onSubmit: async (reason) => {
-            await window.huuperRequestActions.submitAndRedirect({
+            await window.appRequestActions.submitAndRedirect({
               actionURL: config.actionURL(id),
               body: {
                 action: "reject",
@@ -409,13 +409,13 @@ window.huuperRequestDetail = (() => {
         topbarMetaNode.hidden = !ageLabel;
       }
       summaryNode.hidden = false;
-      summaryNode.innerHTML = window.huuperRequestItem.renderDetail(payload);
+      summaryNode.innerHTML = window.appRequestItem.renderDetail(payload);
       renderWorkflow(payload);
-      window.huuperListPage.setStatus(statusNode, "");
+      window.appListPage.setStatus(statusNode, "");
     }
 
     async function refreshDetail() {
-      const payload = await window.huuperAuth.apiFetch(config.detailURL(id));
+      const payload = await window.appAuth.apiFetch(config.detailURL(id));
       applyPayload(payload);
     }
 
@@ -448,7 +448,7 @@ window.huuperRequestDetail = (() => {
         const actionLabel = isMentoringStep
           ? "CLOSE MENTORING"
           : (text(workflow.pending_action_label) || actionText(action));
-        actions.push(`<button id="request-action" class="primary" type="button">${window.huuperListPage.escapeHTML(actionLabel)}</button>`);
+        actions.push(`<button id="request-action" class="primary" type="button">${window.appListPage.escapeHTML(actionLabel)}</button>`);
       }
       if (actions.length === 0 && !processApproval) {
         workflowNode.hidden = true;
@@ -478,7 +478,7 @@ window.huuperRequestDetail = (() => {
           if (!contentHTML) {
             return;
           }
-          window.huuperActionSheet.open({
+          window.appActionSheet.open({
             title: infoTitle,
             contentHTML,
           });
@@ -490,13 +490,13 @@ window.huuperRequestDetail = (() => {
 
       if (addNoteButton) {
         addNoteButton.addEventListener("click", () => {
-          window.huuperRequestNoteSheet.open({
+          window.appRequestNoteSheet.open({
             title: "Add mentoring note",
             submitLabel: "Add",
             emptyStatus: "Write a note.",
             statusNode,
             onSubmit: async (note, sheetButton) => {
-              await window.huuperRequestActions.submitAndRedirect({
+              await window.appRequestActions.submitAndRedirect({
                 actionURL: config.actionURL(id),
                 body: {
                   action: "add_mentoring_note",
@@ -515,8 +515,8 @@ window.huuperRequestDetail = (() => {
           if (!action) {
             return;
           }
-          if ((requiredField === "group" || requiredField === "guardian") && window.huuperRequestAssignmentSheet) {
-            window.huuperRequestAssignmentSheet.open({
+          if ((requiredField === "group" || requiredField === "guardian") && window.appRequestAssignmentSheet) {
+            window.appRequestAssignmentSheet.open({
               requestID: id,
               payload,
               requestsURL: config.requestsURL,
@@ -528,17 +528,17 @@ window.huuperRequestDetail = (() => {
 
           try {
             const body = { action };
-            window.huuperListPage.setStatus(statusNode, "");
-            await window.huuperRequestActions.submitAndRedirect({
+            window.appListPage.setStatus(statusNode, "");
+            await window.appRequestActions.submitAndRedirect({
               actionURL: config.actionURL(id),
               body,
               button,
               redirectURL: config.requestsURL,
             });
           } catch (error) {
-            window.huuperListPage.setStatus(
+            window.appListPage.setStatus(
               statusNode,
-              window.huuperRequestActions.errorMessage(error, "Action unavailable."),
+              window.appRequestActions.errorMessage(error, "Action unavailable."),
             );
             button.disabled = false;
           }
@@ -547,7 +547,7 @@ window.huuperRequestDetail = (() => {
     }
 
     refreshDetail().catch(() => {
-      window.huuperListPage.setStatus(statusNode, "Request unavailable.");
+      window.appListPage.setStatus(statusNode, "Request unavailable.");
     });
   }
 

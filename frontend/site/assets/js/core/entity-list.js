@@ -1,14 +1,14 @@
-window.huuperEntityList = (() => {
+window.appEntityList = (() => {
   function init(config) {
     const listNode = document.querySelector(config.listSelector);
     const statusNode = document.querySelector(config.statusSelector);
-    if (!listNode || !statusNode || !window.huuperListPage) {
+    if (!listNode || !statusNode || !window.appListPage) {
       return;
     }
-    if (config.requiresAuth && !window.huuperAuth) {
+    if (config.requiresAuth && !window.appAuth) {
       return;
     }
-    if (config.requiresRequestItem && !window.huuperRequestItem) {
+    if (config.requiresRequestItem && !window.appRequestItem) {
       return;
     }
 
@@ -22,17 +22,17 @@ window.huuperEntityList = (() => {
             listNode.hidden = false;
             statusNode.hidden = true;
           } else {
-            window.huuperListPage.setStatus(statusNode, config.emptyMessage);
+            window.appListPage.setStatus(statusNode, config.emptyMessage);
           }
         } else {
-          window.huuperListPage.renderList(listNode, items, config.renderItem);
+          window.appListPage.renderList(listNode, items, config.renderItem);
           listNode.hidden = false;
         }
         if (typeof config.afterRender === "function") {
           config.afterRender(listNode, items);
         }
       } catch (_) {
-        window.huuperListPage.setStatus(statusNode, config.errorMessage);
+        window.appListPage.setStatus(statusNode, config.errorMessage);
       }
     }
 

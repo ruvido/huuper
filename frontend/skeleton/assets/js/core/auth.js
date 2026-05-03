@@ -1,5 +1,16 @@
-window.huuperAuth = (() => {
-  const storageKey = "huuper.auth";
+(function migrateLegacyAuth() {
+  const NEW_KEY = "app.auth";
+  const LEGACY_KEY = "huuper.auth";
+  try {
+    if (!localStorage.getItem(NEW_KEY) && localStorage.getItem(LEGACY_KEY)) {
+      localStorage.setItem(NEW_KEY, localStorage.getItem(LEGACY_KEY));
+      localStorage.removeItem(LEGACY_KEY);
+    }
+  } catch (_) { /* localStorage unavailable */ }
+})();
+
+window.appAuth = (() => {
+  const storageKey = "app.auth";
   const loginEndpoint = "/api/collections/users/auth-with-password";
   const refreshEndpoint = "/api/collections/users/auth-refresh";
 
@@ -102,7 +113,7 @@ window.huuperAuth = (() => {
 
   function persist(payload) {
     localStorage.setItem(storageKey, JSON.stringify(payload));
-    window.dispatchEvent(new CustomEvent("huuper:auth", { detail: payload }));
+    window.dispatchEvent(new CustomEvent("app:auth", { detail: payload }));
   }
 
   function clear() {

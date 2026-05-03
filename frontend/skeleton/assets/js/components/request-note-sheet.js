@@ -1,14 +1,14 @@
-window.huuperRequestNoteSheet = (() => {
+window.appRequestNoteSheet = (() => {
   function text(value) {
-    return window.huuperListPage.text(value);
+    return window.appListPage.text(value);
   }
 
   function escapeHTML(value) {
-    return window.huuperListPage.escapeHTML(value);
+    return window.appListPage.escapeHTML(value);
   }
 
   function open(config) {
-    if (!window.huuperActionSheet || !window.huuperListPage) {
+    if (!window.appActionSheet || !window.appListPage) {
       return;
     }
 
@@ -21,7 +21,7 @@ window.huuperRequestNoteSheet = (() => {
     const inputID = "request-note-sheet-input";
     let inputNode = null;
 
-    window.huuperActionSheet.open({
+    window.appActionSheet.open({
       title,
       contentHTML: `
         <div class="request-note-sheet-field">
@@ -41,20 +41,20 @@ window.huuperRequestNoteSheet = (() => {
               inputNode.focus();
             }
             if (statusNode) {
-              window.huuperListPage.setStatus(statusNode, emptyStatus);
+              window.appListPage.setStatus(statusNode, emptyStatus);
             }
             return;
           }
           try {
             sheetButton.disabled = true;
             await config.onSubmit(value, sheetButton, inputNode);
-            window.huuperActionSheet.close();
+            window.appActionSheet.close();
           } catch (error) {
             sheetButton.disabled = false;
             if (statusNode) {
-              window.huuperListPage.setStatus(
+              window.appListPage.setStatus(
                 statusNode,
-                window.huuperRequestActions.errorMessage(error, "Action unavailable."),
+                window.appRequestActions.errorMessage(error, "Action unavailable."),
               );
             }
             throw error;

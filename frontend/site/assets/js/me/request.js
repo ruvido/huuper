@@ -1,9 +1,9 @@
 (() => {
-  if (!window.huuperRequestDetail) {
+  if (!window.appRequestDetail) {
     return;
   }
 
-  window.huuperRequestDetail.init({
+  window.appRequestDetail.init({
     detailURL: (id) => `/api/me/requests/${encodeURIComponent(id)}`,
     actionURL: (id) => `/api/me/requests/${encodeURIComponent(id)}/actions`,
     requestsURL: "/me/requests/",

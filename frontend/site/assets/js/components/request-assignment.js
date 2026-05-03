@@ -1,6 +1,6 @@
-window.huuperRequestAssignment = (() => {
+window.appRequestAssignment = (() => {
   function text(value) {
-    return window.huuperListPage.text(value);
+    return window.appListPage.text(value);
   }
 
   function actionText(value) {
@@ -14,7 +14,7 @@ window.huuperRequestAssignment = (() => {
 
   function metaText(item, mode) {
     if (mode === "group") {
-      return window.huuperGroupMeta.groupMeta(item, {
+      return window.appGroupMeta.groupMeta(item, {
         requestsVisible: false,
       });
     }
@@ -38,7 +38,7 @@ window.huuperRequestAssignment = (() => {
   function renderChoice(item, mode) {
     const name = choiceLabel(item, mode);
     const meta = metaText(item, mode);
-    const initials = window.huuperListPage.escapeHTML(name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0] || "").join("").toUpperCase() || "?");
+    const initials = window.appListPage.escapeHTML(name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0] || "").join("").toUpperCase() || "?");
     const avatar = mode === "group"
       ? `<span class="list-item-media" aria-hidden="true"><span class="list-item-media-face"><span class="list-item-media-text">${initials}</span></span></span>`
       : (() => {
@@ -48,18 +48,18 @@ window.huuperRequestAssignment = (() => {
           return `
             <span class="list-item-media" aria-hidden="true">
               <span class="list-item-media-face">
-                ${url ? `<img class="list-item-media-image" src="${window.huuperListPage.escapeHTML(url)}" alt="" onerror="this.hidden=true; if(this.nextElementSibling){ this.nextElementSibling.hidden=false; }" />` : ""}
+                ${url ? `<img class="list-item-media-image" src="${window.appListPage.escapeHTML(url)}" alt="" onerror="this.hidden=true; if(this.nextElementSibling){ this.nextElementSibling.hidden=false; }" />` : ""}
                 <span class="list-item-media-text"${url ? " hidden" : ""}>${initials}</span>
               </span>
             </span>
           `;
         })();
     return `
-      <button class="picker-row picker-row-with-avatar" type="button" data-choice="${window.huuperListPage.escapeHTML(item.id)}" data-choice-label="${window.huuperListPage.escapeHTML(name)}">
+      <button class="picker-row picker-row-with-avatar" type="button" data-choice="${window.appListPage.escapeHTML(item.id)}" data-choice-label="${window.appListPage.escapeHTML(name)}">
         ${avatar}
         <span class="picker-row-copy">
-          <strong>${window.huuperListPage.escapeHTML(name)}</strong>
-          ${meta ? `<p class="meta-text">${window.huuperListPage.escapeHTML(meta)}</p>` : ""}
+          <strong>${window.appListPage.escapeHTML(name)}</strong>
+          ${meta ? `<p class="meta-text">${window.appListPage.escapeHTML(meta)}</p>` : ""}
         </span>
       </button>
     `;
@@ -72,7 +72,7 @@ window.huuperRequestAssignment = (() => {
         const choiceName = text(button.getAttribute("data-choice-label"));
         const workflow = payload && typeof payload.workflow === "object" ? payload.workflow : {};
         const action = text(workflow.pending_action);
-        window.huuperActionSheet.open({
+        window.appActionSheet.open({
           title: text(payload.full_name || payload.email || payload.id),
           meta: mode === "group" ? `Assign to ${choiceName}` : `Assign guardian ${choiceName}`,
           actions: [
@@ -80,22 +80,22 @@ window.huuperRequestAssignment = (() => {
               label: actionText(mode),
               onSelect: async () => {
                 try {
-                  window.huuperListPage.setStatus(statusNode, "");
+                  window.appListPage.setStatus(statusNode, "");
                   const body = { action };
                   if (mode === "group") {
                     body.group = choiceID;
                   } else {
                     body.guardian = choiceID;
                   }
-                  await window.huuperRequestActions.submitAndRedirect({
+                  await window.appRequestActions.submitAndRedirect({
                     actionURL: config.actionURL(config.requestID),
                     body,
                     redirectURL: config.requestsURL,
                   });
                 } catch (error) {
-                  window.huuperListPage.setStatus(
+                  window.appListPage.setStatus(
                     statusNode,
-                    window.huuperRequestActions.errorMessage(error, "Action unavailable."),
+                    window.appRequestActions.errorMessage(error, "Action unavailable."),
                   );
                 }
               },
@@ -110,23 +110,23 @@ window.huuperRequestAssignment = (() => {
     const statusNode = document.querySelector(config.statusSelector);
     const listNode = document.querySelector(config.listSelector);
     const titleNode = document.querySelector(".top-bar-title");
-    if (!statusNode || !listNode || !window.huuperAuth || !window.huuperListPage || !window.huuperActionSheet || !window.huuperListItem || !window.huuperGroupMeta || !window.huuperRequestActions) {
+    if (!statusNode || !listNode || !window.appAuth || !window.appListPage || !window.appActionSheet || !window.appListItem || !window.appGroupMeta || !window.appRequestActions) {
       return;
     }
 
-    const requestID = window.huuperListPage.queryParam("id");
+    const requestID = window.appListPage.queryParam("id");
     if (!requestID) {
-      window.huuperListPage.setStatus(statusNode, "Missing request.");
+      window.appListPage.setStatus(statusNode, "Missing request.");
       return;
     }
     config.requestID = requestID;
 
-    window.huuperAuth.apiFetch(config.detailURL(requestID)).then((payload) => {
+    window.appAuth.apiFetch(config.detailURL(requestID)).then((payload) => {
       const workflow = payload && typeof payload.workflow === "object" ? payload.workflow : {};
       const requiredField = text(workflow.required_field);
       const expectedAction = config.mode === "group" ? "set_group" : "set_guardian";
       if (workflow.can_take_pending_action !== true || requiredField !== config.mode || text(workflow.pending_action) !== expectedAction) {
-        window.huuperListPage.setStatus(statusNode, "Action unavailable.");
+        window.appListPage.setStatus(statusNode, "Action unavailable.");
         return;
       }
 
@@ -140,16 +140,16 @@ window.huuperRequestAssignment = (() => {
         : (Array.isArray(options.guardians) ? options.guardians : []);
 
       if (items.length === 0) {
-        window.huuperListPage.setStatus(statusNode, "No options.");
+        window.appListPage.setStatus(statusNode, "No options.");
         return;
       }
 
       listNode.hidden = false;
-      window.huuperListPage.renderList(listNode, items, (item) => renderChoice(item, config.mode));
+      window.appListPage.renderList(listNode, items, (item) => renderChoice(item, config.mode));
       bindChoices(listNode, items, payload, config, config.mode, statusNode);
-      window.huuperListPage.setStatus(statusNode, "");
+      window.appListPage.setStatus(statusNode, "");
     }).catch(() => {
-      window.huuperListPage.setStatus(statusNode, "Request unavailable.");
+      window.appListPage.setStatus(statusNode, "Request unavailable.");
     });
   }
 
