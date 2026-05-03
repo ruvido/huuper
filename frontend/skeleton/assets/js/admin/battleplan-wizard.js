@@ -143,7 +143,22 @@
     if (!nextBtn || !nextLabel) return;
     nextBtn.setAttribute("type", "button");
     nextBtn.removeAttribute("form");
-    if (status === "active" || status === "draft") {
+    if (status === "draft" && !state.hasExistingActive) {
+      nextLabel.textContent = (viewCopy.activateLabel || "Activate").toUpperCase();
+      setNextIcon("edit");
+      nextBtn.onclick = async () => {
+        if (nextBtn.disabled) return;
+        nextBtn.disabled = true;
+        try {
+          await auth.apiFetch(`/api/me/battleplans/${encodeURIComponent(state.viewId)}/status`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "active" }),
+          });
+          window.location.href = `${basePath()}/`;
+        } catch { nextBtn.disabled = false; }
+      };
+    } else if (status === "active" || status === "draft") {
       nextLabel.textContent = (viewCopy.editLabel || "Edit").toUpperCase();
       setNextIcon("edit");
       nextBtn.onclick = () => {
@@ -196,6 +211,14 @@
   function priorityCopy() {
     const p = (state.cfg && state.cfg.priority) || {};
     return (state.editId || state.viewId) ? (p.edit || {}) : (p.new || {});
+  }
+
+  // True when the next save will create/keep a draft record:
+  //  - editing an existing draft, or
+  //  - creating a brand-new plan while an active one already exists.
+  function willSaveAsDraft() {
+    if (state.editId) return state.viewedStatus === "draft";
+    return !!state.hasExistingActive;
   }
 
   function saveDraft() {
@@ -372,8 +395,7 @@
     dom.progressState.textContent = stateLabel();
     dom.progressFill.style.width = `${(cur / n) * 100}%`;
     if (isConfirm()) {
-      const isDraft = state.editId && state.viewedStatus === "draft";
-      dom.nextLabel.textContent = (isDraft ? copy.saveDraftLabel : copy.confirmLabel).toUpperCase();
+      dom.nextLabel.textContent = (willSaveAsDraft() ? copy.saveDraftLabel : copy.confirmLabel).toUpperCase();
       setNextIcon("edit");
       return;
     }
@@ -780,7 +802,7 @@
               <label class="field-label wizard-summary-tag">${esc(copy.labels.summaryPriority)}</label>
               <label class="field-label wizard-summary-tag wizard-summary-tag-outline">${state.input.duration_days} days</label>
               <label class="field-label wizard-summary-tag wizard-summary-tag-outline">${esc(visibilityLabel(state.input.visibility)).toUpperCase()}</label>
-              ${state.viewedStatus === "draft" ? `<label class="field-label wizard-summary-tag wizard-summary-tag-draft">DRAFT</label>` : ""}
+              ${willSaveAsDraft() ? `<label class="field-label wizard-summary-tag wizard-summary-tag-draft">DRAFT</label>` : ""}
             </div>
             ${priorityBodyHTML}
           </div>
@@ -1263,18 +1285,18 @@
   async function init() {
     try {
       validateCopy(copy);
-      const activeId = state.editId || state.viewId;
-      const fetchList = activeId
-        ? auth.apiFetch(`/api/me/battleplans/${encodeURIComponent(activeId)}`)
-        : auth.apiFetch("/api/me/battleplans?per_page=200");
-      const [settings, existingOrBp] = await Promise.all([
+      const [settings, list] = await Promise.all([
         auth.apiFetch("/api/me/settings/battleplan"),
-        fetchList,
+        auth.apiFetch("/api/me/battleplans?per_page=200"),
       ]);
       state.cfg = settings.data;
+      const items = (list && Array.isArray(list.items)) ? list.items : [];
+      state.hasExistingBattleplan = items.length > 0;
+      state.hasExistingActive = items.some((it) => it && it.status === "active");
       if (state.editId || state.viewId) {
-        state.hasExistingBattleplan = true;
-        const bp = existingOrBp;
+        const id = state.editId || state.viewId;
+        const bp = items.find((it) => it && it.id === id);
+        if (!bp) throw new Error("battleplan not found");
         state.viewedStatus = bp.status || "";
         if (bp.visibility) state.input.visibility = bp.visibility;
         if (bp.start_date) state.input.start_date = bp.start_date.slice(0, 10);
@@ -1298,10 +1320,6 @@
             }
           }
         }
-      } else {
-        const itms = (existingOrBp && Array.isArray(existingOrBp.items)) ? existingOrBp.items : [];
-        state.hasExistingBattleplan = itms.length > 0;
-        state.hasExistingActive = itms.some((it) => it && it.status === "active");
       }
       validateSettings(state.cfg);
       state.input.visibility = state.input.visibility || defaultVisibilityValue();

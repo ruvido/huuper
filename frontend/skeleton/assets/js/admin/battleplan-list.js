@@ -278,6 +278,14 @@
       showPlaceholder();
       return;
     }
+    // Show the standalone "New Plan" CTA right away. arrangeSections will hide
+    // it once items load if an active plan exists.
+    const emptyNew = document.getElementById("battleplan-empty-new");
+    if (emptyNew) {
+      const copy = (window.huuperCopy && window.huuperCopy.battleplan && window.huuperCopy.battleplan.list) || {};
+      emptyNew.textContent = copy.newPlanLabel || "New Plan";
+      emptyNew.hidden = false;
+    }
     initList();
   })();
 

@@ -24,11 +24,10 @@ window.huuperEntityList = (() => {
           } else {
             window.huuperListPage.setStatus(statusNode, config.emptyMessage);
           }
-          return;
+        } else {
+          window.huuperListPage.renderList(listNode, items, config.renderItem);
+          listNode.hidden = false;
         }
-
-        window.huuperListPage.renderList(listNode, items, config.renderItem);
-        listNode.hidden = false;
         if (typeof config.afterRender === "function") {
           config.afterRender(listNode, items);
         }

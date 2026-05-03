@@ -16,6 +16,7 @@ window.huuperCopy = Object.assign({}, window.huuperCopy || {}, {
     },
     view: {
       editLabel: "Edit",
+      activateLabel: "Activate",
       deleteLabel: "Delete",
       deleteDialog: {
         title: "Delete this battleplan?",
