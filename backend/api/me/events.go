@@ -154,6 +154,20 @@ func EventUnsubscribeHandler(app *pocketbase.PocketBase) func(e *core.RequestEve
 	}
 }
 
+func EventsAccessHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		actor, err := backendinternal.RequireAuthenticatedActor(e)
+		if err != nil {
+			return err
+		}
+		access, err := eventinternal.HasCreateAccess(app, actor)
+		if err != nil {
+			return apis.NewBadRequestError("failed_events_access", err)
+		}
+		return e.JSON(http.StatusOK, map[string]any{"access": access})
+	}
+}
+
 func ListEventsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		actor, err := backendinternal.RequireAuthenticatedActor(e)

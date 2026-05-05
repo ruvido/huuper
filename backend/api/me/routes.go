@@ -39,6 +39,7 @@ type Handlers struct {
 	BattleplanNote        func(e *core.RequestEvent) error
 	BattleplanDelete      func(e *core.RequestEvent) error
 	BattleplanAccess      func(e *core.RequestEvent) error
+	EventsAccess          func(e *core.RequestEvent) error
 }
 
 func Register(se *core.ServeEvent, h Handlers) {
@@ -75,4 +76,5 @@ func Register(se *core.ServeEvent, h Handlers) {
 	se.Router.POST("/api/me/battleplans/{id}/notes", h.BattleplanNote).Bind(apis.RequireAuth())
 	se.Router.DELETE("/api/me/battleplans/{id}", h.BattleplanDelete).Bind(apis.RequireAuth())
 	se.Router.GET("/api/me/access/battleplan", h.BattleplanAccess).Bind(apis.RequireAuth())
+	se.Router.GET("/api/me/access/events", h.EventsAccess).Bind(apis.RequireAuth())
 }

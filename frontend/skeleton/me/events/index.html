@@ -1,4 +1,12 @@
-{{ define "content" }}{{ template "status-list-content" (dict "StatusID" "events-status" "SpotlightID" "events-spotlight" "ListID" "events-list") }}
-<a class="fab" href="/me/events/new/" aria-label="New event">{{ template "icon-plus" . }}</a>
+{{ define "content" }}
+<div class="events-page">
+  <section id="events-window-tabs" class="section-tabs events-window-tabs"></section>
+  <section class="events-section" id="events-future-section">
+    <a class="wizard-btn wizard-btn-primary" id="events-new-cta" href="/me/events/new/" data-wizard-new hidden></a>
+  </section>
+  <p id="events-status" class="meta-text"></p>
+  <section id="events-spotlight" class="list-card list-card-default list-card-flush" hidden></section>
+  <section id="events-list" class="list-card list-card-default" hidden></section>
+</div>
 {{ end }}
 {{ define "page" }}{{ template "layout-me" (dict "Title" "Huuper / Me / Events" "TopbarTitle" "Events" "BackHref" "" "ProfileHref" "/me/profile/" "ActiveNav" "events" "Scripts" (list "/assets/js/core/auth.js" "/assets/js/core/guard-me.js" "/assets/js/core/list-page.js" "/assets/js/core/entity-list.js" "/assets/js/components/events-cadence.js" "/assets/js/me/events-render.js" "/assets/js/me/events.js")) }}{{ end }}

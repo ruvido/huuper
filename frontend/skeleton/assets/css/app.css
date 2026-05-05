@@ -4351,6 +4351,16 @@ textarea.field-input {
   gap: var(--space-5);
 }
 
+.events-page {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.events-section {
+  display: grid;
+  gap: var(--space-2);
+}
+
 .battleplan-section {
   display: grid;
   gap: var(--space-2);

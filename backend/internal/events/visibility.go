@@ -64,6 +64,43 @@ func CanCreate(app *pocketbase.PocketBase, actor *core.Record, group *core.Recor
 	return err == nil && len(groups) > 0
 }
 
+// HasCreateAccess reports whether the actor can create at least one event
+// type. Used to gate the "New Event" CTA on the events list page.
+func HasCreateAccess(app *pocketbase.PocketBase, actor *core.Record) (bool, error) {
+	if app == nil || actor == nil {
+		return false, nil
+	}
+	cfg, err := LoadConfig(app)
+	if err != nil {
+		return false, err
+	}
+	isAdmin := actor.GetBool("admin")
+	hasAssistantType := false
+	for _, typeDef := range cfg.Types {
+		if isAdmin && typeDef.AllowsCreator("admin") {
+			return true, nil
+		}
+		if typeDef.AllowsCreator("assistant") {
+			hasAssistantType = true
+		}
+	}
+	if !hasAssistantType {
+		return false, nil
+	}
+	groups, err := app.FindRecordsByFilter(
+		"groups",
+		"assistant = {:assistant}",
+		"",
+		1,
+		0,
+		map[string]any{"assistant": actor.Id},
+	)
+	if err != nil {
+		return false, err
+	}
+	return len(groups) > 0, nil
+}
+
 func CanEdit(app *pocketbase.PocketBase, actor *core.Record, event *core.Record) (bool, error) {
 	if actor == nil || event == nil {
 		return false, nil

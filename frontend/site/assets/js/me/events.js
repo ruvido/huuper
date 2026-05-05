@@ -59,17 +59,17 @@
   }
 
   function ensureTabsHost() {
-    let host = document.getElementById("events-window-tabs");
-    if (host) return host;
-    const list = document.getElementById("events-list");
-    const status = document.getElementById("events-status");
-    const anchor = status || list;
-    if (!anchor || !anchor.parentNode) return null;
-    host = document.createElement("section");
-    host.id = "events-window-tabs";
-    host.className = "section-tabs events-window-tabs";
-    anchor.parentNode.insertBefore(host, anchor);
-    return host;
+    return document.getElementById("events-window-tabs");
+  }
+
+  let canCreateEvent = false;
+
+  function syncCtaVisibility() {
+    const cta = document.getElementById("events-new-cta");
+    const section = document.getElementById("events-future-section");
+    const visible = canCreateEvent && currentWindow !== "past";
+    if (cta) cta.hidden = !visible;
+    if (section) section.hidden = !visible;
   }
 
   function renderTabs() {
@@ -83,6 +83,7 @@
         currentWindow = next;
         syncURLWindow(currentWindow);
         renderTabs();
+        syncCtaVisibility();
         loadList();
       });
     });
@@ -151,6 +152,22 @@
     }
   }
 
+  async function gateNewEventCTA() {
+    const cta = document.getElementById("events-new-cta");
+    if (!cta) return;
+    const lc = copy();
+    if (lc.newLabel) cta.textContent = lc.newLabel;
+    try {
+      const payload = await window.appAuth.apiFetch("/api/me/access/events");
+      canCreateEvent = !!(payload && payload.access === true);
+    } catch (_) {
+      canCreateEvent = false;
+    }
+    syncCtaVisibility();
+  }
+
+  gateNewEventCTA();
   renderTabs();
+  syncCtaVisibility();
   loadList();
 })();
