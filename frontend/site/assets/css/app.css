@@ -4264,19 +4264,19 @@ textarea.field-input {
 
 /* ---- List (containers + section labels) ---- */
 
-/* Shared overrides for every battleplan list-card (active, draft, archive
-   sections). Strips the default list-card padding so titles/meta align with
-   the section label baseline. */
-.battleplan-list-card {
+/* Generic flush variant of .list-card-default: drops horizontal/top padding
+   so the contained item (typically a spotlight row, or a list whose items
+   should sit edge-to-edge with the surrounding section) extends to the
+   container edges. Used by battleplan sections and the events spotlight. */
+.list-card-flush {
   padding-inline: 0;
   padding-top: 0;
 }
 
-/* Drop the first item's top padding in non-active sections so the visual gap
-   from the section label to the first row of text matches the gap from the
-   active label to the yellow card edge. The active card uses its own
-   internal padding rules and skips this. */
-.battleplan-list-card-flush-first > :first-child {
+/* Drop the first item's top padding so the visual gap from the section label
+   to the first row matches the gap from the active label to the spotlight
+   card edge. */
+.list-card-flush-first > :first-child {
   padding-top: 0;
 }
 
@@ -4312,23 +4312,29 @@ textarea.field-input {
   margin: 0 0 var(--space-2);
 }
 
-.battleplan-list-item-active {
+/* Spotlight: highlighted row at the top of a list (active battleplan,
+   next upcoming event, …). Full-width yellow bar, no rounded corners,
+   extra top breathing room. Inverts inner text + outline pills to the
+   dark accent text color so they read on the bright bg. */
+.list-item-spotlight {
   background: var(--accent);
   color: var(--button-primary-text);
   border: 0;
   border-radius: 0;
-  padding-top: var(--space-8);
-  padding-bottom: var(--space-4);
+  padding: var(--space-4);
+  min-height: var(--space-16);
+  align-content: center;
 }
 
-.battleplan-list-item-active .list-item-copy strong,
-.battleplan-list-item-active .list-item-meta,
-.battleplan-list-item-active .battleplan-list-date,
-.battleplan-list-item-active .wizard-summary-tag-outline {
+.list-item-spotlight .list-item-copy strong,
+.list-item-spotlight .list-item-meta,
+.list-item-spotlight .list-item-side-title,
+.list-item-spotlight .battleplan-list-date,
+.list-item-spotlight .wizard-summary-tag-outline {
   color: var(--button-primary-text);
 }
 
-.battleplan-list-item-active .list-item-copy strong {
+.list-item-spotlight .list-item-copy strong {
   white-space: normal;
   overflow: visible;
   text-overflow: clip;
@@ -4337,11 +4343,11 @@ textarea.field-input {
   line-height: 1.2;
 }
 
-.battleplan-list-item-active .wizard-summary-tag-outline {
+.list-item-spotlight .wizard-summary-tag-outline {
   border-color: currentColor;
 }
 
-.battleplan-list-item-active .request-item-status {
+.list-item-spotlight .request-item-status {
   background: var(--button-primary-text);
   color: var(--accent);
 }
@@ -4403,41 +4409,11 @@ textarea.field-input {
   margin-bottom: var(--space-3);
 }
 
-.events-list-item .events-list-meta {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-.events-list-tags {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: 4px;
-}
-
-.events-tag {
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.events-tag-rally {
-  background: var(--accent);
-  color: var(--button-primary-text);
-  border-color: var(--accent);
-}
-
-.events-tag-call {
-  background: transparent;
-  color: #4cd2c1;
-  border-color: rgba(76, 210, 193, 0.7);
-}
-
-.events-tag-meetup {
-  background: transparent;
-  color: var(--text-muted);
-  border-color: rgba(200, 200, 200, 0.4);
+/* Events list-item is a 2-col row (copy / type-tag side). Mirrors the
+   .request-item override of the standard 3-col .list-item grid — events
+   have no avatar slot. */
+.events-list-item {
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .event-rsvp {

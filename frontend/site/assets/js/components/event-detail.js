@@ -11,22 +11,13 @@ window.appEventDetail = (() => {
     return eventsCopy().detail || {};
   }
 
-  // The detail handler currently doesn't return `type` — we infer it from
-  // the slug prefix (`rally-...`/`call-...`/`meetup-...`) when present, so
-  // that the new flows light up without backend changes. Falls back to
-  // "rally" so the legacy approval flow keeps working.
-  function detectType(event) {
-    const explicit = (event && event.type ? String(event.type).trim() : "");
-    if (explicit) return explicit;
-    const slug = String((event && event.slug) || "").trim();
-    if (slug.startsWith("rally-")) return "rally";
-    if (slug.startsWith("call-")) return "call";
-    if (slug.startsWith("meetup-")) return "meetup";
-    return "rally";
+  function registrationEnabled(event) {
+    if (!event || typeof event.registration === "undefined") return false;
+    return event.registration !== false && event.registration !== null;
   }
 
   function isPastEvent(event) {
-    const raw = String((event && event.event_date) || "").trim();
+    const raw = String((event && event.start_date) || "").trim();
     if (!raw) return false;
     const parsed = new Date(raw);
     if (Number.isNaN(parsed.getTime())) return false;
@@ -103,7 +94,7 @@ window.appEventDetail = (() => {
     const c = detailCopy();
     const esc = window.appListPage.escapeHTML;
     if (state.past) return "";
-    if (state.eventType === "rally") return "";
+    if (!state.registrationEnabled) return "";
     if (state.registered) {
       return `
         <div class="event-rsvp-state">
@@ -141,7 +132,7 @@ window.appEventDetail = (() => {
     const c = detailCopy();
     const esc = window.appListPage.escapeHTML;
     if (!state.past) return "";
-    if (state.eventType === "rally") return "";
+    if (!state.registrationEnabled) return "";
     if (state.canManage) {
       const rows = registrations.map((reg) => renderAttendanceRow(reg, state.scope, esc)).join("");
       return `
@@ -252,7 +243,7 @@ window.appEventDetail = (() => {
 
     function render(payload) {
       const event = payload.event || {};
-      const location = window.appListPage.text(((event.data || {}).location));
+      const location = window.appListPage.text(event.location);
       const duration = window.appListPage.text(((event.data || {}).duration));
       if (topbarTitleNode && event.title) {
         topbarTitleNode.textContent = event.title;
@@ -260,15 +251,11 @@ window.appEventDetail = (() => {
       summaryNode.hidden = false;
       summaryNode.innerHTML = window.appEventSummary.render(location, duration);
 
-      // New (call/meetup + attendance) flows. Gated by event type — for
-      // type="rally" everything below is a no-op so the legacy approval
-      // flow downstream is untouched.
-      const eventType = detectType(event);
       const past = isPastEvent(event);
       const scope = config.scope || "me";
       const canManage = config.canManageRegistrations === true;
       const registered = payload.registered === true;
-      const state = { eventType, past, scope, canManage, registered };
+      const state = { past, scope, canManage, registered, registrationEnabled: registrationEnabled(event) };
 
       const rsvpHost = ensureRsvpHost(summaryNode);
       const rsvpHTML = renderRsvpButtons(state);

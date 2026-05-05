@@ -41,20 +41,14 @@ func EventDetailsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) 
 			return apis.NewBadRequestError("failed_registrations", err)
 		}
 
-		eventData := backendinternal.ParseJSONMap(event.Get("data"))
-
+		item := eventinternal.MapItem(event)
+		if cfg, err := eventinternal.LoadConfig(app); err == nil {
+			eventinternal.ApplyTypeConfig(&item, cfg)
+		}
+		occurrences, _ := eventinternal.OccurrencesFor(event)
 		return e.JSON(http.StatusOK, map[string]any{
-			"event": map[string]any{
-				"id":         event.Id,
-				"type":       event.GetString("type"),
-				"slug":       event.GetString("slug"),
-				"title":      event.GetString("title"),
-				"event_date": event.GetString("event_date"),
-				"url":        event.GetString("url"),
-				"group":      event.GetString("group"),
-				"series":     event.GetString("series"),
-				"data":       eventData,
-			},
+			"event":                   item,
+			"occurrences":             occurrences,
 			"registrations":           attendees,
 			"pending_registrations":   pendingAttendees,
 			"cancelled_registrations": cancelledAttendees,
@@ -167,18 +161,15 @@ func CreateEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) e
 		if err := e.BindBody(&input); err != nil {
 			return apis.NewBadRequestError("invalid_payload", err)
 		}
-		if !eventinternal.IsValidType(input.Type) {
-			return apis.NewBadRequestError("invalid_event_type", nil)
-		}
-		records, err := eventinternal.Create(app, actor, input)
+		record, err := eventinternal.Create(app, actor, input)
 		if err != nil {
 			return apis.NewBadRequestError("failed_event_create", err)
 		}
-		out := make([]eventinternal.Item, 0, len(records))
-		for _, record := range records {
-			out = append(out, eventinternal.MapItem(record))
+		item := eventinternal.MapItem(record)
+		if cfg, err := eventinternal.LoadConfig(app); err == nil {
+			eventinternal.ApplyTypeConfig(&item, cfg)
 		}
-		return e.JSON(http.StatusCreated, map[string]any{"items": out})
+		return e.JSON(http.StatusCreated, item)
 	}
 }
 
@@ -195,7 +186,11 @@ func UpdateEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) e
 		if err := eventinternal.Update(app, record, input); err != nil {
 			return apis.NewBadRequestError("failed_event_update", err)
 		}
-		return e.JSON(http.StatusOK, eventinternal.MapItem(record))
+		item := eventinternal.MapItem(record)
+		if cfg, err := eventinternal.LoadConfig(app); err == nil {
+			eventinternal.ApplyTypeConfig(&item, cfg)
+		}
+		return e.JSON(http.StatusOK, item)
 	}
 }
 
@@ -207,14 +202,23 @@ func RescheduleEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEven
 		}
 		var payload struct {
 			EventDate string `json:"event_date"`
+			StartDate string `json:"start_date"`
 		}
 		if err := e.BindBody(&payload); err != nil {
 			return apis.NewBadRequestError("invalid_payload", err)
 		}
-		if err := eventinternal.Reschedule(app, record, payload.EventDate); err != nil {
+		newDate := strings.TrimSpace(payload.StartDate)
+		if newDate == "" {
+			newDate = payload.EventDate
+		}
+		if err := eventinternal.Reschedule(app, record, newDate); err != nil {
 			return apis.NewBadRequestError("failed_event_reschedule", err)
 		}
-		return e.JSON(http.StatusOK, eventinternal.MapItem(record))
+		item := eventinternal.MapItem(record)
+		if cfg, err := eventinternal.LoadConfig(app); err == nil {
+			eventinternal.ApplyTypeConfig(&item, cfg)
+		}
+		return e.JSON(http.StatusOK, item)
 	}
 }
 
@@ -224,21 +228,30 @@ func CancelEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) e
 		if err != nil {
 			return err
 		}
+		if err := eventinternal.Cancel(app, record); err != nil {
+			return apis.NewBadRequestError("failed_event_cancel", err)
+		}
+		return e.JSON(http.StatusOK, map[string]any{"deleted": 1})
+	}
+}
+
+func CancelOccurrenceEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		record, err := loadEventByID(app, e.Request.PathValue("id"))
+		if err != nil {
+			return err
+		}
 		var payload struct {
-			Scope string `json:"scope"`
+			Date string `json:"date"`
 		}
 		if err := e.BindBody(&payload); err != nil {
 			return apis.NewBadRequestError("invalid_payload", err)
 		}
-		scope := strings.TrimSpace(payload.Scope)
-		if scope == "" {
-			scope = eventinternal.CancelScopeThis
+		if err := eventinternal.CancelOccurrence(app, record, payload.Date); err != nil {
+			return apis.NewBadRequestError("failed_occurrence_cancel", err)
 		}
-		count, err := eventinternal.Cancel(app, record, scope)
-		if err != nil {
-			return apis.NewBadRequestError("failed_event_cancel", err)
-		}
-		return e.JSON(http.StatusOK, map[string]any{"deleted": count})
+		occurrences, _ := eventinternal.OccurrencesFor(record)
+		return e.JSON(http.StatusOK, map[string]any{"occurrences": occurrences})
 	}
 }
 

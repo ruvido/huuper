@@ -18,6 +18,7 @@ type Handlers struct {
 	EventUpdate        func(e *core.RequestEvent) error
 	EventReschedule    func(e *core.RequestEvent) error
 	EventCancel        func(e *core.RequestEvent) error
+	EventCancelOccurrence func(e *core.RequestEvent) error
 	EventRegister      func(e *core.RequestEvent) error
 	EventUnregister    func(e *core.RequestEvent) error
 	EventUnsubscribe   func(e *core.RequestEvent) error
@@ -51,6 +52,7 @@ func Register(se *core.ServeEvent, h Handlers) {
 	se.Router.PATCH("/api/me/events/{id}", h.EventUpdate).Bind(apis.RequireAuth())
 	se.Router.POST("/api/me/events/{id}/reschedule", h.EventReschedule).Bind(apis.RequireAuth())
 	se.Router.POST("/api/me/events/{id}/cancel", h.EventCancel).Bind(apis.RequireAuth())
+	se.Router.POST("/api/me/events/{id}/cancel-occurrence", h.EventCancelOccurrence).Bind(apis.RequireAuth())
 	se.Router.POST("/api/me/events/{id}/register", h.EventRegister).Bind(apis.RequireAuth())
 	se.Router.POST("/api/me/events/{id}/unregister", h.EventUnregister).Bind(apis.RequireAuth())
 	se.Router.GET("/api/me/events/{slug}/status", h.EventStatus).Bind(apis.RequireAuth())

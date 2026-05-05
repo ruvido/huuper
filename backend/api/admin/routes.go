@@ -18,6 +18,7 @@ type Handlers struct {
 	EventUpdate          func(e *core.RequestEvent) error
 	EventReschedule      func(e *core.RequestEvent) error
 	EventCancel          func(e *core.RequestEvent) error
+	EventCancelOccurrence func(e *core.RequestEvent) error
 	EventAttendance      func(e *core.RequestEvent) error
 	RequestsList         func(e *core.RequestEvent) error
 	RequestGet           func(e *core.RequestEvent) error
@@ -45,6 +46,7 @@ func Register(se *core.ServeEvent, h Handlers) {
 	se.Router.PATCH("/api/admin/events/{id}", backendinternal.AdminOnly(h.EventUpdate)).Bind(apis.RequireAuth())
 	se.Router.POST("/api/admin/events/{id}/reschedule", backendinternal.AdminOnly(h.EventReschedule)).Bind(apis.RequireAuth())
 	se.Router.POST("/api/admin/events/{id}/cancel", backendinternal.AdminOnly(h.EventCancel)).Bind(apis.RequireAuth())
+	se.Router.POST("/api/admin/events/{id}/cancel-occurrence", backendinternal.AdminOnly(h.EventCancelOccurrence)).Bind(apis.RequireAuth())
 	se.Router.POST("/api/admin/registrations/{id}/attendance", backendinternal.AdminOnly(h.EventAttendance)).Bind(apis.RequireAuth())
 	se.Router.GET("/api/admin/requests", backendinternal.AdminOnly(h.RequestsList)).Bind(apis.RequireAuth())
 	se.Router.GET("/api/admin/requests/{id}", backendinternal.AdminOnly(h.RequestGet)).Bind(apis.RequireAuth())

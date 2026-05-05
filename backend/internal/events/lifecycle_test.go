@@ -3,50 +3,24 @@ package events
 import (
 	"testing"
 	"time"
-
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tools/types"
 )
 
-func TestIsValidType(t *testing.T) {
-	cases := map[string]bool{
-		"rally":   true,
-		"call":    true,
-		"meetup":  true,
-		"":        false,
-		"unknown": false,
-		"Rally":   false,
+func TestConfigTypeDef(t *testing.T) {
+	cfg := Config{Types: []TypeDef{
+		{Value: "call", Creators: []string{"admin", "assistant"}, Required: map[string]bool{"url": true}},
+	}}
+	def, ok := cfg.TypeDef("call")
+	if !ok {
+		t.Fatalf("expected type def")
 	}
-	for input, want := range cases {
-		if got := IsValidType(input); got != want {
-			t.Errorf("IsValidType(%q) = %v, want %v", input, got, want)
-		}
+	if !def.AllowsCreator("assistant") {
+		t.Fatalf("expected assistant creator")
 	}
-}
-
-func TestIsAssistantCreatableType(t *testing.T) {
-	cases := map[string]bool{
-		"rally":  false,
-		"call":   true,
-		"meetup": true,
-		"":       false,
+	if !def.Requires("url") {
+		t.Fatalf("expected url required")
 	}
-	for input, want := range cases {
-		if got := IsAssistantCreatableType(input); got != want {
-			t.Errorf("IsAssistantCreatableType(%q) = %v, want %v", input, got, want)
-		}
-	}
-}
-
-func TestRequiresGroup(t *testing.T) {
-	if RequiresGroup(TypeMeetup) != true {
-		t.Errorf("meetup must require group")
-	}
-	if RequiresGroup(TypeCall) != false {
-		t.Errorf("call must not require group (admin can create national)")
-	}
-	if RequiresGroup(TypeRally) != false {
-		t.Errorf("rally must not require group")
+	if def.Requires("location") {
+		t.Fatalf("expected location not required")
 	}
 }
 
@@ -84,69 +58,10 @@ func TestParseDate(t *testing.T) {
 	})
 }
 
-func TestParseDatesDeduplicates(t *testing.T) {
-	dates, err := parseDates([]string{"2026-05-04", "2026-05-11", "2026-05-04"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(dates) != 2 {
-		t.Fatalf("expected 2 unique dates, got %d", len(dates))
-	}
-}
-
-func TestValidateCreate(t *testing.T) {
-	cfg := &Config{Recurrence: RecurrenceDef{MaxOccurrences: 10}}
-
-	rally := TypeDef{Value: TypeRally, RequiresTitle: true, RequiresGroup: false}
-	call := TypeDef{Value: TypeCall, RequiresTitle: false, RequiresGroup: false}
-	meetup := TypeDef{Value: TypeMeetup, RequiresTitle: false, RequiresGroup: true}
-
-	t.Run("rally without title fails", func(t *testing.T) {
-		err := validateCreate(CreateInput{Type: TypeRally, Dates: []string{"2026-05-04"}}, rally, cfg)
-		if err == nil {
-			t.Errorf("expected error for missing title")
-		}
-	})
-	t.Run("rally with title passes", func(t *testing.T) {
-		err := validateCreate(CreateInput{Type: TypeRally, Title: "Annual gathering", Dates: []string{"2026-05-04"}}, rally, cfg)
-		if err != nil {
-			t.Errorf("unexpected: %v", err)
-		}
-	})
-	t.Run("call without group passes", func(t *testing.T) {
-		err := validateCreate(CreateInput{Type: TypeCall, Dates: []string{"2026-05-04"}}, call, cfg)
-		if err != nil {
-			t.Errorf("unexpected: %v", err)
-		}
-	})
-	t.Run("meetup without group fails", func(t *testing.T) {
-		err := validateCreate(CreateInput{Type: TypeMeetup, Dates: []string{"2026-05-04"}}, meetup, cfg)
-		if err == nil {
-			t.Errorf("expected error for missing group")
-		}
-	})
-	t.Run("no dates fails", func(t *testing.T) {
-		err := validateCreate(CreateInput{Type: TypeCall, Dates: []string{}}, call, cfg)
-		if err == nil {
-			t.Errorf("expected error for missing dates")
-		}
-	})
-	t.Run("over max fails", func(t *testing.T) {
-		dates := make([]string, 15)
-		for i := range dates {
-			dates[i] = "2026-05-04"
-		}
-		err := validateCreate(CreateInput{Type: TypeCall, Dates: dates}, call, cfg)
-		if err == nil {
-			t.Errorf("expected error for too many occurrences")
-		}
-	})
-}
-
 func TestGenerateSlugFormat(t *testing.T) {
 	date := time.Date(2026, 5, 4, 0, 0, 0, 0, time.UTC)
-	a := generateSlug(TypeCall, date)
-	b := generateSlug(TypeCall, date)
+	a := generateSlug("call", date)
+	b := generateSlug("call", date)
 	if a == b {
 		t.Errorf("slugs must include random suffix to avoid collisions")
 	}
@@ -155,62 +70,116 @@ func TestGenerateSlugFormat(t *testing.T) {
 	}
 }
 
-func TestCollapseSeriesPicksUpcoming(t *testing.T) {
-	collection := newEventTestCollection()
-	r1 := newEventRecord(collection, "2026-05-04", "series-a")
-	r2 := newEventRecord(collection, "2026-05-11", "series-a")
-	r3 := newEventRecord(collection, "2026-05-18", "series-a")
-	standalone := newEventRecord(collection, "2026-05-06", "")
-
-	out := collapseSeries([]*core.Record{r2, r3, r1, standalone}, WindowFuture)
-	if len(out) != 2 {
-		t.Fatalf("expected 2 cards (1 series + 1 standalone), got %d", len(out))
+func TestComputeOccurrencesOnce(t *testing.T) {
+	start := time.Date(2026, 5, 4, 19, 0, 0, 0, time.UTC)
+	got, err := ComputeOccurrences(start, "once", 1)
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
 	}
+	if len(got) != 1 || !got[0].Equal(start) {
+		t.Errorf("once should return [start], got %v", got)
+	}
+}
 
-	var seriesPick *core.Record
-	for _, r := range out {
-		if r.GetString("series") == "series-a" {
-			seriesPick = r
+func TestComputeOccurrencesWeekly(t *testing.T) {
+	start := time.Date(2026, 5, 4, 19, 0, 0, 0, time.UTC) // Monday
+	got, err := ComputeOccurrences(start, "weekly:mon", 3)
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	want := []time.Time{
+		time.Date(2026, 5, 4, 19, 0, 0, 0, time.UTC),
+		time.Date(2026, 5, 11, 19, 0, 0, 0, time.UTC),
+		time.Date(2026, 5, 18, 19, 0, 0, 0, time.UTC),
+	}
+	if len(got) != 3 {
+		t.Fatalf("expected 3 occurrences, got %d", len(got))
+	}
+	for i, w := range want {
+		if !got[i].Equal(w) {
+			t.Errorf("occurrence %d: got %v want %v", i, got[i], w)
 		}
 	}
-	if seriesPick == nil {
-		t.Fatalf("series collapse missing")
+}
+
+func TestComputeOccurrencesMonthlyNthWeekday(t *testing.T) {
+	// 2nd Sunday: May 2026 → Sun 10, Jun → Sun 14, Jul → Sun 12
+	start := time.Date(2026, 5, 10, 10, 0, 0, 0, time.UTC)
+	got, err := ComputeOccurrences(start, "monthly:2nd-sun", 3)
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
 	}
-	if seriesPick.Id != r1.Id {
-		t.Errorf("expected earliest occurrence (r1), got %s", seriesPick.Id)
+	want := []time.Time{
+		time.Date(2026, 5, 10, 10, 0, 0, 0, time.UTC),
+		time.Date(2026, 6, 14, 10, 0, 0, 0, time.UTC),
+		time.Date(2026, 7, 12, 10, 0, 0, 0, time.UTC),
+	}
+	if len(got) != 3 {
+		t.Fatalf("expected 3, got %d", len(got))
+	}
+	for i, w := range want {
+		if !got[i].Equal(w) {
+			t.Errorf("occurrence %d: got %v want %v", i, got[i], w)
+		}
 	}
 }
 
-func TestCollapseSeriesPicksLatestForPast(t *testing.T) {
-	collection := newEventTestCollection()
-	r1 := newEventRecord(collection, "2025-05-04", "series-b")
-	r2 := newEventRecord(collection, "2025-05-11", "series-b")
-
-	out := collapseSeries([]*core.Record{r1, r2}, WindowPast)
-	if len(out) != 1 {
-		t.Fatalf("expected 1 collapsed record, got %d", len(out))
+func TestComputeOccurrencesMonthlyLast(t *testing.T) {
+	// last Friday: May 2026 → Fri 29, Jun → Fri 26, Jul → Fri 31
+	start := time.Date(2026, 5, 29, 18, 0, 0, 0, time.UTC)
+	got, err := ComputeOccurrences(start, "monthly:last-fri", 3)
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
 	}
-	if out[0].Id != r2.Id {
-		t.Errorf("expected latest (r2) for past window, got %s", out[0].Id)
+	want := []time.Time{
+		time.Date(2026, 5, 29, 18, 0, 0, 0, time.UTC),
+		time.Date(2026, 6, 26, 18, 0, 0, 0, time.UTC),
+		time.Date(2026, 7, 31, 18, 0, 0, 0, time.UTC),
+	}
+	for i, w := range want {
+		if !got[i].Equal(w) {
+			t.Errorf("occurrence %d: got %v want %v", i, got[i], w)
+		}
 	}
 }
 
-func newEventTestCollection() *core.Collection {
-	collection := core.NewBaseCollection("events")
-	collection.Fields.Add(
-		&core.TextField{Name: "type"},
-		&core.TextField{Name: "series"},
-		&core.DateField{Name: "event_date"},
-	)
-	return collection
+func TestComputeOccurrencesInvalidCadence(t *testing.T) {
+	start := time.Date(2026, 5, 4, 0, 0, 0, 0, time.UTC)
+	if _, err := ComputeOccurrences(start, "weekly:funday", 3); err == nil {
+		t.Errorf("expected error on bad weekday")
+	}
+	if _, err := ComputeOccurrences(start, "monthly:99th-mon", 3); err == nil {
+		t.Errorf("expected error on bad nth marker")
+	}
+	if _, err := ComputeOccurrences(start, "yearly:jan", 3); err == nil {
+		t.Errorf("expected error on unknown cadence")
+	}
 }
 
-func newEventRecord(collection *core.Collection, date string, series string) *core.Record {
-	r := core.NewRecord(collection)
-	r.Id = "id-" + date + "-" + series
-	r.Set("type", TypeCall)
-	r.Set("series", series)
-	parsed, _ := types.ParseDateTime(date)
-	r.Set("event_date", parsed)
-	return r
+func TestNextOccurrenceSkipsCancelled(t *testing.T) {
+	start := time.Date(2026, 5, 4, 19, 0, 0, 0, time.UTC) // Mon
+	now := time.Date(2026, 5, 5, 0, 0, 0, 0, time.UTC)    // Tue, after first
+	next, ok, err := NextOccurrence(start, "weekly:mon", 3, now, []string{"2026-05-11"})
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	if !ok {
+		t.Fatalf("expected a future occurrence")
+	}
+	want := time.Date(2026, 5, 18, 19, 0, 0, 0, time.UTC)
+	if !next.Equal(want) {
+		t.Errorf("got %v, want %v (May 11 cancelled, May 18 next)", next, want)
+	}
+}
+
+func TestLastOccurrence(t *testing.T) {
+	start := time.Date(2026, 5, 4, 19, 0, 0, 0, time.UTC)
+	got, err := LastOccurrence(start, "weekly:mon", 3)
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	want := time.Date(2026, 5, 18, 19, 0, 0, 0, time.UTC)
+	if !got.Equal(want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
 }

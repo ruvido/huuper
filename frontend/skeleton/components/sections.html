@@ -1,5 +1,6 @@
 {{ define "status-list-content" }}
 <p id="{{ .StatusID }}" class="meta-text"></p>
+{{ if .SpotlightID }}<section id="{{ .SpotlightID }}" class="list-card list-card-default list-card-flush" hidden></section>{{ end }}
 <section id="{{ .ListID }}" class="list-card list-card-default" hidden></section>
 {{ end }}
 

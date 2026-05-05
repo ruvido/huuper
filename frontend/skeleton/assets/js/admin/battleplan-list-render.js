@@ -61,7 +61,7 @@
       sideContent = `<span class="list-item-side-title request-item-status">${esc(status)}</span>`;
     }
     const side = sideContent ? `<span class="list-item-side">${sideContent}</span>` : "";
-    const activeClass = item.status === "active" ? " battleplan-list-item-active" : "";
+    const activeClass = item.status === "active" ? " list-item-spotlight" : "";
     const draftClass = item.status === "draft" ? " battleplan-list-item-draft" : "";
     const archivedClass = item.status === "archived" ? " battleplan-list-item-archived" : "";
     const inner = `

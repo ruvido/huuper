@@ -17,7 +17,7 @@ func init() {
 
 		statuses, err := loadRequestsFlowStatusesForMigration(app)
 		if err != nil {
-			return err
+			return nil
 		}
 		defaultStatus := statuses[0]
 

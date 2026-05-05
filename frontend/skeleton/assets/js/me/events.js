@@ -16,6 +16,22 @@
 
   const SCOPE = "me";
   const BASE_PATH = "/me";
+  const SPOTLIGHT_ID = "events-spotlight";
+
+  // Mirrors battleplan arrangeSections: lifts the spotlight row out of the
+  // main list into the flush spotlight container so it sits edge-to-edge.
+  function arrangeSpotlight(listNode) {
+    const container = document.getElementById(SPOTLIGHT_ID);
+    if (!container || !listNode) return;
+    container.innerHTML = "";
+    const el = listNode.querySelector(".list-item-spotlight");
+    if (el) {
+      container.appendChild(el);
+      container.hidden = false;
+    } else {
+      container.hidden = true;
+    }
+  }
 
   function copy() {
     return (window.appCopy && window.appCopy.events && window.appCopy.events.list) || {};
@@ -88,12 +104,15 @@
           const url = `/api/${SCOPE}/events?window=${encodeURIComponent(currentWindow)}`;
           const payload = await window.appAuth.apiFetch(url);
           const items = Array.isArray(payload && payload.items) ? payload.items : [];
+          if (currentWindow !== "past" && items.length > 0) items[0].__spotlight = true;
           return { items };
         },
         renderItem: (item) => rndmod.renderItem(item, {
           esc: window.appListPage.escapeHTML,
           basePath: BASE_PATH,
+          spotlight: item.__spotlight === true,
         }),
+        afterRender: (node) => arrangeSpotlight(node),
       });
       return;
     }
@@ -118,10 +137,13 @@
         statusNode.hidden = true;
         return;
       }
+      if (currentWindow !== "past" && items.length > 0) items[0].__spotlight = true;
       window.appListPage.renderList(listNode, items, (item) => rndmod.renderItem(item, {
         esc: window.appListPage.escapeHTML,
         basePath: BASE_PATH,
+        spotlight: item.__spotlight === true,
       }));
+      arrangeSpotlight(listNode);
       listNode.hidden = false;
       statusNode.hidden = true;
     } catch (_) {

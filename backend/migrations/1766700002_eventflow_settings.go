@@ -24,41 +24,39 @@ func init() {
 		config := map[string]any{
 			"types": []map[string]any{
 				{
-					"value":                 "rally",
-					"creator":               "admin",
-					"requires_group":        false,
-					"registration_approval": true,
-					"registration_scope":    "occurrence",
-					"requires_title":        true,
+					"value":       "call",
+					"label":       "Call",
+					"description": "Online call.",
+					"creators":    []string{"admin", "assistant"},
+					"required": map[string]bool{
+						"title":    false,
+						"url":      true,
+						"location": false,
+						"group":    false,
+						"end_date": false,
+					},
+					"registration": map[string]bool{
+						"enabled":  true,
+						"approval": false,
+					},
 				},
 				{
-					"value":                 "call",
-					"creator":               "admin_or_assistant",
-					"requires_group":        false,
-					"registration_approval": false,
-					"registration_scope":    "series",
-					"requires_title":        false,
+					"value":       "meetup",
+					"label":       "Meetup",
+					"description": "In-person meetup.",
+					"creators":    []string{"admin", "assistant"},
+					"required": map[string]bool{
+						"title":    false,
+						"url":      false,
+						"location": true,
+						"group":    false,
+						"end_date": false,
+					},
+					"registration": map[string]bool{
+						"enabled":  true,
+						"approval": false,
+					},
 				},
-				{
-					"value":                 "meetup",
-					"creator":               "admin_or_assistant",
-					"requires_group":        true,
-					"registration_approval": false,
-					"registration_scope":    "occurrence",
-					"requires_title":        false,
-				},
-			},
-			"recurrence": map[string]any{
-				"max_occurrences": 52,
-				"rules": []map[string]any{
-					{"type": "weekly"},
-					{"type": "biweekly"},
-					{"type": "monthly"},
-				},
-			},
-			"list": map[string]any{
-				"default_window":  "future",
-				"collapse_series": true,
 			},
 		}
 

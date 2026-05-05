@@ -2,6 +2,8 @@ package events
 
 import (
 	"encoding/json"
+	"log"
+	"strings"
 
 	backendinternal "members/backend/internal"
 
@@ -9,32 +11,25 @@ import (
 )
 
 type Config struct {
-	Types      []TypeDef     `json:"types"`
-	Recurrence RecurrenceDef `json:"recurrence"`
-	List       ListDef       `json:"list"`
+	Types []TypeDef `json:"types"`
 }
 
 type TypeDef struct {
-	Value                string `json:"value"`
-	Creator              string `json:"creator"`
-	RequiresGroup        bool   `json:"requires_group"`
-	RegistrationApproval bool   `json:"registration_approval"`
-	RegistrationScope    string `json:"registration_scope"`
-	RequiresTitle        bool   `json:"requires_title"`
+	Value        string          `json:"value"`
+	Label        string          `json:"label"`
+	Description  string          `json:"description"`
+	Creators     []string        `json:"creators"`
+	Required     map[string]bool `json:"required"`
+	Registration RegistrationDef `json:"registration"`
+	// Legacy fields are read only to tolerate old settings during migration.
+	Creator       string `json:"creator,omitempty"`
+	RequiresGroup bool   `json:"requires_group,omitempty"`
+	RequiresTitle bool   `json:"requires_title,omitempty"`
 }
 
-type RecurrenceDef struct {
-	MaxOccurrences int             `json:"max_occurrences"`
-	Rules          []RecurrenceRule `json:"rules"`
-}
-
-type RecurrenceRule struct {
-	Type string `json:"type"`
-}
-
-type ListDef struct {
-	DefaultWindow  string `json:"default_window"`
-	CollapseSeries bool   `json:"collapse_series"`
+type RegistrationDef struct {
+	Enabled  bool `json:"enabled"`
+	Approval bool `json:"approval"`
 }
 
 func LoadConfig(app *pocketbase.PocketBase) (*Config, error) {
@@ -54,26 +49,66 @@ func LoadConfig(app *pocketbase.PocketBase) (*Config, error) {
 }
 
 func (c *Config) TypeDef(value string) (TypeDef, bool) {
+	value = strings.TrimSpace(value)
 	for _, t := range c.Types {
 		if t.Value == value {
+			t.normalize()
 			return t, true
 		}
 	}
 	return TypeDef{}, false
 }
 
-func (c *Config) IsValidRecurrenceRule(value string) bool {
-	for _, r := range c.Recurrence.Rules {
-		if r.Type == value {
+func (t *TypeDef) normalize() {
+	if t.Required == nil {
+		t.Required = map[string]bool{}
+	}
+	if t.Creator != "" && len(t.Creators) == 0 {
+		switch strings.TrimSpace(t.Creator) {
+		case "admin_or_assistant":
+			t.Creators = []string{"admin", "assistant"}
+		case "admin", "assistant":
+			t.Creators = []string{strings.TrimSpace(t.Creator)}
+		}
+	}
+	if t.RequiresGroup {
+		t.Required["group"] = true
+	}
+	if t.RequiresTitle {
+		t.Required["title"] = true
+	}
+}
+
+func (t TypeDef) AllowsCreator(role string) bool {
+	role = strings.TrimSpace(role)
+	for _, creator := range t.Creators {
+		if strings.TrimSpace(creator) == role {
 			return true
 		}
 	}
 	return false
 }
 
-func (c *Config) MaxOccurrences() int {
-	if c.Recurrence.MaxOccurrences <= 0 {
-		return 52
+func (t TypeDef) Requires(field string) bool {
+	field = strings.TrimSpace(field)
+	for configured, required := range t.Required {
+		configured = strings.TrimSpace(configured)
+		if !isKnownRequiredField(configured) {
+			log.Printf("eventflow: unknown required field %q ignored", configured)
+			continue
+		}
+		if configured == field {
+			return required
+		}
 	}
-	return c.Recurrence.MaxOccurrences
+	return false
+}
+
+func isKnownRequiredField(field string) bool {
+	switch field {
+	case "title", "url", "location", "group", "end_date":
+		return true
+	default:
+		return false
+	}
 }

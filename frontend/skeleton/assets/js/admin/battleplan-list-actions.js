@@ -115,7 +115,7 @@
     const dupBtn = document.getElementById("battleplan-active-duplicate");
     const newBtn = document.getElementById("battleplan-active-new");
 
-    const activeEl = listNode.querySelector(".battleplan-list-item-active");
+    const activeEl = listNode.querySelector(".list-item-spotlight");
     if (activeContainer) {
       activeContainer.innerHTML = "";
       if (activeEl) {

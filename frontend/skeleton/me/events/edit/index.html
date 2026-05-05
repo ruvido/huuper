@@ -1,0 +1,4 @@
+{{ define "content" }}
+{{ template "wizard-shell" (dict "Prefix" "events-wizard") }}
+{{ end }}
+{{ define "page" }}{{ template "layout-me" (dict "Title" "Huuper / Me / Events / Edit" "TopbarTitle" "Event" "BackHref" "" "RightActionCancel" true "BodyClass" "wizard-page-body" "HideBottomNav" true "Scripts" (list "/assets/js/core/auth.js" "/assets/js/core/guard-me.js" "/assets/js/components/action-sheet.js" "/assets/js/me/events-wizard-config.js" "/assets/js/me/events-wizard-render.js" "/assets/js/me/events-wizard-actions.js" "/assets/js/me/events-wizard.js")) }}{{ end }}

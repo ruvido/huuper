@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	eventinternal "members/backend/internal/events"
+
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
@@ -88,9 +90,7 @@ func SummaryHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error
 
 		series := buildSeries(users, allRequests, guardianDates, stats)
 
-		today := time.Now().Format("2006-01-02")
-		eventFilter := fmt.Sprintf("event_date >= '%s'", today)
-		events, err := app.FindRecordsByFilter("events", eventFilter, "event_date", 1, 0)
+		events, err := eventinternal.ListForUser(app, e.Auth, eventinternal.WindowFuture)
 		if err != nil {
 			return apis.NewBadRequestError("failed_events", err)
 		}
@@ -98,7 +98,7 @@ func SummaryHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error
 		var next *eventNext
 		if len(events) > 0 {
 			event := events[0]
-			eventID := event.Id
+			eventID := event.ID
 			registrations, err := app.FindRecordsByFilter("event_registrations", fmt.Sprintf("event = '%s'", eventID), "", 0, 0)
 			if err != nil {
 				return apis.NewBadRequestError("failed_registrations", err)
@@ -110,8 +110,8 @@ func SummaryHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error
 
 			next = &eventNext{
 				ID:            eventID,
-				Title:         event.GetString("title"),
-				EventDate:     event.GetString("event_date"),
+				Title:         event.Title,
+				EventDate:     event.StartDate,
 				Registrations: len(registrations),
 				Pending:       len(pending),
 			}
