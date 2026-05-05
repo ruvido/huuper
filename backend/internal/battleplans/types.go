@@ -10,10 +10,10 @@ import (
 )
 
 const (
-	StatusActive   = "active"
+	StatusActive    = "active"
 	StatusCompleted = "completed"
 	StatusArchived  = "archived"
-	StatusDraft    = "draft"
+	StatusDraft     = "draft"
 
 	CadenceDaily        = "daily"
 	CadencePaused       = "paused"
@@ -47,9 +47,16 @@ type Priority struct {
 	Why   string `json:"why,omitempty"`
 }
 
+type Note struct {
+	Text string `json:"text"`
+	At   string `json:"at"`
+	By   string `json:"by,omitempty"`
+}
+
 type Data struct {
 	Priority Priority          `json:"priority"`
 	Pillars  map[string]Pillar `json:"pillars"`
+	Notes    []Note            `json:"notes,omitempty"`
 }
 
 type ListItem struct {

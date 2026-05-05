@@ -145,6 +145,26 @@ func BattleplanStatusHandler(app *pocketbase.PocketBase) func(e *core.RequestEve
 	}
 }
 
+func BattleplanNoteHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		actor, record, err := requireOwnedBattleplan(app, e)
+		if err != nil {
+			return err
+		}
+
+		var payload struct {
+			Note string `json:"note"`
+		}
+		if err := e.BindBody(&payload); err != nil {
+			return apis.NewBadRequestError("invalid_payload", err)
+		}
+		if err := battleplans.AddNote(app, actor, record, payload.Note); err != nil {
+			return err
+		}
+		return e.JSON(http.StatusOK, battleplans.MapItem(record))
+	}
+}
+
 func DeleteBattleplanHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		_, record, err := requireOwnedBattleplan(app, e)

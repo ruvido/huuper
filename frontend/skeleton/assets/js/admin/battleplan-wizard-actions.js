@@ -76,12 +76,47 @@
     } catch { nextBtn.disabled = false; }
   }
 
+  function ensureAddNoteButton(deps) {
+    const { state, dom, auth, PREFIX } = deps;
+    if (!dom.sticky || state.loadedStatus !== "active") return null;
+    let button = document.getElementById(`${PREFIX}-add-note`);
+    if (!button) {
+      button = document.createElement("button");
+      button.id = `${PREFIX}-add-note`;
+      button.className = "battleplan-view-note-button";
+      button.type = "button";
+      dom.sticky.insertBefore(button, dom.sticky.firstChild);
+    }
+    const viewCopy = (((window.appCopy || {}).battleplan || {}).view) || {};
+    button.textContent = (viewCopy.addNoteLabel || "+ Add Note").toUpperCase();
+    button.onclick = () => {
+      if (!window.appRequestNoteSheet) return;
+      window.appRequestNoteSheet.open({
+        title: viewCopy.addNoteTitle || "Add battleplan note",
+        submitLabel: viewCopy.addNoteSubmitLabel || "Add",
+        emptyStatus: viewCopy.addNoteEmptyStatus || "Write a note.",
+        statusNode: dom.status,
+        onSubmit: async (note, sheetButton) => {
+          sheetButton.disabled = true;
+          await auth.apiFetch(`/api/me/battleplans/${encodeURIComponent(state.viewId)}/notes`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ note }),
+          });
+          window.location.reload();
+        },
+      });
+    };
+    return button;
+  }
+
   function configureViewActions(deps) {
     const { state, dom, basePath, PREFIX } = deps;
     const bpCopy = (window.appCopy && window.appCopy.battleplan) || {};
     const viewCopy = bpCopy.view || {};
     const listCopy = bpCopy.list || {};
     const status = state.loadedStatus || "";
+    ensureAddNoteButton(deps);
 
     if (dom.back) {
       if (status === "archived") {

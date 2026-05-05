@@ -258,6 +258,45 @@
     `;
   }
 
+  function dateOnly(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    return raw.slice(0, 10);
+  }
+
+  function renderNotesHTML(notes) {
+    if (!Array.isArray(notes) || notes.length === 0) return "";
+    const items = notes.map((note) => {
+      const noteText = String((note && note.text) || "").trim();
+      if (!noteText) return "";
+      const who = String((note && note.by) || "").trim();
+      const when = dateOnly(note && note.at);
+      const metaParts = [];
+      if (when) {
+        metaParts.push(`\u2014 ${when}`);
+      }
+      if (who) {
+        metaParts.push(who);
+      }
+      const meta = metaParts.join(" \u2022 ");
+      return `
+        <div class="battleplan-note-item">
+          <span class="battleplan-note-marker" aria-hidden="true"></span>
+          <p class="battleplan-note-text">
+            ${esc(noteText)}
+            ${meta ? `<span class="battleplan-note-meta">${esc(meta)}</span>` : ""}
+          </p>
+        </div>
+      `;
+    }).filter(Boolean).join("");
+    return items ? `
+      <div>
+        <label class="field-label wizard-summary-tag">Notes</label>
+        <div class="battleplan-notes-history">${items}</div>
+      </div>
+    ` : "";
+  }
+
   function renderConfirm(ctx) {
     const { state, dom, copy, PREFIX, isSummaryView } = ctx;
     const c = state.cfg.wizard.confirmation;
@@ -335,6 +374,7 @@
     const priorityTargetAttrs = summaryView
       ? ""
       : ` class="wizard-summary-edit-target" data-action="go-step" data-step="1"`;
+    const notesHTML = summaryView ? renderNotesHTML(state.input.data.notes) : "";
 
     const topErrorSlot = document.getElementById(`${PREFIX}-top-error`);
     if (topErrorSlot) {
@@ -362,6 +402,7 @@
             <label class="field-label wizard-summary-tag">${esc(copy.labels.summaryPillars)}</label>
             <ul class="wizard-pillars-summary">${pillarsSummary}</ul>
           </div>
+          ${notesHTML}
         </div>
       </section>
     `;

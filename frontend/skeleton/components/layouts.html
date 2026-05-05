@@ -102,7 +102,7 @@
 <!doctype html>
 <html lang="en">
   {{ template "head" . }}
-  <body>
+  <body{{- if .BodyClass }} class="{{ .BodyClass }}"{{- end }}>
     {{ template "scope-guard" "me" }}
     <main class="app">
       <section class="app-shell">
@@ -112,7 +112,9 @@
         {{ template "content" . }}
       </section>
     </main>
+    {{- if not .HideBottomNav }}
     {{ template "bottomnav-me" . }}
+    {{- end }}
   </body>
 </html>
 {{ end }}
@@ -133,9 +135,9 @@
         {{ template "content" . }}
       </section>
     </main>
-    {{ if not .HideBottomNav }}
+    {{- if not .HideBottomNav }}
     {{ template "bottomnav-admin" . }}
-    {{ end }}
+    {{- end }}
   </body>
 </html>
 {{ end }}

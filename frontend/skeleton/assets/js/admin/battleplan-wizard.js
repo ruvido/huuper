@@ -690,6 +690,13 @@
           state.input.data.priority.title = String(bpData.priority.title || "");
           state.input.data.priority.why = String(bpData.priority.why || "");
         }
+        if (Array.isArray(bpData.notes)) {
+          state.input.data.notes = bpData.notes.map((note) => ({
+            text: String((note && note.text) || ""),
+            at: String((note && note.at) || ""),
+            by: String((note && note.by) || ""),
+          }));
+        }
         if (bpData.pillars && typeof bpData.pillars === "object") {
           for (const def of (state.cfg.pillars || [])) {
             const src = bpData.pillars[def.key];

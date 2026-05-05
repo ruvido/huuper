@@ -6,8 +6,10 @@ import (
 	"time"
 
 	backendinternal "members/backend/internal"
+	groupinternal "members/backend/internal/groups"
 
 	"github.com/pocketbase/pocketbase"
+	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tools/types"
 )
@@ -81,7 +83,7 @@ func stampNewRoutines(existing Data, incoming Data, now string) Data {
 		}
 	}
 
-	out := Data{Priority: incoming.Priority, Pillars: map[string]Pillar{}}
+	out := Data{Priority: incoming.Priority, Pillars: map[string]Pillar{}, Notes: existing.Notes}
 	for pkey, pillar := range incoming.Pillars {
 		stamped := make([]Routine, len(pillar.Routines))
 		for i, r := range pillar.Routines {
@@ -165,6 +167,27 @@ func Update(app *pocketbase.PocketBase, record *core.Record, in Input) error {
 	existing := ParseData(record.Get("data"))
 	merged := stampNewRoutines(existing, in.Data, types.NowDateTime().String())
 	record.Set("data", merged)
+	return app.Save(record)
+}
+
+func AddNote(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, note string) error {
+	if record == nil {
+		return fmt.Errorf("missing battleplan")
+	}
+	if record.GetString("status") != StatusActive {
+		return apis.NewBadRequestError("battleplan_not_active", nil)
+	}
+	note = strings.TrimSpace(note)
+	if note == "" {
+		return apis.NewBadRequestError("missing_note", nil)
+	}
+	data := ParseData(record.Get("data"))
+	data.Notes = append(data.Notes, Note{
+		Text: note,
+		At:   time.Now().UTC().Format(time.RFC3339),
+		By:   groupinternal.UserDisplayName(actor),
+	})
+	record.Set("data", data)
 	return app.Save(record)
 }
 

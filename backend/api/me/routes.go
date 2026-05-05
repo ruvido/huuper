@@ -6,38 +6,39 @@ import (
 )
 
 type Handlers struct {
-	Settings           func(e *core.RequestEvent) error
-	GroupsList         func(e *core.RequestEvent) error
-	GroupGet           func(e *core.RequestEvent) error
-	GroupAssistant     func(e *core.RequestEvent) error
-	UserGet            func(e *core.RequestEvent) error
-	EventsList         func(e *core.RequestEvent) error
-	EventGet           func(e *core.RequestEvent) error
-	EventStatus        func(e *core.RequestEvent) error
-	EventCreate        func(e *core.RequestEvent) error
-	EventUpdate        func(e *core.RequestEvent) error
-	EventReschedule    func(e *core.RequestEvent) error
-	EventCancel        func(e *core.RequestEvent) error
+	Settings              func(e *core.RequestEvent) error
+	GroupsList            func(e *core.RequestEvent) error
+	GroupGet              func(e *core.RequestEvent) error
+	GroupAssistant        func(e *core.RequestEvent) error
+	UserGet               func(e *core.RequestEvent) error
+	EventsList            func(e *core.RequestEvent) error
+	EventGet              func(e *core.RequestEvent) error
+	EventStatus           func(e *core.RequestEvent) error
+	EventCreate           func(e *core.RequestEvent) error
+	EventUpdate           func(e *core.RequestEvent) error
+	EventReschedule       func(e *core.RequestEvent) error
+	EventCancel           func(e *core.RequestEvent) error
 	EventCancelOccurrence func(e *core.RequestEvent) error
-	EventRegister      func(e *core.RequestEvent) error
-	EventUnregister    func(e *core.RequestEvent) error
-	EventUnsubscribe   func(e *core.RequestEvent) error
-	EventAttendance    func(e *core.RequestEvent) error
-	TelegramToken      func(e *core.RequestEvent) error
-	RequestsList       func(e *core.RequestEvent) error
-	RequestGet         func(e *core.RequestEvent) error
-	RequestAction      func(e *core.RequestEvent) error
-	GroupMembers       func(e *core.RequestEvent) error
-	GroupGuardians     func(e *core.RequestEvent) error
-	GroupRequestsCount func(e *core.RequestEvent) error
-	DefaultInvite      func(e *core.RequestEvent) error
-	BattleplansList    func(e *core.RequestEvent) error
-	BattleplanGet      func(e *core.RequestEvent) error
-	BattleplanCreate   func(e *core.RequestEvent) error
-	BattleplanUpdate   func(e *core.RequestEvent) error
-	BattleplanStatus   func(e *core.RequestEvent) error
-	BattleplanDelete   func(e *core.RequestEvent) error
-	BattleplanAccess   func(e *core.RequestEvent) error
+	EventRegister         func(e *core.RequestEvent) error
+	EventUnregister       func(e *core.RequestEvent) error
+	EventUnsubscribe      func(e *core.RequestEvent) error
+	EventAttendance       func(e *core.RequestEvent) error
+	TelegramToken         func(e *core.RequestEvent) error
+	RequestsList          func(e *core.RequestEvent) error
+	RequestGet            func(e *core.RequestEvent) error
+	RequestAction         func(e *core.RequestEvent) error
+	GroupMembers          func(e *core.RequestEvent) error
+	GroupGuardians        func(e *core.RequestEvent) error
+	GroupRequestsCount    func(e *core.RequestEvent) error
+	DefaultInvite         func(e *core.RequestEvent) error
+	BattleplansList       func(e *core.RequestEvent) error
+	BattleplanGet         func(e *core.RequestEvent) error
+	BattleplanCreate      func(e *core.RequestEvent) error
+	BattleplanUpdate      func(e *core.RequestEvent) error
+	BattleplanStatus      func(e *core.RequestEvent) error
+	BattleplanNote        func(e *core.RequestEvent) error
+	BattleplanDelete      func(e *core.RequestEvent) error
+	BattleplanAccess      func(e *core.RequestEvent) error
 }
 
 func Register(se *core.ServeEvent, h Handlers) {
@@ -71,6 +72,7 @@ func Register(se *core.ServeEvent, h Handlers) {
 	se.Router.GET("/api/me/battleplans/{id}", h.BattleplanGet).Bind(apis.RequireAuth())
 	se.Router.PATCH("/api/me/battleplans/{id}", h.BattleplanUpdate).Bind(apis.RequireAuth())
 	se.Router.POST("/api/me/battleplans/{id}/status", h.BattleplanStatus).Bind(apis.RequireAuth())
+	se.Router.POST("/api/me/battleplans/{id}/notes", h.BattleplanNote).Bind(apis.RequireAuth())
 	se.Router.DELETE("/api/me/battleplans/{id}", h.BattleplanDelete).Bind(apis.RequireAuth())
 	se.Router.GET("/api/me/access/battleplan", h.BattleplanAccess).Bind(apis.RequireAuth())
 }

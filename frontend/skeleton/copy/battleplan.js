@@ -25,6 +25,10 @@ window.appCopy = Object.assign({}, window.appCopy || {}, {
     },
     view: {
       editLabel: "Edit",
+      addNoteLabel: "+ Add Note",
+      addNoteTitle: "Add battleplan note",
+      addNoteSubmitLabel: "Add",
+      addNoteEmptyStatus: "Write a note.",
       activateLabel: "Activate",
       deleteLabel: "Delete",
       deleteDialog: {
