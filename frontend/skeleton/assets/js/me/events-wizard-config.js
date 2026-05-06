@@ -11,6 +11,8 @@
   const WEEKDAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
   const MONTH_POSITIONS = ["1st", "2nd", "3rd", "4th", "5th", "last"];
   const COUNT_OPTIONS = [1, 3, 6, 12];
+  const DETAIL_FIELDS = ["title", "location", "url", "description"];
+  const REQUIRED_FIELDS = ["title", "url", "location", "group", "end_date", "time", "description"];
 
   function typeDef(cfg, value) {
     if (!cfg || !Array.isArray(cfg.types)) return null;
@@ -31,6 +33,10 @@
     return !!(type && type.required && type.required[field] === true);
   }
 
+  function hasAnyRequired(type, fields) {
+    return (fields || []).some((field) => required(type, field));
+  }
+
   function isValidISODate(value) {
     if (!value) return false;
     const m = String(value).match(/^\d{4}-\d{2}-\d{2}$/);
@@ -47,10 +53,82 @@
     return `${yyyy}-${mm}-${dd}`;
   }
 
-  function combineDateTime(dateISO, timeHHMM) {
+  function dateTimeRFC3339(dateISO, timeHHMM) {
     if (!isValidISODate(dateISO)) return "";
     const time = /^\d{2}:\d{2}$/.test(String(timeHHMM || "")) ? timeHHMM : "00:00";
-    return `${dateISO}T${time}:00`;
+    const [yy, mm, dd] = dateISO.split("-").map((s) => Number(s));
+    const [hh, min] = time.split(":").map((s) => Number(s));
+    return new Date(yy, mm - 1, dd, hh, min, 0).toISOString();
+  }
+
+  function isValidTimeText(raw) {
+    const value = String(raw || "").trim();
+    const m = value.match(/^(\d{2}):(\d{2})$/);
+    if (!m) return false;
+    const hh = Number(m[1]);
+    const mm = Number(m[2]);
+    return hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59;
+  }
+
+  function isAllowedURLHost(host) {
+    if (!host) return false;
+    const normalized = String(host).trim().toLowerCase();
+    if (!normalized) return false;
+    if (normalized === "localhost") return true;
+    if (normalized.includes(".")) return true;
+    return /^\d{1,3}(\.\d{1,3}){3}$/.test(normalized);
+  }
+
+  function normalizeURL(raw) {
+    const value = String(raw || "").trim();
+    if (!value) return "";
+    let parsed;
+    try {
+      parsed = new URL(value);
+    } catch (_) {
+      return "";
+    }
+    const scheme = String(parsed.protocol || "").toLowerCase();
+    if (scheme !== "http:" && scheme !== "https:") return "";
+    if (!isAllowedURLHost(parsed.hostname)) return "";
+    parsed.protocol = scheme;
+    parsed.hostname = parsed.hostname.toLowerCase();
+    return parsed.toString();
+  }
+
+  function resetFieldsForType(input, type) {
+    if (!input || !type) return;
+    if (!required(type, "group")) {
+      input.group = "";
+      input.groupName = "";
+    }
+    if (!required(type, "time")) input.startTime = "";
+    if (!required(type, "end_date")) input.endDate = "";
+    if (!required(type, "title")) input.title = "";
+    if (!required(type, "location")) input.location = "";
+    if (!required(type, "url")) input.url = "";
+    if (!input.data || typeof input.data !== "object") input.data = {};
+    if (!required(type, "description")) input.data.description = "";
+  }
+
+  function eventPayload(input, type) {
+    resetFieldsForType(input, type);
+    const payload = {
+      type: input.type,
+      start_date: dateTimeRFC3339(input.startDate, input.startTime),
+      cadence: cadenceFromInput(input),
+      count: input.schedule === "once" ? 1 : Number(input.count || 3),
+      data: {},
+    };
+    if (input.group) payload.group = input.group;
+    if (input.endDate) payload.end_date = dateTimeRFC3339(input.endDate, "");
+    if (input.title) payload.title = input.title;
+    if (input.location) payload.location = input.location;
+    const url = normalizeURL(input.url);
+    if (url) payload.url = url;
+    const desc = (input.data && input.data.description || "").trim();
+    if (desc) payload.data.description = desc;
+    return payload;
   }
 
   function weekdayFromDate(startISO) {
@@ -98,8 +176,8 @@
           last.setDate(last.getDate() - ((last.getDay() - weekday + 7) % 7));
           next.setTime(last.getTime());
         } else {
-        const nthMap = { "1st": 1, "2nd": 2, "3rd": 3, "4th": 4, "5th": 5 };
-        const nth = nthMap[pos] || 1;
+          const nthMap = { "1st": 1, "2nd": 2, "3rd": 3, "4th": 4, "5th": 5 };
+          const nth = nthMap[pos] || 1;
           const offset = (weekday - anchor.getDay() + 7) % 7;
           next.setTime(anchor.getTime());
           next.setDate(1 + offset + (nth - 1) * 7);
@@ -131,19 +209,36 @@
     if (!cfg || !Array.isArray(cfg.types) || cfg.types.length === 0) {
       throw new Error("eventflow settings missing types");
     }
+    cfg.types.forEach((type) => {
+      if (!type || !type.value) throw new Error("eventflow type missing value");
+      const requiredMap = type.required || {};
+      Object.keys(requiredMap).forEach((field) => {
+        if (!REQUIRED_FIELDS.includes(field)) {
+          throw new Error(`eventflow type ${type.value} has unknown field ${field}`);
+        }
+      });
+    });
   }
 
   ns.config = {
     WEEKDAYS,
     MONTH_POSITIONS,
     COUNT_OPTIONS,
+    DETAIL_FIELDS,
+    REQUIRED_FIELDS,
     pad2,
     typeDef,
     allowedTypes,
     required,
+    hasAnyRequired,
     isValidISODate,
     todayISO,
-    combineDateTime,
+    dateTimeRFC3339,
+    isValidTimeText,
+    isAllowedURLHost,
+    normalizeURL,
+    resetFieldsForType,
+    eventPayload,
     weekdayFromDate,
     monthPositionFromDate,
     cadenceFromInput,

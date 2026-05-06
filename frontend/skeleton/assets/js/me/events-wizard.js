@@ -105,7 +105,7 @@
   //   0: type
   //   1: group (skipped when type does not require group)
   //   2: dates
-  //   3: details
+  //   3: details (skipped when the selected type has no required detail fields)
   //   4: confirm
   // Step plan when EDITING (single occurrence):
   //   0: details (we treat editing as details-only; reschedule is a separate action)
@@ -114,12 +114,15 @@
     if (state.editId) return ["details", "confirm"];
     const td = cfgmod.typeDef(state.cfg, state.input.type);
     const requiresGroup = cfgmod.required(td, "group");
+    const requiresDetails = cfgmod.hasAnyRequired(td, cfgmod.DETAIL_FIELDS);
     const keys = ["type"];
     // Group step is only injected when the chosen type actually requires it.
     // (Init defaults state.input.type to the first allowed type, so we don't
     // need to defensively include the group step for an "unknown" type.)
     if (requiresGroup) keys.push("group");
-    keys.push("dates", "details", "confirm");
+    keys.push("dates");
+    if (requiresDetails) keys.push("details");
+    keys.push("confirm");
     return keys;
   }
 
@@ -192,7 +195,7 @@
   function renderEditFooterActions() {
     if (!dom.stage) return;
     const wrap = document.createElement("div");
-    wrap.className = "events-wizard-edit-actions";
+    wrap.className = "wizard-routines";
     const cancelLabel = (copy.actions && copy.actions.cancelEvent) || "Cancel event";
     const rescheduleLabel = (copy.actions && copy.actions.reschedule) || "Reschedule";
     wrap.innerHTML = `
@@ -214,10 +217,7 @@
         if (newType !== state.input.type) {
           state.input.type = newType;
           const td = cfgmod.typeDef(state.cfg, newType);
-          if (!cfgmod.required(td, "group")) {
-            state.input.group = "";
-            state.input.groupName = "";
-          }
+          cfgmod.resetFieldsForType(state.input, td);
         }
       }
     } else if (key === "group") {
@@ -238,8 +238,10 @@
       }
       const startTimeEl = dom.stage.querySelector('input[name="event_start_time"]');
       if (startTimeEl) state.input.startTime = startTimeEl.value;
+      else state.input.startTime = "";
       const endEl = dom.stage.querySelector('input[name="event_end_date"]');
       if (endEl) state.input.endDate = endEl.value;
+      else state.input.endDate = "";
       const weekdayEl = dom.stage.querySelector('input[name="event_weekday"]:checked');
       if (weekdayEl) state.input.weekday = weekdayEl.value;
       const monthPositionEl = dom.stage.querySelector('input[name="event_month_position"]:checked');
@@ -259,6 +261,8 @@
       if (descEl) {
         state.input.data = state.input.data || {};
         state.input.data.description = descEl.value;
+      } else if (state.input.data) {
+        state.input.data.description = "";
       }
     }
   }
@@ -275,11 +279,30 @@
       const requires = cfgmod.required(td, "group");
       if (requires && !state.input.group) return copy.errors.groupRequired || "Group required";
     } else if (key === "dates") {
-      if (!cfgmod.isValidISODate(state.input.startDate)) return copy.errors.startDateRequired || "Start date required";
+      if (!String(state.input.startDate || "").trim()) {
+        state.fieldErrors.start_date = true;
+        return copy.errors.startDateRequired || "Start date required";
+      }
+      if (!cfgmod.isValidISODate(state.input.startDate)) {
+        state.fieldErrors.start_date = true;
+        return copy.errors.startDateInvalid || "Start date must be valid.";
+      }
       const td = cfgmod.typeDef(state.cfg, state.input.type);
-      if (cfgmod.required(td, "end_date") && !cfgmod.isValidISODate(state.input.endDate)) {
+      if (cfgmod.required(td, "time") && !String(state.input.startTime || "").trim()) {
+        state.fieldErrors.time = true;
+        return copy.errors.timeRequired || "Time required";
+      }
+      if (cfgmod.required(td, "time") && !cfgmod.isValidTimeText(state.input.startTime)) {
+        state.fieldErrors.time = true;
+        return copy.errors.timeInvalid || "Time must be valid.";
+      }
+      if (cfgmod.required(td, "end_date") && !String(state.input.endDate || "").trim()) {
         state.fieldErrors.end_date = true;
         return copy.errors.endDateRequired || "End date required";
+      }
+      if (cfgmod.required(td, "end_date") && !cfgmod.isValidISODate(state.input.endDate)) {
+        state.fieldErrors.end_date = true;
+        return copy.errors.endDateInvalid || "End date must be valid.";
       }
       if (state.input.endDate && !cfgmod.isValidISODate(state.input.endDate)) return copy.errors.endDateInvalid || "Invalid end date";
       if (state.input.endDate && state.input.endDate < state.input.startDate) return copy.errors.endDateBeforeStart || "End date must be after start date";
@@ -304,40 +327,29 @@
         state.fieldErrors.url = true;
         return copy.errors.urlRequired || "URL required";
       }
-      if (state.input.url) {
-        try { new URL(state.input.url); } catch (_) { return copy.errors.urlInvalid || "Invalid URL"; }
+      if (cfgmod.required(td, "description") && !(state.input.data && String(state.input.data.description || "").trim())) {
+        state.fieldErrors.description = true;
+        return copy.errors.descriptionRequired || "Description required";
+      }
+      if (state.input.url && !cfgmod.normalizeURL(state.input.url)) {
+        state.fieldErrors.url = true;
+        return copy.errors.urlInvalid || "Invalid URL";
       }
     }
     return "";
   }
 
   function buildCreatePayload() {
-    const payload = {
-      type: state.input.type,
-      start_date: cfgmod.combineDateTime(state.input.startDate, state.input.startTime),
-      cadence: cfgmod.cadenceFromInput(state.input),
-      count: state.input.schedule === "once" ? 1 : Number(state.input.count || 3),
-      end_date: state.input.endDate || "",
-      location: state.input.location || "",
-      url: state.input.url || "",
-      title: state.input.title || "",
-      group: state.input.group || "",
-      data: {},
-    };
-    const desc = (state.input.data && state.input.data.description || "").trim();
-    if (desc) payload.data = { description: desc };
-    return payload;
+    return cfgmod.eventPayload(state.input, cfgmod.typeDef(state.cfg, state.input.type));
   }
 
   function buildUpdatePayload() {
-    const data = {};
-    const desc = (state.input.data && state.input.data.description || "").trim();
-    if (desc) data.description = desc;
+    const payload = cfgmod.eventPayload(state.input, cfgmod.typeDef(state.cfg, state.input.type));
     return {
-      title: state.input.title || "",
-      location: state.input.location || "",
-      url: state.input.url || "",
-      data,
+      title: payload.title || "",
+      location: payload.location || "",
+      url: payload.url || "",
+      data: payload.data || {},
     };
   }
 
@@ -396,6 +408,19 @@
   }
 
   if (dom.form) {
+    dom.form.addEventListener("blur", (e) => {
+      const target = e.target;
+      if (!target || target.tagName !== "INPUT") return;
+      if (!["event_start_date", "event_start_time", "event_end_date"].includes(target.name)) return;
+      syncFromDOM();
+      if (currentStepKey() !== "dates") return;
+      const err = validateStep();
+      if (!err) return;
+      setStatus(err);
+      render();
+      setStatus(err);
+    }, true);
+
     dom.form.addEventListener("submit", (e) => {
       e.preventDefault();
       syncFromDOM();
@@ -406,20 +431,8 @@
       render();
     });
 
-    // Live-update on input/change so typed values flow into state and the
-    // schedule preview refreshes.
-    dom.form.addEventListener("input", (e) => {
-      syncFromDOM();
-      // Re-render the dates step on certain inputs so the preview updates.
-      if (e.target && (e.target.name === "event_start_date" || e.target.name === "event_start_time" || e.target.name === "event_end_date")) {
-        if (currentStepKey() === "dates") render();
-      }
-    });
     dom.form.addEventListener("change", async (e) => {
       syncFromDOM();
-      if (e.target && ["event_schedule", "event_weekday", "event_month_position", "event_month_day", "event_count"].includes(e.target.name)) {
-        if (currentStepKey() === "dates") render();
-      }
       if (e.target && e.target.name === "event_type") {
         // Type change resets group and may change the step plan. We also
         // refetch groups in case the user switches to a type that needs them.
@@ -440,7 +453,6 @@
           auth,
           scope: state.scope,
           eventID: state.editId,
-          hasSeries: false,
           onDone: () => { window.location.href = `${basePath}/events/`; },
         });
       } else if (action === "reschedule") {
@@ -525,7 +537,7 @@
 
   async function init() {
     try {
-      cfgmod.validateCopy(copy);
+      cfgmod.validateCopy(copyAll);
       state.isAdmin = state.scope === "admin" || detectIsAdmin();
       const settings = await auth.apiFetch(`/api/${state.scope}/settings/eventflow`);
       state.cfg = settings && settings.data ? settings.data : settings;

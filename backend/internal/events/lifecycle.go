@@ -2,6 +2,7 @@ package events
 
 import (
 	"fmt"
+	"net"
 	"net/url"
 	"strconv"
 	"strings"
@@ -90,7 +91,10 @@ func Create(app *pocketbase.PocketBase, creator *core.Record, in CreateInput) (*
 	}
 
 	title := strings.TrimSpace(in.Title)
-	url := strings.TrimSpace(in.URL)
+	url, err := normalizeURL(in.URL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid url: %w", err)
+	}
 	location := strings.TrimSpace(in.Location)
 	groupID := strings.TrimSpace(in.Group)
 
@@ -142,7 +146,11 @@ func Update(app *pocketbase.PocketBase, record *core.Record, in UpdateInput) err
 	if strings.TrimSpace(in.Title) != "" {
 		record.Set("title", strings.TrimSpace(in.Title))
 	}
-	record.Set("url", strings.TrimSpace(in.URL))
+	url, err := normalizeURL(in.URL)
+	if err != nil {
+		return fmt.Errorf("invalid url: %w", err)
+	}
+	record.Set("url", url)
 	record.Set("location", strings.TrimSpace(in.Location))
 	if strings.TrimSpace(in.Cadence) != "" {
 		record.Set("cadence", strings.TrimSpace(in.Cadence))
@@ -283,6 +291,9 @@ func parseDate(raw string) (time.Time, error) {
 }
 
 func validateInputRequirements(app *pocketbase.PocketBase, typeDef TypeDef, in CreateInput, start time.Time, end *time.Time) error {
+	if typeDef.Requires("time") && !hasTimeComponent(in.StartDate) {
+		return fmt.Errorf("missing required field time")
+	}
 	if typeDef.Requires("title") && strings.TrimSpace(in.Title) == "" {
 		return fmt.Errorf("missing required field title")
 	}
@@ -297,6 +308,9 @@ func validateInputRequirements(app *pocketbase.PocketBase, typeDef TypeDef, in C
 	}
 	if typeDef.Requires("location") && strings.TrimSpace(in.Location) == "" {
 		return fmt.Errorf("missing required field location")
+	}
+	if typeDef.Requires("description") && strings.TrimSpace(stringValue(in.Data["description"])) == "" {
+		return fmt.Errorf("missing required field description")
 	}
 	if typeDef.Requires("group") && strings.TrimSpace(in.Group) == "" {
 		return fmt.Errorf("missing required field group")
@@ -316,6 +330,9 @@ func validateInputRequirements(app *pocketbase.PocketBase, typeDef TypeDef, in C
 }
 
 func validateRecordRequirements(app *pocketbase.PocketBase, typeDef TypeDef, record *core.Record) error {
+	if typeDef.Requires("time") && record.GetDateTime("event_date").Time().IsZero() {
+		return fmt.Errorf("missing required field time")
+	}
 	if typeDef.Requires("title") && strings.TrimSpace(record.GetString("title")) == "" {
 		return fmt.Errorf("missing required field title")
 	}
@@ -330,6 +347,10 @@ func validateRecordRequirements(app *pocketbase.PocketBase, typeDef TypeDef, rec
 	}
 	if typeDef.Requires("location") && strings.TrimSpace(record.GetString("location")) == "" {
 		return fmt.Errorf("missing required field location")
+	}
+	data := backendinternal.ParseJSONMap(record.Get("data"))
+	if typeDef.Requires("description") && strings.TrimSpace(stringValue(data["description"])) == "" {
+		return fmt.Errorf("missing required field description")
 	}
 	if typeDef.Requires("group") && strings.TrimSpace(record.GetString("group")) == "" {
 		return fmt.Errorf("missing required field group")
@@ -350,19 +371,66 @@ func validateRecordRequirements(app *pocketbase.PocketBase, typeDef TypeDef, rec
 	return nil
 }
 
-func validateURL(raw string) error {
+func stringValue(raw any) string {
+	if value, ok := raw.(string); ok {
+		return value
+	}
+	return ""
+}
+
+func hasTimeComponent(raw string) bool {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return fmt.Errorf("empty")
+		return false
 	}
-	parsed, err := url.ParseRequestURI(raw)
+	return strings.Contains(raw, "T") || strings.Contains(raw, " ")
+}
+
+func validateURL(raw string) error {
+	_, err := normalizeURL(raw)
+	return err
+}
+
+func normalizeURL(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", fmt.Errorf("empty")
+	}
+	parsed, err := url.Parse(raw)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if parsed.Scheme == "" || parsed.Host == "" {
-		return fmt.Errorf("missing scheme or host")
+		return "", fmt.Errorf("missing scheme or host")
 	}
-	return nil
+	scheme := strings.ToLower(parsed.Scheme)
+	if scheme != "http" && scheme != "https" {
+		return "", fmt.Errorf("unsupported scheme %q", parsed.Scheme)
+	}
+	host := strings.ToLower(strings.TrimSpace(parsed.Hostname()))
+	if host == "" {
+		return "", fmt.Errorf("missing host")
+	}
+	if !isAllowedURLHost(host) {
+		return "", fmt.Errorf("invalid host %q", host)
+	}
+	parsed.Scheme = scheme
+	if port := parsed.Port(); port != "" {
+		parsed.Host = net.JoinHostPort(host, port)
+	} else {
+		parsed.Host = host
+	}
+	return parsed.String(), nil
+}
+
+func isAllowedURLHost(host string) bool {
+	if host == "localhost" {
+		return true
+	}
+	if strings.Contains(host, ".") {
+		return true
+	}
+	return net.ParseIP(host) != nil
 }
 
 func generateSlug(eventType string, date time.Time) string {

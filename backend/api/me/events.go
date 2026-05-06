@@ -96,10 +96,15 @@ func EventGetHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) erro
 		if cfg, err := eventinternal.LoadConfig(app); err == nil {
 			eventinternal.ApplyTypeConfig(&item, cfg)
 		}
+		canEdit, err := eventinternal.CanEdit(app, authRecord, event)
+		if err != nil {
+			return apis.NewBadRequestError("failed_event_edit_check", err)
+		}
 		occurrences, _ := eventinternal.OccurrencesFor(event)
 		return e.JSON(http.StatusOK, map[string]any{
 			"event":                   item,
 			"occurrences":             occurrences,
+			"can_edit":                canEdit,
 			"registered":              registered,
 			"registrations":           attendees,
 			"pending_registrations":   []any{},

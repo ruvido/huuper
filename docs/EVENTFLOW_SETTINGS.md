@@ -26,6 +26,8 @@ application capabilities. They are intentionally not configured here.
 - `group`: group relation. When present on an event, visibility is limited to
   members of that group.
 - `end_date`: end datetime, useful for multi-day events.
+- `time`: start time.
+- `description`: event description.
 
 Unknown fields in `required` are ignored and logged by the backend.
 
@@ -55,7 +57,9 @@ Unknown fields in `required` are ignored and logged by the backend.
         "url": true,
         "location": false,
         "group": false,
-        "end_date": false
+        "end_date": false,
+        "time": true,
+        "description": false
       },
       "registration": {
         "enabled": true,
@@ -72,7 +76,9 @@ Unknown fields in `required` are ignored and logged by the backend.
         "url": false,
         "location": true,
         "group": false,
-        "end_date": false
+        "end_date": false,
+        "time": false,
+        "description": false
       },
       "registration": {
         "enabled": true,

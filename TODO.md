@@ -3,9 +3,9 @@
 X save draft
 X duplicate
 X icona freccia su next (fulmine solo alla fine)
-X invece che "+" "crea nuovo piano" in evidenza (se c'e' draft => modifica draft)
+X invece che "+" "crea nuovo piano" in evidenza 
+X note per il piano
 - set end date
-- note per il piano
 - icona "libro" per link alla pagina pdb
 - spazio in alto sopra al titolo buggy!
 - reminder in request a 7gg e 1gg dalla scadenza (anche un celebrate!)

@@ -42,30 +42,17 @@ Stato della migrazione del modello eventi (call/meetup, drop rally, drop series,
 - **CSS spotlight** (`app.css`): padding simmetrico `var(--space-4)` + `align-content: center` per centrare verticalmente il contenuto. La classe `.list-item-spotlight` è la stessa per active battleplan e first-upcoming event (drop di `.battleplan-list-item-active` come classe duplicata).
 - **Pages templates**: `me/events/index.html` e `admin/events/index.html` includono `events-cadence.js` prima di `events-render.js`. La `status-list-content` template ha lo slot `SpotlightID` opzionale per il primo upcoming.
 - **Wizard settings-driven** (`frontend/skeleton/assets/js/me/events-wizard*.js`): legge tipi/label/description/required da `settings.eventflow.types`, filtra via `creators`, invia `{type,start_date,cadence,count,end_date,location,url,title,group,data}` e non usa piu' `dates[]`/`series`.
+- **Detail occurrences** (`frontend/skeleton/assets/js/components/event-detail.js` + detail templates): render `payload.occurrences`, mostra cancelled/past, espone "Cancel this one" solo con `can_edit`, chiama `POST /api/{scope}/events/{id}/cancel-occurrence`, e il cancel totale non invia piu' `scope`.
 
 ### ⏳ Da fare
 
-#### #25 — Detail page: occurrences + per-occurrence cancel
+#### #26 — End-to-end smoke + polish
 
-**Scope**: `frontend/skeleton/me/event/index.html` + `frontend/skeleton/admin/event/index.html` + JS associati.
+**Scope**: verifica manuale dei flussi eventi ricorrenti e piccoli fix emersi dal giro browser.
 
 **Task**:
-- Render della sezione "Occurrences": legge `payload.occurrences` (array `{date, cancelled, past}`) dal detail endpoint.
-- Per ogni occorrenza FUTURA non-cancellata: bottone **"Cancel this one"** → `POST /api/{scope}/events/{id}/cancel-occurrence` con `{"date": "2026-05-11"}`. Refresh del detail.
-- Le occorrenze cancellate → mostrate con stile barrato/grigio + label "cancelled".
-- Le past → solo informative, niente bottoni.
-- Bottone esistente "Cancel" (delete record) → resta. Nessun più scope picker (this/all/future) nel cancel flow.
-- Copy keys da aggiungere in `frontend/skeleton/copy/events.js`:
-  - `detail.occurrencesLabel`: "Occurrences"
-  - `detail.cancelOccurrenceLabel`: "Cancel this one"
-  - `detail.cancelledLabel`: "Cancelled"
-  - `detail.cancelOccurrenceConfirm.title`: "Cancel this occurrence?"
-  - ... (e altre per il flow)
-
-**Affected files**:
-- `frontend/skeleton/assets/js/me/event-detail.js` (probabilmente esiste, da estendere)
-- `frontend/skeleton/assets/js/admin/event-detail.js` o equivalente
-- `frontend/skeleton/copy/events.js` (nuovi key)
+- Eseguire la verifica end-to-end sotto.
+- Sistemare eventuali dettagli di render/UX trovati nel detail/list/wizard.
 
 ## Note implementative
 

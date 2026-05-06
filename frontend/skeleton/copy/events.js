@@ -30,17 +30,18 @@ window.appCopy = Object.assign({}, window.appCopy || {}, {
       registerError: "Could not register.",
       unregisterError: "Could not unregister.",
       attendanceError: "Could not update attendance.",
+      occurrencesLabel: "Occurrences",
+      cancelOccurrenceLabel: "Cancel this one",
+      cancelledLabel: "Cancelled",
+      pastLabel: "Past",
+      cancelOccurrenceConfirm: {
+        title: "Cancel this occurrence?",
+        confirmLabel: "Cancel occurrence",
+      },
       cancelDialog: {
         title: "Cancel this event?",
         confirmLabel: "Cancel event",
         cancelLabel: "Keep event",
-      },
-    },
-    cancel: {
-      scopeLabels: {
-        this: "Only this occurrence",
-        future: "This and future events",
-        all: "All events",
       },
     },
     wizard: {
@@ -130,6 +131,9 @@ window.appCopy = Object.assign({}, window.appCopy || {}, {
         typeInvalid: "Invalid event type.",
         groupRequired: "Pick a group.",
         startDateRequired: "Pick a start date.",
+        startDateInvalid: "Start date must be valid.",
+        timeRequired: "Pick a start time.",
+        timeInvalid: "Time must be valid.",
         endDateRequired: "Pick an end date.",
         endDateInvalid: "End date must be valid.",
         endDateBeforeStart: "End date must be after start date.",
@@ -140,6 +144,7 @@ window.appCopy = Object.assign({}, window.appCopy || {}, {
         titleRequired: "Title is required for this event type.",
         locationRequired: "Location is required for this event type.",
         urlRequired: "Link is required for this event type.",
+        descriptionRequired: "Description is required for this event type.",
         urlInvalid: "Link must be a valid URL.",
         saveFailed: "Save failed. Try again.",
         noAllowedTypes: "You can't create any event type.",

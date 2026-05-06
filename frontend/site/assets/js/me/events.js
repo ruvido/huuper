@@ -2,9 +2,7 @@
 // renders list items via appMeEventsList.render, and wires the
 // future/past window switcher tabs.
 //
-// TODO: wizard for create/edit/cancel-with-scope is OUT OF SCOPE for this
-// round — see the events backend (api/me/events.go) for the existing
-// endpoints we'll wire next round.
+// TODO: deeper edit flows are handled by the shared events wizard.
 (() => {
   if (!window.appEntityList || !window.appAuth || !window.appListPage) {
     return;

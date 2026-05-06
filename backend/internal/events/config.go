@@ -106,7 +106,7 @@ func (t TypeDef) Requires(field string) bool {
 
 func isKnownRequiredField(field string) bool {
 	switch field {
-	case "title", "url", "location", "group", "end_date":
+	case "title", "url", "location", "group", "end_date", "time", "description":
 		return true
 	default:
 		return false

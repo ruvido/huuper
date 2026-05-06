@@ -34,6 +34,49 @@ window.appEventDetail = (() => {
     }
   }
 
+  function occurrenceDate(occurrence) {
+    const raw = String((occurrence && occurrence.date) || "").trim();
+    if (!raw) return "";
+    return raw.slice(0, 10);
+  }
+
+  function renderOccurrences(occurrences, canEdit) {
+    const c = detailCopy();
+    const esc = window.appListPage.escapeHTML;
+    const cad = window.appEventsCadence || {};
+    const items = Array.isArray(occurrences) ? occurrences : [];
+    if (items.length === 0) return "";
+    const rows = items.map((occurrence) => {
+      const date = occurrenceDate(occurrence);
+      const cancelled = occurrence && occurrence.cancelled === true;
+      const past = occurrence && occurrence.past === true;
+      const dateLabel = cad.shortDate ? cad.shortDate(date) : date;
+      const status = cancelled ? (c.cancelledLabel || "Cancelled") : (past ? (c.pastLabel || "Past") : "");
+      const action = canEdit && !cancelled && !past
+        ? `<button type="button" class="wizard-btn wizard-btn-outline" data-cancel-occurrence="${esc(date)}">${esc(c.cancelOccurrenceLabel || "Cancel this one")}</button>`
+        : "";
+      return `
+        <li class="event-occurrence-row${cancelled ? " event-occurrence-row-cancelled" : ""}${past ? " event-occurrence-row-past" : ""}">
+          <span class="event-occurrence-date">${esc(dateLabel || date)}</span>
+          ${status ? `<span class="event-occurrence-status">${esc(status)}</span>` : ""}
+          ${action ? `<span class="event-occurrence-action">${action}</span>` : ""}
+        </li>
+      `;
+    }).join("");
+    return `
+      <h3 class="event-occurrences-title">${esc(c.occurrencesLabel || "Occurrences")}</h3>
+      <ul class="event-occurrences-list">${rows}</ul>
+    `;
+  }
+
+  async function postCancelOccurrence(scope, eventID, date) {
+    return window.appAuth.apiFetch(`/api/${scope}/events/${encodeURIComponent(eventID)}/cancel-occurrence`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ date }),
+    });
+  }
+
   // Inserts (or returns the existing) host element used for the per-user
   // RSVP section (register/unregister buttons). Lives between the summary
   // card and the tabs section so it reads as the primary detail action.
@@ -210,6 +253,29 @@ window.appEventDetail = (() => {
     });
   }
 
+  function bindOccurrenceHandlers(host, state, eventID, refresh) {
+    host.querySelectorAll("button[data-cancel-occurrence]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const date = btn.getAttribute("data-cancel-occurrence") || "";
+        if (!date) return;
+        const c = detailCopy();
+        const dialog = c.cancelOccurrenceConfirm || {};
+        window.appActionSheet.open({
+          title: dialog.title || "Cancel this occurrence?",
+          actions: [],
+          footerAction: {
+            label: dialog.confirmLabel || c.cancelOccurrenceLabel || "Cancel this one",
+            tone: "danger",
+            onSelect: async () => {
+              await postCancelOccurrence(state.scope, eventID, date);
+              if (typeof refresh === "function") refresh();
+            },
+          },
+        });
+      });
+    });
+  }
+
   function init(config) {
     const summaryNode = document.querySelector("#event-summary");
     const topbarTitleNode = document.querySelector(".top-bar-title");
@@ -218,12 +284,13 @@ window.appEventDetail = (() => {
     const tabGuestsNode = document.querySelector("#event-tab-guests");
     const tabPendingNode = document.querySelector("#event-tab-pending");
     const registrationsNode = document.querySelector("#event-registrations");
+    const occurrencesNode = document.querySelector("#event-occurrences");
     const cancelledBlockNode = document.querySelector("#event-cancelled-block");
     const cancelledToggleNode = document.querySelector("#event-cancelled-toggle");
     const cancelledLabelNode = document.querySelector("#event-cancelled-label");
     const cancelledCountNode = document.querySelector("#event-cancelled-count");
     const cancelledListNode = document.querySelector("#event-cancelled-list");
-    if (!summaryNode || !tabsNode || !tabUsersNode || !tabGuestsNode || !tabPendingNode || !registrationsNode || !cancelledBlockNode || !cancelledToggleNode || !cancelledLabelNode || !cancelledCountNode || !cancelledListNode || !window.appAuth || !window.appListPage || !window.appEventSummary || !window.appListItem || !window.appActionSheet) {
+    if (!summaryNode || !occurrencesNode || !tabsNode || !tabUsersNode || !tabGuestsNode || !tabPendingNode || !registrationsNode || !cancelledBlockNode || !cancelledToggleNode || !cancelledLabelNode || !cancelledCountNode || !cancelledListNode || !window.appAuth || !window.appListPage || !window.appEventSummary || !window.appListItem || !window.appActionSheet) {
       return;
     }
 
@@ -254,8 +321,19 @@ window.appEventDetail = (() => {
       const past = isPastEvent(event);
       const scope = config.scope || "me";
       const canManage = config.canManageRegistrations === true;
+      const canEdit = payload.can_edit === true || config.canEdit === true;
       const registered = payload.registered === true;
       const state = { past, scope, canManage, registered, registrationEnabled: registrationEnabled(event) };
+
+      const occurrencesHTML = renderOccurrences(payload.occurrences, canEdit);
+      if (occurrencesHTML) {
+        occurrencesNode.innerHTML = occurrencesHTML;
+        occurrencesNode.hidden = false;
+        bindOccurrenceHandlers(occurrencesNode, state, id, load);
+      } else {
+        occurrencesNode.innerHTML = "";
+        occurrencesNode.hidden = true;
+      }
 
       const rsvpHost = ensureRsvpHost(summaryNode);
       const rsvpHTML = renderRsvpButtons(state);

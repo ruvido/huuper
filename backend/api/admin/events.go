@@ -49,6 +49,7 @@ func EventDetailsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) 
 		return e.JSON(http.StatusOK, map[string]any{
 			"event":                   item,
 			"occurrences":             occurrences,
+			"can_edit":                true,
 			"registrations":           attendees,
 			"pending_registrations":   pendingAttendees,
 			"cancelled_registrations": cancelledAttendees,

@@ -1,8 +1,7 @@
 // /admin/events list orchestrator. Same shape as /me/events: window
 // switcher tabs + async list refresh on tab change.
 //
-// TODO: wizard for create/edit/cancel-with-scope is OUT OF SCOPE for this
-// round.
+// TODO: deeper edit flows are handled by the shared events wizard.
 (() => {
   if (!window.appEntityList || !window.appAuth || !window.appListPage) {
     return;

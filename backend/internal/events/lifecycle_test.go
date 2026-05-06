@@ -58,6 +58,32 @@ func TestParseDate(t *testing.T) {
 	})
 }
 
+func TestNormalizeURL(t *testing.T) {
+	t.Run("normalizes valid web url", func(t *testing.T) {
+		got, err := normalizeURL(" HTTPS://Example.COM/path?q=1 ")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != "https://example.com/path?q=1" {
+			t.Fatalf("got %q", got)
+		}
+	})
+	t.Run("rejects single-label host", func(t *testing.T) {
+		if _, err := normalizeURL("HTTPS://ASDSD"); err == nil {
+			t.Fatalf("expected error")
+		}
+	})
+	t.Run("accepts localhost", func(t *testing.T) {
+		got, err := normalizeURL("http://localhost:3000")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != "http://localhost:3000" {
+			t.Fatalf("got %q", got)
+		}
+	})
+}
+
 func TestGenerateSlugFormat(t *testing.T) {
 	date := time.Date(2026, 5, 4, 0, 0, 0, 0, time.UTC)
 	a := generateSlug("call", date)
