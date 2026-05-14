@@ -468,7 +468,7 @@ func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 				promotedUserCreated = promoteResult.Created
 			}
 		case backendrequests.ActionReject:
-			if err := backendrequests.ApplyRejectAction(actor, record, data, strings.TrimSpace(payload.Reason)); err != nil {
+			if err := backendrequests.ApplyRejectAction(app, actor, record, data, strings.TrimSpace(payload.Reason)); err != nil {
 				return err
 			}
 		case backendrequests.ActionPromote:

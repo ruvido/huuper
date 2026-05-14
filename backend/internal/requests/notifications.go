@@ -39,6 +39,15 @@ type NotificationTemplate struct {
 	} `json:"telegram"`
 }
 
+type EmailDelivery struct {
+	Sent   int `json:"sent"`
+	Failed int `json:"failed"`
+}
+
+func (d EmailDelivery) Accepted() bool {
+	return d.Sent > 0 && d.Failed == 0
+}
+
 func NotifyNewRequest(app *pocketbase.PocketBase, record *core.Record, data map[string]any) {
 	template, found, err := loadNotificationTemplate(app, templateKindNewRequest)
 	if err != nil {
@@ -59,28 +68,29 @@ func NotifyNewRequest(app *pocketbase.PocketBase, record *core.Record, data map[
 	_, _ = sendNotificationEmail(app, []mail.Address{recipient}, template, values)
 }
 
-func NotifyRequestSubmitted(app *pocketbase.PocketBase, record *core.Record, data map[string]any) {
+func NotifyRequestSubmitted(app *pocketbase.PocketBase, record *core.Record, data map[string]any) EmailDelivery {
 	if record == nil {
-		return
+		return EmailDelivery{}
 	}
 
 	template, found, err := loadNotificationTemplate(app, templateKindRequestSubmitted)
 	if err != nil {
 		app.Logger().Warn("Failed to load request template", "kind", templateKindRequestSubmitted, "error", err)
-		return
+		return EmailDelivery{Failed: 1}
 	}
 	if !found {
-		return
+		return EmailDelivery{Failed: 1}
 	}
 
 	recipient, ok := backendinternal.ParseAddress(strings.TrimSpace(record.GetString("email")))
 	if !ok {
 		app.Logger().Warn("Missing request candidate email", "kind", templateKindRequestSubmitted, "request", record.Id)
-		return
+		return EmailDelivery{Failed: 1}
 	}
 
 	values := requestNotificationValues(app, record, data, nil, "", "", nil, nil, nil)
-	_, _ = sendNotificationEmail(app, []mail.Address{recipient}, template, values)
+	sent, failed := sendNotificationEmail(app, []mail.Address{recipient}, template, values)
+	return EmailDelivery{Sent: sent, Failed: failed}
 }
 
 func NotifyRequestStep(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any, step FlowStep) {

@@ -1,6 +1,8 @@
 package migrations
 
 import (
+	"strconv"
+
 	"github.com/pocketbase/pocketbase/core"
 	m "github.com/pocketbase/pocketbase/migrations"
 )
@@ -56,6 +58,7 @@ func init() {
 				value = "meetup"
 			}
 			record.Set("type", value)
+			record.Set("count", strconv.Itoa(snapCount(record.GetInt("count"))))
 			if err := app.Save(record); err != nil {
 				return err
 			}
@@ -75,13 +78,12 @@ func defaultEventflowV2() map[string]any {
 				"description": "Online call.",
 				"creators":    []string{"admin", "assistant"},
 				"required": map[string]bool{
-					"title":       false,
-					"url":         true,
-					"location":    false,
-					"group":       false,
-					"end_date":    false,
-					"time":        true,
-					"description": false,
+					"title":    true,
+					"url":      true,
+					"location": false,
+					"group":    false,
+					"end_date": false,
+					"time":     true,
 				},
 				"registration": map[string]bool{
 					"enabled":  true,
@@ -94,13 +96,11 @@ func defaultEventflowV2() map[string]any {
 				"description": "In-person meetup.",
 				"creators":    []string{"admin", "assistant"},
 				"required": map[string]bool{
-					"title":       false,
-					"url":         false,
-					"location":    true,
-					"group":       false,
-					"end_date":    false,
-					"time":        false,
-					"description": false,
+					"title":    false,
+					"url":      false,
+					"location": true,
+					"group":    false,
+					"end_date": false,
 				},
 				"registration": map[string]bool{
 					"enabled":  true,

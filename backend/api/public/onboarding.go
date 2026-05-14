@@ -94,9 +94,6 @@ func OnboardingCompleteHandler(app *pocketbase.PocketBase) func(e *core.RequestE
 		}
 
 		userData := backendinternal.ParseJSONMap(user.Get("data"))
-		if _, ok := userData["onboarding_password_set_at"]; ok {
-			return apis.NewBadRequestError("password_already_set", nil)
-		}
 
 		var payload struct {
 			Password        string `json:"password"`
@@ -258,7 +255,9 @@ func OnboardingFinalizeHandler(app *pocketbase.PocketBase) func(e *core.RequestE
 		}
 
 		existingData := backendinternal.ParseJSONMap(user.Get("data"))
-		user.Set("data", backendrequests.MergeUserData(existingData, data))
+		mergedData := backendrequests.MergeUserData(existingData, data)
+		mergedData["onboarding_completed_at"] = time.Now().UTC().Format(time.RFC3339)
+		user.Set("data", mergedData)
 		if err := app.Save(user); err != nil {
 			app.Logger().Error(
 				"[onboarding.finalize] save failed",

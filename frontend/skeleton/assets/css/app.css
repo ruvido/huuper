@@ -353,12 +353,6 @@ body:has(.top-bar-detail-page) .bottom-nav {
   letter-spacing: -0.04em;
 }
 
-.topbar-meta-badge {
-  min-height: var(--topbar-badge-height);
-  height: var(--topbar-badge-height);
-  padding: 0 var(--topbar-badge-padding-inline);
-}
-
 .topbar-avatar-image {
   display: block;
   width: var(--avatar-sm);
@@ -620,7 +614,7 @@ body:has(.top-bar-detail-page) .bottom-nav {
 }
 
 .onboarding-topbar-error[hidden] {
-  display: block !important;
+  display: grid;
   visibility: hidden;
 }
 
@@ -778,6 +772,207 @@ body:has(.top-bar-detail-page) .bottom-nav {
   position: relative;
 }
 
+.public-request-otp {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  text-align: center;
+  justify-items: center;
+}
+
+.public-request-otp-label {
+  justify-self: center;
+}
+
+.public-request-otp-change {
+  align-self: start;
+  margin-top: var(--space-1);
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: var(--font-ui-xs);
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
+}
+
+.public-request-otp-control {
+  position: relative;
+  width: max-content;
+  max-width: 100%;
+}
+
+.public-request-otp-input {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  opacity: 0;
+}
+
+.public-request-otp-slots {
+  display: grid;
+  grid-template-columns: repeat(4, clamp(44px, 12vw, 52px));
+  gap: var(--space-2);
+  justify-content: center;
+  width: max-content;
+}
+
+.public-request-otp-slot {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border: 1px solid var(--line);
+  background: rgba(18, 18, 14, 0.66);
+  color: var(--text);
+  font-size: var(--font-ui-lg);
+  font-weight: 800;
+  border-radius: var(--radius-sm);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.public-request-otp-slot.is-filled {
+  border-color: var(--accent);
+}
+
+.public-request-otp-control:focus-within .public-request-otp-slot.is-current {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.public-request-otp-email-muted,
+.public-request-otp-email-muted:disabled {
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--line);
+  opacity: 0.6;
+  cursor: not-allowed;
+  -webkit-text-fill-color: var(--text-muted);
+}
+
+.public-request-otp-email-muted:focus {
+  border-color: var(--line);
+  box-shadow: none;
+}
+
+.public-request-otp .public-request-subtitle {
+  text-align: center;
+}
+
+.public-request-otp-state {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-height: clamp(44px, 12vw, 52px);
+}
+
+.public-request-otp.is-verifying .public-request-otp-slots,
+.public-request-otp.is-verified .public-request-otp-slots {
+  display: none;
+}
+
+.public-request-otp.is-verifying .public-request-otp-input,
+.public-request-otp.is-verified .public-request-otp-input {
+  pointer-events: none;
+}
+
+.public-request-otp.is-verifying .public-request-otp-state,
+.public-request-otp.is-verified .public-request-otp-state {
+  display: flex;
+}
+
+.public-request-otp-spinner {
+  display: none;
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--line);
+  border-top-color: var(--text);
+  border-radius: 50%;
+  animation: public-request-otp-spin 0.7s linear infinite;
+}
+
+.public-request-otp.is-verifying .public-request-otp-spinner {
+  display: inline-block;
+}
+
+.public-request-otp-check {
+  display: none;
+  width: 40px;
+  height: 40px;
+  color: #22c55e;
+}
+
+.public-request-otp.is-verified .public-request-otp-check {
+  display: inline-block;
+  animation: public-request-otp-check-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes public-request-otp-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes public-request-otp-check-pop {
+  0% { transform: scale(0); opacity: 0; }
+  60% { transform: scale(1.25); opacity: 1; }
+  80% { transform: scale(0.92); }
+  100% { transform: scale(1); }
+}
+
+.public-request-success-stack {
+  text-align: center;
+  align-items: center;
+}
+
+.public-request-success-check {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--space-6);
+  color: #22c55e;
+  animation: public-request-success-pop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.public-request-success-check svg {
+  width: 96px;
+  height: 96px;
+}
+
+@keyframes public-request-success-pop {
+  0% { transform: scale(0); opacity: 0; }
+  55% { transform: scale(1.3); opacity: 1; }
+  75% { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+
+.public-request-otp-resend {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: var(--font-ui-xs);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.public-request-otp-resend:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.public-request-otp-resend.is-loading {
+  opacity: 0.7;
+}
+
+.onboarding-topbar-next.request-action-loading {
+  --spinner-color: #16130a;
+}
+
 .public-request-password-heading {
   display: grid;
   gap: var(--space-1);
@@ -813,7 +1008,7 @@ body:has(.top-bar-detail-page) .bottom-nav {
 }
 
 .public-request-field-error[hidden] {
-  display: block !important;
+  display: block;
   visibility: hidden;
 }
 
@@ -823,11 +1018,23 @@ body:has(.top-bar-detail-page) .bottom-nav {
 }
 
 .public-request-password-error {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(100% + var(--space-2));
   margin: 0;
+  min-height: 4rem;
+  color: var(--danger-muted);
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  text-align: left;
+  display: block;
+}
+
+.public-request-password-error,
+.public-request-password-error.meta-text,
+.public-request-password-error.meta-text.is-error {
+  font-size: var(--font-ui-xs);
+}
+
+.public-request-password-error:empty {
+  visibility: hidden;
 }
 
 .public-request-copy {
@@ -1158,13 +1365,7 @@ body:has(.top-bar-detail-page) .bottom-nav {
 }
 
 #public-request-status {
-  min-height: calc(2 * 1.35em);
   text-align: center;
-}
-
-#public-request-status[hidden] {
-  display: block !important;
-  visibility: hidden;
 }
 
 .empty-state {
@@ -2637,6 +2838,42 @@ body.request-page .request-workflow-card .action-row .primary {
   gap: var(--space-2);
 }
 
+.request-bottom-actions-row:has(.request-cancel-inline) {
+  grid-template-columns: var(--button-height-md) minmax(0, 1fr);
+}
+
+.request-cancel-inline {
+  display: inline-grid;
+  place-items: center;
+  width: var(--button-height-md);
+  height: var(--button-height-md);
+  padding: 0;
+  border: 1px solid rgba(239, 68, 68, 0.46);
+  border-radius: var(--button-radius-md);
+  background: rgba(239, 68, 68, 0.1);
+  color: rgb(248, 113, 113);
+}
+
+.request-cancel-inline svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  fill: currentColor;
+}
+
+.request-alert-badge {
+  display: inline-grid;
+  place-items: center;
+  width: var(--icon-md);
+  height: var(--icon-md);
+  color: rgb(248, 113, 113);
+}
+
+.request-alert-badge svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  fill: currentColor;
+}
+
 .request-note-sheet-field {
   display: grid;
   gap: 0;
@@ -2884,6 +3121,16 @@ body.request-page {
 
 .dashboard-title a {
   text-decoration: none;
+}
+
+.dashboard-title-comingsoon {
+  display: inline-block;
+  margin-left: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--font-ui-s);
+  font-weight: 600;
+  letter-spacing: 0;
+  white-space: nowrap;
 }
 
 .dashboard-block {
@@ -3284,6 +3531,11 @@ body.has-section-banner .app-shell {
   gap: var(--space-2);
 }
 
+.step-progress.step-progress-aside-only > .step-progress-meta,
+.step-progress.step-progress-aside-only > .step-progress-bar {
+  display: none;
+}
+
 .step-progress-aside-controls .segmented {
   width: 100%;
 }
@@ -3293,7 +3545,53 @@ body.has-section-banner .app-shell {
 }
 
 .step-progress-visibility-options {
-  grid-column: span 2;
+  grid-column: 4 / span 2;
+}
+
+.wizard-end-date-presets {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 4px;
+}
+
+.wizard-end-date-presets .segmented-option {
+  min-height: var(--button-height-md);
+  border: 1px solid var(--line);
+  background: rgba(18, 18, 14, 0.66);
+}
+
+.wizard-end-date-custom {
+  border: 1px solid var(--line);
+  background: rgba(18, 18, 14, 0.66);
+  padding: 4px;
+  cursor: text;
+}
+
+.wizard-end-date-custom > input[type="radio"] {
+  display: none;
+}
+
+.wizard-end-date-custom > input[type="text"] {
+  width: 100%;
+  min-height: var(--button-height-md);
+  border: 0;
+  padding: 0 var(--space-2);
+  margin: 0;
+  background: transparent;
+  color: var(--accent);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: var(--font-ui-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+  outline: none;
+}
+
+.wizard-end-date-custom > input[type="text"]::placeholder {
+  color: var(--text-faint);
+  font-weight: 700;
 }
 
 .step-progress-aside .segmented {
@@ -3674,7 +3972,7 @@ textarea.field-input {
 }
 
 .wizard-page.wizard-page-has-progress {
-  padding-top: var(--space-16);
+  padding-top: var(--space-4);
 }
 
 .wizard-page.wizard-page-confirm {
@@ -3752,11 +4050,7 @@ textarea.field-input {
 }
 
 .wizard-step-priority {
-  padding-top: var(--space-32);
-}
-
-.wizard-step-priority .wizard-step-header + div {
-  margin-top: var(--space-5);
+  padding-top: 0;
 }
 
 .wizard-step-confirm {
@@ -4387,6 +4681,14 @@ textarea.field-input {
   gap: var(--space-2);
 }
 
+#events-new-cta {
+  background: var(--button-primary-text);
+  color: var(--accent);
+  border-color: var(--accent);
+  box-shadow: none;
+  --spinner-color: var(--accent);
+}
+
 .battleplan-section {
   display: grid;
   gap: var(--space-2);
@@ -4707,4 +5009,462 @@ textarea.field-input {
   margin: 0;
   font-weight: 600;
   color: var(--text-muted);
+}
+
+/* === Mockup design system ===
+   Stack-only model (modern Tailwind/Radix/Linear approach).
+   ONE layout primitive: .mockup-stack with 5 size variants.
+   Components NEVER have outer margin. Padding only on visual "shells".
+   All vertical rhythm flows from stack gap. No mixing margin+gap+padding
+   on the same axis. */
+
+/* --- Layout primitive (the only one) --- */
+.mockup-stack {
+  display: flex;
+  flex-direction: column;
+}
+.mockup-stack-xs { gap: var(--space-1); }  /*  4px — label+caption */
+.mockup-stack-sm { gap: var(--space-2); }  /*  8px — hero internals */
+.mockup-stack-md { gap: var(--space-3); }  /* 12px — section internals */
+.mockup-stack-lg { gap: var(--space-4); }  /* 16px — card internals */
+.mockup-stack-xl { gap: var(--space-6); }  /* 24px — page rhythm */
+
+/* --- Typography (margin: 0 — rhythm comes from parent stack) --- */
+.mockup-display {
+  margin: 0;
+  font-size: var(--type-display-size);
+  line-height: 0.95;
+  letter-spacing: var(--type-display-letter-spacing);
+  font-weight: 800;
+  color: var(--text);
+}
+
+.mockup-card-title {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.mockup-section-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.mockup-section-count {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.mockup-label {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.mockup-quote {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: 14px;
+  font-style: italic;
+  line-height: 1.5;
+}
+
+/* --- Inline composites (icon + text on one line) --- */
+.mockup-meta {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+.mockup-meta svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: currentColor;
+}
+
+/* --- Chips (also reusable as status tags) --- */
+.mockup-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.mockup-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  background: transparent;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* --- Visual shells (own padding/border — wrap content in a stack) --- */
+.mockup-card {
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.mockup-link-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.mockup-link-row-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.mockup-link-row-value {
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+
+/* --- Horizontal row utility (title + count / left + right) --- */
+.mockup-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+/* --- Buttons --- */
+.mockup-actions {
+  display: flex;
+  gap: var(--space-3);
+}
+.mockup-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: 42px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+.mockup-btn-primary {
+  background: var(--accent);
+  color: var(--button-primary-text);
+}
+.mockup-btn svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: currentColor;
+}
+
+/* --- Tabs --- */
+.mockup-tabs {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.mockup-tabs::-webkit-scrollbar {
+  display: none;
+}
+.mockup-tab {
+  flex: none;
+  height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.mockup-tab-current {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--button-primary-text);
+}
+
+/* --- Vertical list (rows separated by borders) --- */
+.mockup-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+}
+.mockup-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--line);
+}
+.mockup-row-muted .mockup-row-title,
+.mockup-row-muted .mockup-row-sub {
+  color: var(--text-muted);
+}
+.mockup-row-main {
+  flex: 1;
+  min-width: 0;
+}
+.mockup-row-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+.mockup-row-sub {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* --- Avatar --- */
+.mockup-avatar {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+/* === Mockup v2 — Option B: editorial, no-shell ===
+   Strategy declared once, applied everywhere. No exceptions.
+
+   1. LAYOUT — one primitive: .m2-stack (flex column) with four gap sizes.
+      Geometric scale, each ~2x the previous, so hierarchy is unmistakable:
+        tight  4px   info that form a single unit (label + value)
+        close 12px   related siblings (heading → lead, eyebrow → content)
+        loose 24px   groups within a section (h2 → content, h2 → actions)
+        major 48px   page rhythm (section → section)
+
+   2. NO SHELLS — zero borders, zero card backgrounds, zero padding-y on
+      containers. The only "decorated" component is the primary button.
+
+   3. NO MARGINS — every text element is margin: 0. Vertical rhythm comes
+      exclusively from stack gaps. Margin + gap on the same axis = forbidden.
+
+   4. HIERARCHY VIA TYPE — display / lead / h2 / eyebrow / body / meta / mono.
+      Color does secondary work: text → text-muted → text-faint. */
+
+.m2-stack {
+  display: flex;
+  flex-direction: column;
+}
+.m2-stack-tight { gap: 4px; }
+.m2-stack-close { gap: 12px; }
+.m2-stack-loose { gap: 24px; }
+.m2-stack-major { gap: 48px; }
+
+.m2-kicker {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.m2-display {
+  margin: 0;
+  font-size: clamp(2.45rem, 7.8vw, 3.7rem);
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.m2-lead {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.5;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.m2-h2 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.m2-eyebrow {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.m2-body {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.m2-body-strong {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.m2-meta {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.m2-mono {
+  margin: 0;
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+
+.m2-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.m2-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: var(--button-height-md);
+  padding: 0 var(--button-padding-inline-md);
+  border: 0;
+  background: var(--accent);
+  color: var(--button-primary-text);
+  font: inherit;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.m2-btn-ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+
+.m2-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.m2-line svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  fill: currentColor;
+  color: var(--text-faint);
+}
+
+/* Sole exception to no-shell rule: the CTA card.
+   Centered, narrower than page, decorated — exactly because it's the
+   one element that should pull the eye to the action. */
+.m2-card {
+  align-self: center;
+  width: 100%;
+  max-width: 280px;
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  text-align: center;
+}
+
+.m2-tabs {
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.m2-tabs::-webkit-scrollbar {
+  display: none;
+}
+.m2-tab {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.m2-tab-current {
+  color: var(--accent);
+}
+
+.m2-listing {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.m2-listing-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+.m2-listing-meta {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-faint);
+}
+.m2-listing-muted .m2-listing-name {
+  color: var(--text-muted);
+  font-weight: 500;
 }

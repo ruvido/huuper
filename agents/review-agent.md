@@ -25,10 +25,12 @@ Se `frontend/site` e' stato editato a mano, la review fallisce.
 - action row duplicata?
 - list row duplicata?
 - layout pagina duplicato?
+- testo user-facing hardcodato fuori da `frontend/skeleton/copy/*`, `backend/internal/copywriting/` o settings?
 - una singola pagina dettaglio fa 2 o piu' chiamate correlate che il backend potrebbe aggregare?
 - il backend ha reintrodotto file-frammento con naming tecnico rumoroso invece di file di dominio?
 
 Se la stessa struttura e' copiata in piu' pagine senza motivo forte, la review fallisce.
+Se il testo user-facing e' hardcodato in componenti, template, JS o handler, la review fallisce.
 Se una pagina dettaglio duplica composizione dati lato frontend invece di usare un endpoint backend chiaro, la review fallisce.
 Se il backend spezza un dominio in file tipo `_get`, `_list`, `_handler` senza motivo forte, la review fallisce.
 
@@ -68,6 +70,7 @@ La review deve dare:
 Una task frontend e' chiudibile solo se:
 - niente edit manuali in `frontend/site`
 - niente duplicazione strutturale evitabile
+- niente testo user-facing hardcodato fuori da `frontend/skeleton/copy/*`, `backend/internal/copywriting/` o settings
 - nessuna feature inventata
 - wireframe sobrio
 - pagine aderenti ai flussi reali

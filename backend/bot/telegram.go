@@ -293,7 +293,7 @@ func handleChatJoinRequest(request *tgbotapi.ChatJoinRequest) {
 		return
 	}
 
-	user, err := tginternal.ConsumeMemberInvite(app, inviteLink)
+	user, resolvedInviteLink, err := tginternal.ResolveMemberInviteForChat(app, inviteLink, request.Chat.ID)
 	if err != nil {
 		log.Printf("Failed to resolve invite link %q: %v", inviteLink, err)
 		notifyJoinFailure("resolve invite link", request, inviteLink, nil, err)
@@ -302,6 +302,9 @@ func handleChatJoinRequest(request *tgbotapi.ChatJoinRequest) {
 	}
 
 	telegramData := backendinternal.ParseJSONMap(user.Get("telegram"))
+	if telegramData == nil {
+		telegramData = map[string]any{}
+	}
 	telegramData["id"] = request.From.ID
 	if username := strings.TrimSpace(request.From.UserName); username != "" {
 		telegramData["username"] = username
@@ -312,7 +315,7 @@ func handleChatJoinRequest(request *tgbotapi.ChatJoinRequest) {
 	if lastName := strings.TrimSpace(request.From.LastName); lastName != "" {
 		telegramData["last_name"] = lastName
 	}
-	telegramData["invite_link"] = inviteLink
+	telegramData["invite_link"] = resolvedInviteLink
 	user.Set("telegram", telegramData)
 	if err := app.Save(user); err != nil {
 		log.Printf("Failed to save Telegram data for user %s: %v", user.Id, err)
@@ -331,11 +334,17 @@ func handleChatJoinRequest(request *tgbotapi.ChatJoinRequest) {
 		return
 	}
 
-	if _, err := bot.Request(tgbotapi.RevokeChatInviteLinkConfig{
-		ChatConfig: tgbotapi.ChatConfig{ChatID: request.Chat.ID},
-		InviteLink: inviteLink,
-	}); err != nil {
-		log.Printf("Failed to revoke invite link %q for chat %d: %v", inviteLink, request.Chat.ID, err)
+	if err := tginternal.DeleteInviteTokenByLink(app, resolvedInviteLink); err != nil {
+		log.Printf("Failed to delete invite token %q after approving chat join request for user %d in chat %d: %v", resolvedInviteLink, request.From.ID, request.Chat.ID, err)
+	}
+
+	if resolvedInviteLink == inviteLink {
+		if _, err := bot.Request(tgbotapi.RevokeChatInviteLinkConfig{
+			ChatConfig: tgbotapi.ChatConfig{ChatID: request.Chat.ID},
+			InviteLink: inviteLink,
+		}); err != nil {
+			log.Printf("Failed to revoke invite link %q for chat %d: %v", inviteLink, request.Chat.ID, err)
+		}
 	}
 
 	syncUserGroupRecord(user, request.Chat.ID, "member")

@@ -17,20 +17,30 @@ import (
 type Input struct {
 	StartDate    string `json:"start_date"`
 	DurationDays int    `json:"duration_days"`
+	EndDate      string `json:"end_date,omitempty"`
 	Visibility   string `json:"visibility"`
 	Status       string `json:"status,omitempty"`
 	Data         Data   `json:"data"`
 }
 
 func validateInput(in Input, cfg *Config) error {
-	if !cfg.IsValidDuration(in.DurationDays) {
+	start, err := parseDate(in.StartDate)
+	if err != nil {
+		return fmt.Errorf("invalid start_date")
+	}
+	if strings.TrimSpace(in.EndDate) != "" {
+		end, err := parseDate(in.EndDate)
+		if err != nil {
+			return fmt.Errorf("invalid end_date")
+		}
+		if !end.After(start) {
+			return fmt.Errorf("end_date must be after start_date")
+		}
+	} else if !cfg.IsValidDuration(in.DurationDays) {
 		return fmt.Errorf("duration_days must be one of the configured values")
 	}
 	if !cfg.IsValidVisibility(in.Visibility) {
 		return fmt.Errorf("invalid visibility")
-	}
-	if _, err := parseDate(in.StartDate); err != nil {
-		return fmt.Errorf("invalid start_date")
 	}
 	return validateData(in.Data, cfg)
 }
@@ -117,7 +127,12 @@ func Create(app *pocketbase.PocketBase, userID string, in Input) (*core.Record, 
 	}
 
 	start, _ := parseDate(in.StartDate)
-	end := start.AddDate(0, 0, in.DurationDays)
+	var end time.Time
+	if strings.TrimSpace(in.EndDate) != "" {
+		end, _ = parseDate(in.EndDate)
+	} else {
+		end = start.AddDate(0, 0, in.DurationDays)
+	}
 
 	collection, err := app.FindCollectionByNameOrId("battleplans")
 	if err != nil {

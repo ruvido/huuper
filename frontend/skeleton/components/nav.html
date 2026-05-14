@@ -30,10 +30,6 @@
     {{ template "icon-groups" . }}
     <span>Groups</span>
   </a>
-  <a class="nav-item{{ if eq .ActiveNav "events" }} nav-item-current{{ end }}" href="/me/events/">
-    {{ template "icon-events" . }}
-    <span>Events</span>
-  </a>
   <a class="nav-item{{ if eq .ActiveNav "requests" }} nav-item-current{{ end }}" href="/me/requests/">
     {{ template "icon-requests" . }}
     <span>Requests</span>

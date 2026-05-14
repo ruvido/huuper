@@ -46,6 +46,7 @@ Linee guida minime per contribuire al progetto in modo coerente, semplice e mant
 - Il frontend v2 ha watch e live reload attivi: dopo le modifiche a `frontend/skeleton`, l'output si rigenera automaticamente. Non ripetere istruzioni su rebuild manuale salvo blocco esplicito.
 - L'archivio del vecchio frontend Svelte vive in `archive/frontend-svelte/` e non fa parte del path attivo.
 - Usare CSS semantico e componenti/template chiari.
+- Non hardcodare mai testo user-facing dentro componenti, template, JS o handler: il copy frontend deve stare in `frontend/skeleton/copy/*`; il copy backend deve stare in `backend/internal/copywriting/` (per request: `backend/internal/copywriting/requests/`) o arrivare da settings.
 - Il primo obiettivo frontend v2 e' wireframing funzionale, non design finale.
 - Il dev mode deve restare semplice e trasparente, con watcher/build standard e senza automazioni opache.
 - Per il frontend v2 valgono anche `agents/frontend-agent.md` e `agents/review-agent.md`.

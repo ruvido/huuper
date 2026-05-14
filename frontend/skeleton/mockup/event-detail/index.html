@@ -1,0 +1,105 @@
+{{ define "content" }}
+<section class="mockup-stack mockup-stack-xl">
+
+  <header class="mockup-stack mockup-stack-sm">
+    <div class="mockup-chips">
+      <span class="mockup-chip">Call</span>
+      <span class="mockup-chip">Gruppo Roma</span>
+    </div>
+    <h1 class="mockup-display">Call settimanale</h1>
+    <p class="mockup-quote">Apriamo il mese con un check-in di gruppo. Portate appunti dalla settimana.</p>
+  </header>
+
+  <article class="mockup-card">
+    <div class="mockup-stack mockup-stack-md">
+      <h2 class="mockup-card-title">Will you be there?</h2>
+      <div class="mockup-stack mockup-stack-xs">
+        <p class="mockup-label">Mon 11 May 2026 · Weekly × 3</p>
+        <p class="mockup-meta">{{ template "icon-geo-alt" . }}<span>Roma, online</span></p>
+      </div>
+      <div class="mockup-actions">
+        <button class="mockup-btn" type="button">{{ template "icon-x-circle" . }}<span>No</span></button>
+        <button class="mockup-btn mockup-btn-primary" type="button">{{ template "icon-check" . }}<span>Yes</span></button>
+      </div>
+    </div>
+  </article>
+
+  <div class="mockup-link-row">
+    <span class="mockup-link-row-label">Link</span>
+    <span class="mockup-link-row-value">huuper.app/c/abc-123</span>
+  </div>
+
+  <section class="mockup-stack mockup-stack-md">
+    <header class="mockup-section-head">
+      <h3 class="mockup-section-title">Occurrences</h3>
+      <span class="mockup-section-count">3</span>
+    </header>
+    <ul class="mockup-list">
+      <li class="mockup-row">
+        <div class="mockup-row-main mockup-stack mockup-stack-xs">
+          <p class="mockup-row-title">Mon 11 May 2026</p>
+          <p class="mockup-row-sub">21:00 · Roma, online</p>
+        </div>
+        <span class="mockup-chip">Next</span>
+      </li>
+      <li class="mockup-row mockup-row-muted">
+        <div class="mockup-row-main mockup-stack mockup-stack-xs">
+          <p class="mockup-row-title">Mon 18 May 2026</p>
+          <p class="mockup-row-sub">21:00 · Roma, online</p>
+        </div>
+      </li>
+      <li class="mockup-row mockup-row-muted">
+        <div class="mockup-row-main mockup-stack mockup-stack-xs">
+          <p class="mockup-row-title">Mon 25 May 2026</p>
+          <p class="mockup-row-sub">21:00 · Roma, online</p>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <section class="mockup-stack mockup-stack-md">
+    <header class="mockup-section-head">
+      <h3 class="mockup-section-title">Attendees</h3>
+      <span class="mockup-section-count">6</span>
+    </header>
+    <nav class="mockup-tabs">
+      <button class="mockup-tab mockup-tab-current" type="button">Going · 4</button>
+      <button class="mockup-tab" type="button">Pending · 1</button>
+      <button class="mockup-tab" type="button">Out · 1</button>
+    </nav>
+    <ul class="mockup-list">
+      <li class="mockup-row">
+        <span class="mockup-avatar">MR</span>
+        <div class="mockup-row-main mockup-stack mockup-stack-xs">
+          <p class="mockup-row-title">Marco Rossi</p>
+          <p class="mockup-row-sub">Confirmed · 2h ago</p>
+        </div>
+      </li>
+      <li class="mockup-row">
+        <span class="mockup-avatar">LB</span>
+        <div class="mockup-row-main mockup-stack mockup-stack-xs">
+          <p class="mockup-row-title">Luca Bianchi</p>
+          <p class="mockup-row-sub">Confirmed · yesterday</p>
+        </div>
+      </li>
+      <li class="mockup-row">
+        <span class="mockup-avatar">DV</span>
+        <div class="mockup-row-main mockup-stack mockup-stack-xs">
+          <p class="mockup-row-title">Davide Verdi</p>
+          <p class="mockup-row-sub">Confirmed · 3d ago</p>
+        </div>
+      </li>
+      <li class="mockup-row">
+        <span class="mockup-avatar">FN</span>
+        <div class="mockup-row-main mockup-stack mockup-stack-xs">
+          <p class="mockup-row-title">Federico Neri</p>
+          <p class="mockup-row-sub">Confirmed · 4d ago</p>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+</section>
+{{ end }}
+
+{{ define "page" }}{{ template "layout-me" (dict "Title" "Mockup / Event Detail" "TopbarTitle" "Event" "BackHref" "" "BackHistory" true "ProfileHref" "/me/profile/" "ActiveNav" "events" "Scripts" (list)) }}{{ end }}

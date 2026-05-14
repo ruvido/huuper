@@ -15,6 +15,8 @@ func RegisterRoutes(app *pocketbase.PocketBase, se *core.ServeEvent) {
 		Settings:           publicroutes.SettingsHandler(app),
 		EventsAccept:       publicroutes.AcceptEventHandler(app),
 		EventsRegister:     publicroutes.RegisterEventHandler(app),
+		RequestsEmailOTP:   publicroutes.RequestEmailOTPHandler(app),
+		RequestsOTPVerify:  publicroutes.VerifyRequestEmailOTPHandler(app),
 		RequestsCreate:     publicroutes.SubmitRequestHandler(app),
 		OnboardingGet:      publicroutes.OnboardingGetHandler(app),
 		OnboardingComplete: publicroutes.OnboardingCompleteHandler(app),

@@ -72,6 +72,26 @@ func DeleteInviteToken(app core.App, userID string, groupID string) error {
 	return deleteUserTokensByService(app, userID, inviteTokenService, groupID)
 }
 
+func DeleteInviteTokenByLink(app core.App, inviteLink string) error {
+	inviteLink = strings.TrimSpace(inviteLink)
+	if inviteLink == "" {
+		return nil
+	}
+
+	tokenRecord, err := app.FindFirstRecordByFilter(
+		"tokens",
+		"token = {:token} && service = {:service}",
+		map[string]any{
+			"token":   inviteLink,
+			"service": inviteTokenService,
+		},
+	)
+	if err != nil || tokenRecord == nil {
+		return err
+	}
+	return app.Delete(tokenRecord)
+}
+
 // RevokeAndDeleteUserInviteTokens revokes every outstanding Telegram invite
 // link previously issued to the user and deletes the matching token records.
 // Best-effort: a single failing group (missing chat_id, revoke error, ...)

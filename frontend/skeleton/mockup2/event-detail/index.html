@@ -1,0 +1,77 @@
+{{ define "content" }}
+<article class="m2-stack m2-stack-major">
+
+  <header class="m2-stack m2-stack-close">
+    <p class="m2-kicker">Call · Gruppo Roma</p>
+    <h1 class="m2-display">Call settimanale</h1>
+    <p class="m2-lead">Apriamo il mese con un check-in di gruppo. Portate appunti dalla settimana.</p>
+    <div class="m2-stack m2-stack-tight">
+      <p class="m2-body-strong m2-line">{{ template "icon-calendar" . }}<span>Mon 11 May 2026 — 21:00</span></p>
+      <p class="m2-meta m2-line">{{ template "icon-geo-alt" . }}<span>Roma · online · weekly × 3</span></p>
+    </div>
+  </header>
+
+  <article class="m2-card">
+    <div class="m2-stack m2-stack-loose">
+      <h2 class="m2-h2">Will you be there?</h2>
+      <div class="m2-actions">
+        <button class="m2-btn m2-btn-ghost" type="button">No</button>
+        <button class="m2-btn" type="button">Yes</button>
+      </div>
+    </div>
+  </article>
+
+  <section class="m2-stack m2-stack-close">
+    <p class="m2-eyebrow">Link</p>
+    <p class="m2-mono m2-line">{{ template "icon-arrow-right" . }}<span>huuper.app/c/abc-123</span></p>
+  </section>
+
+  <section class="m2-stack m2-stack-loose">
+    <p class="m2-eyebrow">Occurrences · 3</p>
+    <div class="m2-stack m2-stack-close">
+      <div class="m2-listing">
+        <span class="m2-listing-name">Mon 11 May 2026</span>
+        <span class="m2-listing-meta">21:00 · next</span>
+      </div>
+      <div class="m2-listing m2-listing-muted">
+        <span class="m2-listing-name">Mon 18 May 2026</span>
+        <span class="m2-listing-meta">21:00</span>
+      </div>
+      <div class="m2-listing m2-listing-muted">
+        <span class="m2-listing-name">Mon 25 May 2026</span>
+        <span class="m2-listing-meta">21:00</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="m2-stack m2-stack-loose">
+    <p class="m2-eyebrow">Attendees · 6</p>
+    <nav class="m2-tabs">
+      <button class="m2-tab m2-tab-current" type="button">Going 4</button>
+      <button class="m2-tab" type="button">Pending 1</button>
+      <button class="m2-tab" type="button">Out 1</button>
+    </nav>
+    <div class="m2-stack m2-stack-close">
+      <div class="m2-listing">
+        <span class="m2-listing-name">Marco Rossi</span>
+        <span class="m2-listing-meta">2h ago</span>
+      </div>
+      <div class="m2-listing">
+        <span class="m2-listing-name">Luca Bianchi</span>
+        <span class="m2-listing-meta">yesterday</span>
+      </div>
+      <div class="m2-listing">
+        <span class="m2-listing-name">Davide Verdi</span>
+        <span class="m2-listing-meta">3d ago</span>
+      </div>
+      <div class="m2-listing">
+        <span class="m2-listing-name">Federico Neri</span>
+        <span class="m2-listing-meta">4d ago</span>
+      </div>
+    </div>
+  </section>
+
+</article>
+{{ end }}
+
+{{ define "page" }}{{ template "layout-me" (dict "Title" "Mockup2 / Event Detail" "TopbarTitle" "Event" "BackHref" "" "BackHistory" true "ProfileHref" "/me/profile/" "ActiveNav" "events" "Scripts" (list)) }}{{ end }}

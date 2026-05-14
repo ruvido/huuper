@@ -7,12 +7,16 @@ window.appRequestDetail = (() => {
     return window.appListPage.escapeHTML(value);
   }
 
-  function requestAgeDaysLabel(value) {
-    return window.appRequestItem.requestAgeDays(value);
-  }
-
   function actionText(value) {
     return window.appRequestItem.actionText(value);
+  }
+
+  function copy() {
+    return (window.appCopy && window.appCopy.ui && window.appCopy.ui.requests) || {};
+  }
+
+  function cancelIconHTML() {
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708"/></svg>`;
   }
 
   function row(label, value) {
@@ -367,7 +371,6 @@ window.appRequestDetail = (() => {
     const statusNode = document.querySelector("#request-status");
     const summaryNode = document.querySelector("#request-summary");
     const workflowNode = document.querySelector("#request-workflow");
-    const topbarMetaNode = document.querySelector("#request-topbar-meta");
     const rejectButtonNode = document.querySelector("[data-request-reject]");
     if (!statusNode || !summaryNode || !workflowNode || !window.appAuth || !window.appListPage || !window.appRequestItem || !window.appActionSheet || !window.appRequestActions || !window.appRequestNoteSheet) {
       return;
@@ -380,13 +383,26 @@ window.appRequestDetail = (() => {
       return;
     }
 
-    if (rejectButtonNode) {
-      rejectButtonNode.addEventListener("click", () => {
+    function bindRejectButton(buttonNode) {
+      if (!buttonNode) {
+        return;
+      }
+      buttonNode.addEventListener("click", () => {
+        const assistantCancel = buttonNode.dataset.requestReject === "cancel";
+        const requestCopy = copy();
+        const rejectDialog = requestCopy.rejectDialog || {};
+        const cancelDialog = requestCopy.cancelGroupAdmissionDialog || {};
         window.appRequestNoteSheet.open({
-          title: "Are you sure you want to reject candidate?",
-          submitLabel: "Reject",
+          title: assistantCancel
+            ? (cancelDialog.title || "Cancel group admission?")
+            : (rejectDialog.title || "Are you sure you want to reject candidate?"),
+          submitLabel: assistantCancel
+            ? (cancelDialog.submitLabel || "Cancel")
+            : (rejectDialog.submitLabel || "Reject"),
           submitTone: "danger",
-          emptyStatus: "Write reason.",
+          emptyStatus: assistantCancel
+            ? (cancelDialog.emptyStatus || "Write cancel note.")
+            : (rejectDialog.emptyStatus || "Write reason."),
           statusNode,
           onSubmit: async (reason) => {
             await window.appRequestActions.submitAndRedirect({
@@ -402,12 +418,9 @@ window.appRequestDetail = (() => {
       });
     }
 
+    bindRejectButton(rejectButtonNode);
+
     function applyPayload(payload) {
-      if (topbarMetaNode) {
-        const ageLabel = requestAgeDaysLabel(payload && payload.created);
-        topbarMetaNode.textContent = ageLabel;
-        topbarMetaNode.hidden = !ageLabel;
-      }
       summaryNode.hidden = false;
       summaryNode.innerHTML = window.appRequestItem.renderDetail(payload);
       renderWorkflow(payload);
@@ -436,6 +449,7 @@ window.appRequestDetail = (() => {
       const mentoringNotesCount = Array.isArray(mentoringState.notes) ? mentoringState.notes.length : 0;
       const isMentoringStep = requiredField === "mentoring_notes";
       const canCloseMentoring = !isMentoringStep || mentoringNotesCount > 0;
+      const canRejectInline = config.inlineGroupApprovalCancel === true && workflow.can_reject === true && action === "set_group_approved";
       const parts = [`<article class="request-workflow-card">`];
       if (processApproval) {
         parts.push(processApproval);
@@ -445,9 +459,15 @@ window.appRequestDetail = (() => {
         actions.push(`<button id="request-action-add-note" class="secondary" type="button">+ ADD NOTE</button>`);
       }
       if (canTakeAction && action && canCloseMentoring) {
+        const requestCopy = copy();
         const actionLabel = isMentoringStep
-          ? "CLOSE MENTORING"
+          ? (requestCopy.mentoringActionLabel || "Finalize mentoring")
           : (text(workflow.pending_action_label) || actionText(action));
+        if (canRejectInline) {
+          const cancelDialog = copy().cancelGroupAdmissionDialog || {};
+          const ariaLabel = text(cancelDialog.ariaLabel) || "Cancel group admission";
+          actions.push(`<button class="request-cancel-inline" type="button" aria-label="${escapeHTML(ariaLabel)}" data-request-reject="cancel">${cancelIconHTML()}</button>`);
+        }
         actions.push(`<button id="request-action" class="primary" type="button">${window.appListPage.escapeHTML(actionLabel)}</button>`);
       }
       if (actions.length === 0 && !processApproval) {
@@ -487,6 +507,7 @@ window.appRequestDetail = (() => {
 
       const button = workflowNode.querySelector("#request-action");
       const addNoteButton = workflowNode.querySelector("#request-action-add-note");
+      workflowNode.querySelectorAll("[data-request-reject]").forEach(bindRejectButton);
 
       if (addNoteButton) {
         addNoteButton.addEventListener("click", () => {
@@ -511,7 +532,26 @@ window.appRequestDetail = (() => {
       }
 
       if (button) {
-        button.addEventListener("click", async () => {
+        const submitPrimaryAction = async (submitButton) => {
+          try {
+            const body = { action };
+            window.appListPage.setStatus(statusNode, "");
+            await window.appRequestActions.submitAndRedirect({
+              actionURL: config.actionURL(id),
+              body,
+              button: submitButton,
+              redirectURL: config.requestsURL,
+            });
+          } catch (error) {
+            window.appListPage.setStatus(
+              statusNode,
+              window.appRequestActions.errorMessage(error, "Action unavailable."),
+            );
+            submitButton.disabled = false;
+          }
+        };
+
+        button.addEventListener("click", () => {
           if (!action) {
             return;
           }
@@ -526,22 +566,19 @@ window.appRequestDetail = (() => {
             return;
           }
 
-          try {
-            const body = { action };
-            window.appListPage.setStatus(statusNode, "");
-            await window.appRequestActions.submitAndRedirect({
-              actionURL: config.actionURL(id),
-              body,
-              button,
-              redirectURL: config.requestsURL,
+          if (action === "set_mentoring_done") {
+            const closeMentoringDialog = copy().closeMentoringDialog || {};
+            window.appActionSheet.open({
+              title: closeMentoringDialog.title || "Are you sure you want to close mentoring?",
+              footerAction: {
+                label: closeMentoringDialog.submitLabel || "Close mentoring",
+                onSelect: (sheetButton) => submitPrimaryAction(sheetButton),
+              },
             });
-          } catch (error) {
-            window.appListPage.setStatus(
-              statusNode,
-              window.appRequestActions.errorMessage(error, "Action unavailable."),
-            );
-            button.disabled = false;
+            return;
           }
+
+          submitPrimaryAction(button).catch(() => {});
         });
       }
     }

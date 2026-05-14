@@ -34,7 +34,7 @@
         const hero = document.getElementById("battleplan-hero");
         const target = document.getElementById("battleplan-hero-title");
         if (!hero || !target) return;
-        target.innerHTML = title;
+        target.innerHTML = `${title} <span class="dashboard-title-comingsoon">(Coming soon!)</span>`;
         hero.hidden = false;
       } catch (_) {
         /* hero is optional */

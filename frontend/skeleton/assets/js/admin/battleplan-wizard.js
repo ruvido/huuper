@@ -69,6 +69,8 @@
     input: {
       start_date: new Date().toISOString().slice(0, 10),
       duration_days: 30,
+      end_date: "",
+      use_end_date: false,
       visibility: "",
       data: {
         priority: { title: "", why: "" },
@@ -112,7 +114,7 @@
   }
 
   function totalSteps() {
-    return 3 + state.cfg.pillars.length; // intro + priority + N pillars + confirm
+    return 4 + state.cfg.pillars.length; // intro + priority + N pillars + endDate + confirm
   }
 
   function minStep() {
@@ -134,6 +136,10 @@
 
   function isPillarStep() {
     return state.step >= 2 && state.step <= state.cfg.pillars.length + 1;
+  }
+
+  function isEndDateStep() {
+    return state.step === state.cfg.pillars.length + 2;
   }
 
   function internalStepFromURLStep(urlStep) {
@@ -180,13 +186,19 @@
     if (isConfirm()) return state.cfg.wizard.confirmation.title.toUpperCase();
     if (state.step === 0) return state.cfg.wizard.intro.title.toUpperCase();
     if (state.step === 1) return String(cfgmod.priorityCopy(state).title || "").toUpperCase();
+    if (isEndDateStep()) {
+      const sharedCopy = (window.appCopy && window.appCopy.battleplan && window.appCopy.battleplan.wizardShared) || {};
+      return String(sharedCopy.endDateTitle || copy.labels.durationField || "End Date").toUpperCase();
+    }
     const def = state.cfg.pillars[state.step - 2];
     return def ? def.label.toUpperCase() : "";
   }
 
   function syncProgress() {
-    const n = state.cfg.pillars.length;
-    const cur = isPillarStep() ? state.step - 1 : 0;
+    const n = state.cfg.pillars.length + 1; // pillars + end date
+    let cur = 0;
+    if (isPillarStep()) cur = state.step - 1;
+    else if (isEndDateStep()) cur = n;
     dom.progressLabel.textContent = `${copy.progressPrefix}: ${cfgmod.pad2(cur)}/${cfgmod.pad2(n)}`;
     dom.progressState.textContent = stateLabel();
     dom.progressFill.style.width = `${(cur / n) * 100}%`;
@@ -224,8 +236,11 @@
       dom.form.classList.toggle("wizard-form-view", onSummaryView);
       if (!onSummaryView) dom.form.classList.remove("wizard-form-view-overflow");
     }
-    if (dom.progress) dom.progress.hidden = onIntro || isConfirm();
-    if (dom.aside) dom.aside.hidden = onIntro || isConfirm();
+    if (dom.progress) {
+      dom.progress.hidden = state.step === 0 || isConfirm();
+      dom.progress.classList.toggle("step-progress-aside-only", state.step === 1);
+    }
+    if (dom.aside) dom.aside.hidden = state.step === 0 || isConfirm();
     if (dom.back) dom.back.hidden = onIntro;
     if (dom.sticky) dom.sticky.classList.toggle("sticky-actions-intro", onIntro);
   }
@@ -256,9 +271,12 @@
     } else if (state.step === 1) {
       rndmod.renderVisibilityAside(ctx);
       rndmod.renderPriority(ctx);
-    } else if (state.step <= state.cfg.pillars.length + 1) {
+    } else if (isPillarStep()) {
       rndmod.renderVisibilityAside(ctx);
       rndmod.renderPillar(ctx, state.step - 2);
+    } else if (isEndDateStep()) {
+      rndmod.renderVisibilityAside(ctx);
+      rndmod.renderEndDate(ctx);
     } else {
       rndmod.renderConfirm(ctx);
     }
@@ -287,14 +305,34 @@
   function syncFromDOM() {
     const visAside = dom.aside && dom.aside.querySelector('[name="visibility_aside"]:checked');
     if (visAside) state.input.visibility = visAside.value;
-    const durationAside = dom.aside && dom.aside.querySelector('[name="duration_aside"]:checked');
-    if (durationAside) state.input.duration_days = Number(durationAside.value);
     if (state.step === 1) {
       const titleEl = dom.stage.querySelector('[name="priority_title"]');
       const whyEl = dom.stage.querySelector('[name="priority_why"]');
       if (titleEl) state.input.data.priority.title = titleEl.value.trim();
       if (whyEl) state.input.data.priority.why = whyEl.value.trim();
-    } else if (state.step >= 2 && state.step <= state.cfg.pillars.length + 1) {
+    } else if (isEndDateStep()) {
+      const choice = dom.stage.querySelector('[name="duration_choice"]:checked');
+      const dateInput = dom.stage.querySelector('[name="duration_end_date"]');
+      if (choice) {
+        if (choice.value === "custom") {
+          state.input.use_end_date = true;
+          const raw = dateInput ? dateInput.value.trim() : "";
+          state.input.end_date = raw;
+          if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+            const start = new Date(state.input.start_date + "T00:00:00Z");
+            const end = new Date(raw + "T00:00:00Z");
+            if (!isNaN(end.getTime())) {
+              const diff = Math.round((end - start) / 86400000);
+              if (diff > 0) state.input.duration_days = diff;
+            }
+          }
+        } else {
+          state.input.use_end_date = false;
+          state.input.duration_days = Number(choice.value);
+          state.input.end_date = "";
+        }
+      }
+    } else if (isPillarStep()) {
       const def = state.cfg.pillars[state.step - 2];
       const value = ensurePillar(def.key);
       const objEl = dom.stage.querySelector(`[name="pillar_objective_${def.key}"]`);
@@ -334,9 +372,17 @@
         state.fieldErrors.priorityWhy = true;
         return copy.errors.priorityWhyRequired;
       }
-      if (!state.cfg.durations.some((item) => item.value === state.input.duration_days)) return copy.errors.invalidDuration;
       if (!state.cfg.visibility.find((v) => v.value === state.input.visibility)) return copy.errors.invalidVisibility;
-    } else if (state.step >= 2 && state.step <= state.cfg.pillars.length + 1) {
+    } else if (isEndDateStep()) {
+      if (state.input.use_end_date) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(state.input.end_date)) return copy.errors.invalidDuration;
+        const endTs = Date.parse(state.input.end_date + "T00:00:00Z");
+        const startTs = Date.parse(state.input.start_date + "T00:00:00Z");
+        if (isNaN(endTs) || !(endTs > startTs)) return copy.errors.invalidDuration;
+      } else if (!state.cfg.durations.some((item) => item.value === state.input.duration_days)) {
+        return copy.errors.invalidDuration;
+      }
+    } else if (isPillarStep()) {
       const def = state.cfg.pillars[state.step - 2];
       const value = ensurePillar(def.key);
       for (const r of value.routines) {
@@ -359,6 +405,7 @@
     return {
       start_date: state.input.start_date,
       duration_days: state.input.duration_days,
+      end_date: state.input.use_end_date ? state.input.end_date : "",
       visibility: state.input.visibility,
       data: {
         priority: state.input.data.priority,
@@ -527,7 +574,7 @@
   dom.form.addEventListener("submit", async (e) => {
     e.preventDefault();
     syncFromDOM();
-    if (state.step >= 2 && state.step <= state.cfg.pillars.length + 1) {
+    if (isPillarStep()) {
       const def = state.cfg.pillars[state.step - 2];
       const removed = pruneIncompleteRoutinesForPillar(def.key);
       if (removed > 0) {
@@ -644,13 +691,52 @@
     syncFromDOM();
   });
 
+  dom.form.addEventListener("focusin", (e) => {
+    const el = e.target;
+    if (!el) return;
+    const tag = el.tagName;
+    if (tag !== "INPUT" && tag !== "TEXTAREA") return;
+    if (el.type === "radio" || el.type === "checkbox") return;
+    // Wait for mobile keyboard to expand (and viewport to shrink) before scrolling.
+    window.setTimeout(() => {
+      if (document.activeElement !== el) return;
+      if (typeof el.scrollIntoView === "function") {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 300);
+  });
+
   if (dom.aside) {
     dom.aside.addEventListener("change", (e) => {
-      if (!e.target || (e.target.name !== "duration_aside" && e.target.name !== "visibility_aside")) return;
+      if (!e.target || e.target.name !== "visibility_aside") return;
       syncFromDOM();
       render();
     });
   }
+
+  dom.stage.addEventListener("click", (e) => {
+    const block = e.target.closest(".wizard-end-date-custom");
+    if (!block) return;
+    state.input.use_end_date = true;
+    const customRadio = dom.stage.querySelector('[name="duration_choice"][value="custom"]');
+    if (customRadio) customRadio.checked = true;
+    const textInput = block.querySelector('input[type="text"]');
+    if (textInput && document.activeElement !== textInput) textInput.focus();
+  });
+
+  dom.stage.addEventListener("input", (e) => {
+    if (!e.target || e.target.name !== "duration_end_date") return;
+    state.input.use_end_date = true;
+    const customRadio = dom.stage.querySelector('[name="duration_choice"][value="custom"]');
+    if (customRadio) customRadio.checked = true;
+    syncFromDOM();
+  });
+
+  dom.stage.addEventListener("change", (e) => {
+    if (!e.target || e.target.name !== "duration_choice") return;
+    syncFromDOM();
+    render();
+  });
 
   dom.form.addEventListener("change", (e) => {
     if (e.target && e.target.name === "visibility_aside") {

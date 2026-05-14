@@ -68,7 +68,9 @@ window.appRequestListPage = (() => {
       }
 
       window.appListPage.renderList(listNode, visibleItems, (item) => {
-        return window.appRequestItem.renderListItem(item, config.itemHref(item.id));
+        return window.appRequestItem.renderListItem(item, config.itemHref(item.id), {
+          emailAlertBadge: config.emailAlertBadge === true,
+        });
       });
       listNode.hidden = false;
       statusNode.hidden = true;

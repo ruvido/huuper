@@ -84,47 +84,96 @@ func DefaultGroupInvite(app *pocketbase.PocketBase, actor *core.Record) (string,
 	return group.Id, link, nil
 }
 
-func ConsumeMemberInvite(app *pocketbase.PocketBase, inviteLink string) (*core.Record, error) {
+func ResolveMemberInviteForChat(app *pocketbase.PocketBase, inviteLink string, chatID int64) (*core.Record, string, error) {
 	trimmed := strings.TrimSpace(inviteLink)
 	if trimmed == "" {
-		return nil, apis.NewBadRequestError("missing_invite_link", nil)
+		return nil, "", apis.NewBadRequestError("missing_invite_link", nil)
 	}
 
-	var user *core.Record
-	err := app.RunInTransaction(func(txApp core.App) error {
-		tokenRecord, err := txApp.FindFirstRecordByFilter(
-			"tokens",
-			"token = {:token} && service = {:service}",
-			map[string]any{
-				"token":   trimmed,
-				"service": inviteTokenService,
-			},
-		)
-		if err != nil || tokenRecord == nil {
-			return apis.NewBadRequestError("invalid_invite_link", err)
-		}
+	tokenRecord, err := inviteTokenForJoinRequest(app, trimmed, chatID)
+	if err != nil || tokenRecord == nil {
+		return nil, "", apis.NewBadRequestError("invalid_invite_link", err)
+	}
 
-		userID := strings.TrimSpace(tokenRecord.GetString("user"))
-		if userID == "" {
-			return apis.NewBadRequestError("invalid_invite_link", nil)
-		}
+	userID := strings.TrimSpace(tokenRecord.GetString("user"))
+	if userID == "" {
+		return nil, "", apis.NewBadRequestError("invalid_invite_link", nil)
+	}
 
-		resolved, err := txApp.FindRecordById("users", userID)
-		if err != nil || resolved == nil {
-			return apis.NewBadRequestError("invalid_invite_link", err)
-		}
+	resolved, err := app.FindRecordById("users", userID)
+	if err != nil || resolved == nil {
+		return nil, "", apis.NewBadRequestError("invalid_invite_link", err)
+	}
 
-		if err := txApp.Delete(tokenRecord); err != nil {
-			return apis.NewBadRequestError("invalid_invite_link", err)
-		}
+	return resolved, strings.TrimSpace(tokenRecord.GetString("token")), nil
+}
 
-		user = resolved
-		return nil
-	})
+func inviteTokenForJoinRequest(app *pocketbase.PocketBase, inviteLink string, chatID int64) (*core.Record, error) {
+	prefix, redacted := strings.CutSuffix(inviteLink, "...")
+	if redacted {
+		return inviteTokenByPrefix(app, prefix, chatID)
+	}
+
+	return app.FindFirstRecordByFilter(
+		"tokens",
+		"token = {:token} && service = {:service}",
+		map[string]any{
+			"token":   inviteLink,
+			"service": inviteTokenService,
+		},
+	)
+}
+
+func inviteTokenByPrefix(app *pocketbase.PocketBase, prefix string, chatID int64) (*core.Record, error) {
+	if strings.TrimSpace(prefix) == "" || chatID == 0 {
+		return nil, nil
+	}
+
+	group, err := groupByTelegramChatID(app, chatID)
+	if err != nil || group == nil {
+		return nil, err
+	}
+
+	tokens, err := app.FindRecordsByFilter(
+		"tokens",
+		"group = {:group} && service = {:service}",
+		"",
+		0,
+		0,
+		map[string]any{
+			"group":   group.Id,
+			"service": inviteTokenService,
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
-	return user, nil
+
+	var match *core.Record
+	for _, token := range tokens {
+		if strings.HasPrefix(strings.TrimSpace(token.GetString("token")), prefix) {
+			if match != nil {
+				return nil, fmt.Errorf("ambiguous redacted invite link")
+			}
+			match = token
+		}
+	}
+	return match, nil
+}
+
+func groupByTelegramChatID(app *pocketbase.PocketBase, chatID int64) (*core.Record, error) {
+	groups, err := app.FindRecordsByFilter("groups", "", "", 0, 0)
+	if err != nil {
+		return nil, err
+	}
+	needle := strconv.FormatInt(chatID, 10)
+	for _, group := range groups {
+		telegramData := backendinternal.ParseJSONMap(group.Get("telegram"))
+		if strings.TrimSpace(backendinternal.AnyToString(telegramData["chat_id"])) == needle {
+			return group, nil
+		}
+	}
+	return nil, nil
 }
 
 func GenerateGroupInvite(app *pocketbase.PocketBase, user *core.Record, group *core.Record) (string, error) {

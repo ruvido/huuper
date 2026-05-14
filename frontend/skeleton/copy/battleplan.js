@@ -49,6 +49,8 @@ window.appCopy = Object.assign({}, window.appCopy || {}, {
       },
       summaryDurationDays: "{count} days",
       summaryDraftBadge: "DRAFT",
+      endDateTitle: "End Date",
+      endDateDescription: "Choose when the battleplan ends.",
     },
     placeholder: {
       label: "sharpening the blades",

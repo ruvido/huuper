@@ -87,6 +87,7 @@ func htmlToText(raw string) string {
 func SendPlainEmailToRecipients(app *pocketbase.PocketBase, recipients []mail.Address, subject string, body string, senderKey string) (int, int) {
 	from, ok := SenderFromEmailSettings(app, senderKey)
 	if !ok {
+		app.Logger().Warn("Skipping email with missing sender", "subject", subject, "sender_key", senderKey, "recipients", len(recipients))
 		return 0, len(recipients)
 	}
 
@@ -105,6 +106,7 @@ func SendPlainEmailToRecipients(app *pocketbase.PocketBase, recipients []mail.Ad
 		if err := app.NewMailClient().Send(message); err == nil {
 			sent++
 		} else {
+			app.Logger().Warn("Failed to send email", "subject", subject, "recipient", recipient.Address, "error", err)
 			failed++
 		}
 	}

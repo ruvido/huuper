@@ -37,9 +37,12 @@ func init() {
 				typeDef["required"] = required
 			}
 			value, _ := typeDef["value"].(string)
-			required["time"] = value == "call"
-			if _, ok := required["description"]; !ok {
-				required["description"] = false
+			delete(required, "description")
+			if value == "call" {
+				required["time"] = true
+				required["title"] = true
+			} else {
+				delete(required, "time")
 			}
 		}
 		record.Set("data", data)

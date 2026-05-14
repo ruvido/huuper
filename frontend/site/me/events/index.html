@@ -6,22 +6,25 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Huuper / Me / Events</title>
-  <link rel="icon" type="image/png" href="/assets/favicon/realmen-logo.png?v=1778083445" />
-  <link rel="shortcut icon" href="/assets/images/favicon/favicon.ico?v=1778083445" sizes="any" />
-  <link rel="apple-touch-icon" href="/assets/images/favicon/apple-touch-icon.png?v=1778083445" />
-  <script src="/copy/brand.js?v=1778083445"></script>
-  <script src="/copy/ui.js?v=1778083445"></script>
-  <script src="/copy/battleplan.js?v=1778083445"></script>
-  <script src="/copy/events.js?v=1778083445"></script>
-  <link rel="stylesheet" href="/assets/css/app.css?v=1778083445" />
-  <script src="/assets/js/core/topbar.js?v=1778083445" defer></script>
-  <script src="/assets/js/core/auth.js?v=1778083445" defer></script>
-  <script src="/assets/js/core/guard-me.js?v=1778083445" defer></script>
-  <script src="/assets/js/core/list-page.js?v=1778083445" defer></script>
-  <script src="/assets/js/core/entity-list.js?v=1778083445" defer></script>
-  <script src="/assets/js/components/events-cadence.js?v=1778083445" defer></script>
-  <script src="/assets/js/me/events-render.js?v=1778083445" defer></script>
-  <script src="/assets/js/me/events.js?v=1778083445" defer></script>
+  <link rel="icon" type="image/png" href="/assets/favicon/realmen-logo.png?v=1778754326" />
+  <link rel="shortcut icon" href="/assets/images/favicon/favicon.ico?v=1778754326" sizes="any" />
+  <link rel="apple-touch-icon" href="/assets/images/favicon/apple-touch-icon.png?v=1778754326" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" />
+  <script src="/copy/brand.js?v=1778754326"></script>
+  <script src="/copy/ui.js?v=1778754326"></script>
+  <script src="/copy/battleplan.js?v=1778754326"></script>
+  <script src="/copy/events.js?v=1778754326"></script>
+  <link rel="stylesheet" href="/assets/css/app.css?v=1778754326" />
+  <script src="/assets/js/core/topbar.js?v=1778754326" defer></script>
+  <script src="/assets/js/core/auth.js?v=1778754326" defer></script>
+  <script src="/assets/js/core/guard-me.js?v=1778754326" defer></script>
+  <script src="/assets/js/core/list-page.js?v=1778754326" defer></script>
+  <script src="/assets/js/core/entity-list.js?v=1778754326" defer></script>
+  <script src="/assets/js/components/events-cadence.js?v=1778754326" defer></script>
+  <script src="/assets/js/me/events-render.js?v=1778754326" defer></script>
+  <script src="/assets/js/me/events.js?v=1778754326" defer></script>
 </head>
 
   <body>
@@ -102,11 +105,11 @@
         
 <div class="events-page">
   <section id="events-window-tabs" class="section-tabs events-window-tabs"></section>
+  <p id="events-status" class="meta-text"></p>
+  <section id="events-spotlight" class="list-card list-card-default list-card-flush" hidden></section>
   <section class="events-section" id="events-future-section">
     <a class="wizard-btn wizard-btn-primary" id="events-new-cta" href="/me/events/new/" data-wizard-new hidden></a>
   </section>
-  <p id="events-status" class="meta-text"></p>
-  <section id="events-spotlight" class="list-card list-card-default list-card-flush" hidden></section>
   <section id="events-list" class="list-card list-card-default" hidden></section>
 </div>
 
@@ -117,10 +120,6 @@
   <a class="nav-item" href="/me/">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6m-5.784 6A2.24 2.24 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.3 6.3 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1zM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5"/></svg>
     <span>Groups</span>
-  </a>
-  <a class="nav-item nav-item-current" href="/me/events/">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 .5a.5.5 0 0 0-1 0V1H2a2 2 0 0 0-2 2v1h16V3a2 2 0 0 0-2-2h-1V.5a.5.5 0 0 0-1 0V1H4zM16 14V5H0v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2m-3.5-7h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5"/></svg>
-    <span>Events</span>
   </a>
   <a class="nav-item" href="/me/requests/">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.98 4a.5.5 0 0 0-.39.188L1.54 8H6a.5.5 0 0 1 .5.5 1.5 1.5 0 1 0 3 0A.5.5 0 0 1 10 8h4.46l-3.05-3.812A.5.5 0 0 0 11.02 4zm-1.17-.437A1.5 1.5 0 0 1 4.98 3h6.04a1.5 1.5 0 0 1 1.17.563l3.7 4.625a.5.5 0 0 1 .106.374l-.39 3.124A1.5 1.5 0 0 1 14.117 13H1.883a1.5 1.5 0 0 1-1.489-1.314l-.39-3.124a.5.5 0 0 1 .106-.374z"/></svg>

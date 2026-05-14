@@ -93,12 +93,51 @@ func ApplySetAdminApprovedAction(app *pocketbase.PocketBase, actor *core.Record,
 	return applyExpectedStepAction(app, actor, record, data, payload, FlowActionAdminApproved)
 }
 
-func ApplyRejectAction(actor *core.Record, record *core.Record, data map[string]any, reason string) error {
+func canRejectRequestForFlow(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any, flow FlowConfig) (bool, error) {
+	if actor == nil {
+		return false, nil
+	}
+	if actor.GetBool("admin") {
+		return true, nil
+	}
+	if record == nil || record.GetBool("rejected") {
+		return false, nil
+	}
+
+	stepIndex := EffectiveStepIndex(record, data, flow)
+	nextStep, hasNext := FlowStepAt(flow, stepIndex)
+	if !hasNext || nextStep.Action != FlowActionGroupApproved {
+		return false, nil
+	}
+
+	return backendinternal.IsActorAssignedForRole(app, actor, record, RoleAssistant, RoleAdmin, RoleGuardian, RoleAssistant)
+}
+
+func canRejectRequest(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any) (bool, error) {
+	if actor == nil {
+		return false, nil
+	}
+	if actor.GetBool("admin") {
+		return true, nil
+	}
+
+	flow, err := LoadFlowForRequest(app, data)
+	if err != nil {
+		return false, err
+	}
+	return canRejectRequestForFlow(app, actor, record, data, flow)
+}
+
+func ApplyRejectAction(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any, reason string) error {
 	if reason == "" {
 		return apis.NewBadRequestError("missing_reject_reason", nil)
 	}
 
-	if !actor.GetBool("admin") {
+	ok, err := canRejectRequest(app, actor, record, data)
+	if err != nil {
+		return apis.NewBadRequestError("invalid_requests_flow_settings", err)
+	}
+	if !ok {
 		return apis.NewForbiddenError("forbidden_reject", nil)
 	}
 
@@ -193,8 +232,12 @@ func ApplyPromoteAction(app *pocketbase.PocketBase, actor *core.Record, record *
 		return PromoteResult{}, apis.NewBadRequestError("failed_user_lookup", err)
 	}
 	if existing != nil {
-		// Idempotent promote: if the user already exists for this email,
-		// treat the promote action as already completed.
+		if !OnboardingCompleteForUser(app, existing) {
+			if err := resetExistingUserOnboarding(app, existing, record, data); err != nil {
+				return PromoteResult{}, err
+			}
+			return PromoteResult{UserID: existing.Id, Created: false}, nil
+		}
 		return PromoteResult{UserID: existing.Id, Created: false}, nil
 	}
 
@@ -214,6 +257,7 @@ func ApplyPromoteAction(app *pocketbase.PocketBase, actor *core.Record, record *
 	user.Set("status", "approved")
 
 	userData := BuildUserData(data)
+	userData["request"] = promotedRequestSnapshot(app, record, data)
 	if len(userData) > 0 {
 		user.Set("data", userData)
 	}
@@ -255,6 +299,36 @@ func ApplyPromoteAction(app *pocketbase.PocketBase, actor *core.Record, record *
 	data["onboarding_url"] = onboardingURL
 
 	return PromoteResult{UserID: user.Id, Created: true}, nil
+}
+
+func resetExistingUserOnboarding(app *pocketbase.PocketBase, user *core.Record, record *core.Record, data map[string]any) error {
+	tempPassword := backendinternal.RandomToken()
+	if tempPassword == "" {
+		return apis.NewBadRequestError("failed_to_generate_password", nil)
+	}
+
+	userData := BuildUserData(data)
+	userData["request"] = promotedRequestSnapshot(app, record, data)
+	user.Set("password", tempPassword)
+	user.Set("passwordConfirm", tempPassword)
+	user.Set("status", "approved")
+	user.Set("avatar", "")
+	user.Set("data", userData)
+	if err := app.Save(user); err != nil {
+		return apis.NewBadRequestError("failed_to_reset_onboarding_user", err)
+	}
+
+	DeleteOnboardingTokensForUser(app, user.Id)
+	onboardingToken, err := GenerateOnboardingToken(app, user.Id)
+	if err != nil {
+		return apis.NewBadRequestError("failed_to_create_onboarding_token", err)
+	}
+	onboardingURL := BuildOnboardingURL(app, onboardingToken)
+	if strings.TrimSpace(onboardingURL) == "" {
+		return apis.NewBadRequestError("invalid_onboarding_url", nil)
+	}
+	data["onboarding_url"] = onboardingURL
+	return nil
 }
 
 // generatePromoteInvites tries to generate a telegram invite link for every
@@ -373,6 +447,10 @@ func applyGroupAssignment(app *pocketbase.PocketBase, record *core.Record, data 
 	if data != nil {
 		assigned := map[string]any{
 			"assigned_at": time.Now().UTC().Format(time.RFC3339),
+			"group": map[string]any{
+				"id":   group.Id,
+				"name": strings.TrimSpace(group.GetString("name")),
+			},
 		}
 		if actor != nil {
 			assigned["assigned_by"] = actorDisplayName(actor)

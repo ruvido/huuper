@@ -110,7 +110,7 @@
   }
 
   function renderVisibilityAside(ctx) {
-    const { state, dom, copy } = ctx;
+    const { state, dom } = ctx;
     if (!dom.aside) return;
     dom.aside.classList.remove("step-progress-aside-badges");
     dom.aside.classList.add("step-progress-aside-controls");
@@ -125,17 +125,39 @@
         <span>${esc(item.label)}</span>
       </label>
     `).join("");
-    const durationOpts = state.cfg.durations.map((item) => `
-      <label class="segmented-option">
-        <input type="radio" name="duration_aside" value="${item.value}" ${state.input.duration_days === item.value ? "checked" : ""} />
-        <span>${item.value}${esc(copy.daysSuffix || "D")}</span>
-      </label>
-    `).join("");
     dom.aside.innerHTML = `
-      <div class="segmented step-progress-duration-options">${durationOpts}</div>
       <div class="segmented step-progress-visibility-options">${opts}</div>
     `;
     dom.aside.hidden = false;
+  }
+
+  function renderEndDate(ctx) {
+    const { state, dom, copy } = ctx;
+    const customSelected = !!state.input.use_end_date;
+    const customDate = state.input.end_date || "";
+    const sharedCopy = (window.appCopy && window.appCopy.battleplan && window.appCopy.battleplan.wizardShared) || {};
+    const titleText = sharedCopy.endDateTitle || copy.labels.durationField || "End Date";
+    const descText = sharedCopy.endDateDescription || "";
+    const introBlock = descText ? `<div class="intro-quote"><p>${esc(descText)}</p></div>` : "";
+    const durationOpts = state.cfg.durations.map((item) => `
+      <label class="wizard-end-date-preset segmented-option">
+        <input type="radio" name="duration_choice" value="${item.value}" ${!customSelected && state.input.duration_days === item.value ? "checked" : ""} />
+        <span>${item.value}${esc(copy.daysSuffix || "D")}</span>
+      </label>
+    `).join("");
+    dom.stage.innerHTML = `
+      <section class="wizard-step wizard-step-end-date">
+        <header class="wizard-step-header">
+          <h2 class="display-hero">${esc(titleText)}</h2>
+          ${introBlock}
+        </header>
+        <div class="wizard-end-date-presets segmented">${durationOpts}</div>
+        <div class="wizard-end-date-custom segmented-option${customSelected ? "" : " is-empty"}">
+          <input type="radio" name="duration_choice" value="custom" ${customSelected ? "checked" : ""} />
+          <input type="text" name="duration_end_date" inputmode="numeric" autocomplete="off" placeholder="yyyy-mm-dd" maxlength="10" value="${esc(customDate)}" />
+        </div>
+      </section>
+    `;
   }
 
   function renderRoutine(ctx, pillarKey, idx, routine) {
@@ -416,6 +438,7 @@
     animateCollapseOtherRoutines,
     renderIntro,
     renderPriority,
+    renderEndDate,
     renderVisibilityAside,
     renderRoutine,
     renderPillar,

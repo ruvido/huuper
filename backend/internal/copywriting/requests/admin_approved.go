@@ -1,5 +1,7 @@
 package requests
 
+import "strings"
+
 var adminApprovedTemplate = EmailTemplate{
 	Kind:    "requests.admin_approved",
 	Subject: "Set your password",
@@ -11,4 +13,9 @@ var adminApprovedTemplate = EmailTemplate{
 		"Set password",
 		"{{onboarding_url}}",
 	),
+	TelegramBody: strings.TrimSpace(`
+{{full_name}} has been admitted to {{group_name}}.
+
+The onboarding email has been sent to {{email}}.
+`),
 }

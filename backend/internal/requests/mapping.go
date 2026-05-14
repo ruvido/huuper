@@ -128,6 +128,7 @@ func BuildWorkflowState(app *pocketbase.PocketBase, actor *core.Record, record *
 	if state.CurrentActionLabel == "" {
 		state.CurrentActionLabel = strings.ReplaceAll(NormalizeStatus(status), "_", " ")
 	}
+	assigned := false
 	if hasNext && !rejected {
 		state.RequiredField = RequiredFieldForAction(nextStep.Action)
 		ok, err := backendinternal.HasRoleForRequest(app, actor, record, nextStep.Role, RoleAdmin, RoleGuardian, RoleAssistant)
@@ -135,12 +136,18 @@ func BuildWorkflowState(app *pocketbase.PocketBase, actor *core.Record, record *
 			return WorkflowState{}, err
 		}
 		state.CanTakeAction = ok
-		assigned, err := backendinternal.IsActorAssignedForRole(app, actor, record, nextStep.Role, RoleAdmin, RoleGuardian, RoleAssistant)
+		assigned, err = backendinternal.IsActorAssignedForRole(app, actor, record, nextStep.Role, RoleAdmin, RoleGuardian, RoleAssistant)
 		if err != nil {
 			return WorkflowState{}, err
 		}
 		state.ActorIsAssigned = assigned
 	}
-	state.CanReject = actor != nil && actor.GetBool("admin") && !rejected
+	if !rejected {
+		canReject, err := canRejectRequestForFlow(app, actor, record, data, flow)
+		if err != nil {
+			return WorkflowState{}, err
+		}
+		state.CanReject = canReject
+	}
 	return state, nil
 }

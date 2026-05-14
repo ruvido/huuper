@@ -37,6 +37,7 @@ Se il tree corrente non e' ancora li', ogni modifica deve andare in quella direz
 - Una top bar condivisa si definisce una volta.
 - Le bottom bar si definiscono per dominio, non per pagina.
 - I campi form si definiscono una volta.
+- Il testo user-facing non si hardcoda mai in componenti, template o JS: il copy frontend va centralizzato in `frontend/skeleton/copy/*`; il copy backend sta in `backend/internal/copywriting/` (per request: `backend/internal/copywriting/requests/`) o arriva da settings.
 - Le varianti `me` e `admin` riusano gli stessi blocchi di base, cambiando solo struttura e contenuto necessario.
 - Una pagina dettaglio non deve fan-out su piu' endpoint se il backend puo' aggregare il payload in modo chiaro.
 
@@ -100,5 +101,6 @@ Blocca e correggi se vedi:
 - CTA non reali
 - testo esplicativo invece di contenuto UI reale
 - edit manuali in `frontend/site`
+- testo user-facing hardcodato fuori da `frontend/skeleton/copy/*`, `backend/internal/copywriting/` o settings
 - fallback automatici non richiesti
 - logica inferita dal contesto invece che confermata

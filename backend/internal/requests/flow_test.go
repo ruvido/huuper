@@ -3,6 +3,7 @@ package requests
 import (
 	"testing"
 
+	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
 )
 
@@ -33,6 +34,32 @@ func testRequestRecord() *core.Record {
 	record.Set("data", map[string]any{})
 	record.Set("rejected", false)
 	return record
+}
+
+func testUserRecord(id string, admin bool) *core.Record {
+	collection := core.NewBaseCollection("users")
+	collection.Fields.Add(
+		&core.TextField{Name: "email"},
+		&core.BoolField{Name: "admin"},
+		&core.JSONField{Name: "data"},
+	)
+	record := core.NewRecord(collection)
+	record.Set("id", id)
+	record.Set("admin", admin)
+	return record
+}
+
+func testPocketBase(t *testing.T) *pocketbase.PocketBase {
+	t.Helper()
+
+	app := pocketbase.NewWithConfig(pocketbase.Config{
+		DefaultDataDir:       t.TempDir(),
+		DefaultEncryptionEnv: "pb_test_env",
+	})
+	if err := app.Bootstrap(); err != nil {
+		t.Fatalf("failed to bootstrap test app: %v", err)
+	}
+	return app
 }
 
 func TestEffectiveStepIndexTracksSatisfiedSteps(t *testing.T) {
@@ -341,15 +368,7 @@ func TestBuildWorkflowStateAllowsAdminOverride(t *testing.T) {
 	data := map[string]any{}
 	record.Set("data", SetRequestFlowSnapshot(data, testFlow()))
 
-	collection := core.NewBaseCollection("users")
-	collection.Fields.Add(
-		&core.TextField{Name: "email"},
-		&core.BoolField{Name: "admin"},
-		&core.JSONField{Name: "data"},
-	)
-	admin := core.NewRecord(collection)
-	admin.Set("id", "admin-1")
-	admin.Set("admin", true)
+	admin := testUserRecord("admin0000000001", true)
 
 	state, err := BuildWorkflowState(nil, admin, record, data, false, testFlow())
 	if err != nil {
@@ -366,6 +385,101 @@ func TestBuildWorkflowStateAllowsAdminOverride(t *testing.T) {
 	}
 	if !state.ActorIsAssigned {
 		t.Fatalf("expected admin on admin-role step to have ActorIsAssigned=true")
+	}
+
+	if err := ApplyRejectAction(nil, admin, record, data, "No fit"); err != nil {
+		t.Fatalf("expected admin reject to remain allowed without flow lookup: %v", err)
+	}
+}
+
+func TestAssignedAssistantCanRejectOnlyOnGroupApprovedStep(t *testing.T) {
+	app := testPocketBase(t)
+
+	groups := core.NewBaseCollection("groups")
+	groups.Fields.Add(&core.TextField{Name: "assistant"})
+	if err := app.Save(groups); err != nil {
+		t.Fatalf("failed to save groups collection: %v", err)
+	}
+
+	assistant := testUserRecord("assistant000001", false)
+	other := testUserRecord("assistant000002", false)
+	group := core.NewRecord(groups)
+	group.Set("id", "group0000000001")
+	group.Set("assistant", assistant.Id)
+	if err := app.Save(group); err != nil {
+		t.Fatalf("failed to save group: %v", err)
+	}
+
+	record := testRequestRecord()
+	record.Set("group", group.Id)
+	record.Set("guardian", "guardian0000001")
+	data := map[string]any{
+		"guardian": map[string]any{
+			"name":        "Guardian",
+			"assigned_at": "2026-04-09T10:00:00Z",
+		},
+		"mentoring": map[string]any{
+			"notes":   []any{map[string]any{"text": "done", "at": "2026-04-09T10:30:00Z"}},
+			"done_at": "2026-04-09T10:30:00Z",
+		},
+	}
+	record.Set("data", SetRequestFlowSnapshot(data, testFlow()))
+
+	state, err := BuildWorkflowState(app, assistant, record, data, false, testFlow())
+	if err != nil {
+		t.Fatalf("unexpected error for assigned assistant: %v", err)
+	}
+	if !state.CanReject {
+		t.Fatalf("expected assigned assistant to reject while group approval is pending")
+	}
+	if err := ApplyRejectAction(app, assistant, record, data, "No fit"); err != nil {
+		t.Fatalf("expected assigned assistant reject to succeed: %v", err)
+	}
+
+	record = testRequestRecord()
+	record.Set("group", group.Id)
+	record.Set("guardian", "guardian0000001")
+	data = map[string]any{
+		"guardian": map[string]any{
+			"name":        "Guardian",
+			"assigned_at": "2026-04-09T10:00:00Z",
+		},
+	}
+	record.Set("data", SetRequestFlowSnapshot(data, testFlow()))
+
+	state, err = BuildWorkflowState(app, assistant, record, data, false, testFlow())
+	if err != nil {
+		t.Fatalf("unexpected error before group approval step: %v", err)
+	}
+	if state.CanReject {
+		t.Fatalf("expected assigned assistant reject to be blocked before group approval is pending")
+	}
+	if err := ApplyRejectAction(app, assistant, record, data, "No fit"); err == nil {
+		t.Fatalf("expected assigned assistant reject to fail before group approval is pending")
+	}
+
+	record.Set("guardian", "guardian0000001")
+	data = map[string]any{
+		"guardian": map[string]any{
+			"name":        "Guardian",
+			"assigned_at": "2026-04-09T10:00:00Z",
+		},
+		"mentoring": map[string]any{
+			"notes":   []any{map[string]any{"text": "done", "at": "2026-04-09T10:30:00Z"}},
+			"done_at": "2026-04-09T10:30:00Z",
+		},
+	}
+	record.Set("data", SetRequestFlowSnapshot(data, testFlow()))
+
+	state, err = BuildWorkflowState(app, other, record, data, false, testFlow())
+	if err != nil {
+		t.Fatalf("unexpected error for other assistant: %v", err)
+	}
+	if state.CanReject {
+		t.Fatalf("expected non-assigned assistant reject to be blocked")
+	}
+	if err := ApplyRejectAction(app, other, record, data, "No fit"); err == nil {
+		t.Fatalf("expected non-assigned assistant reject to fail")
 	}
 }
 

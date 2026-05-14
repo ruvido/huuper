@@ -42,6 +42,22 @@ func TestDefaultNotificationTemplateIncludesRequestSubmittedCopy(t *testing.T) {
 	}
 }
 
+func TestDefaultNotificationTemplateIncludesAdminApprovedTelegramCopy(t *testing.T) {
+	template, found, err := defaultNotificationTemplate(templateKindAdminApproved)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !found {
+		t.Fatalf("expected default template to be found")
+	}
+	if got := strings.TrimSpace(template.Telegram.Body); got == "" {
+		t.Fatalf("expected telegram body to be populated")
+	}
+	if !strings.Contains(template.Telegram.Body, "{{full_name}}") {
+		t.Fatalf("expected full_name placeholder in telegram body, got %q", template.Telegram.Body)
+	}
+}
+
 func TestMergeNotificationTemplateUsesDefaultTelegramBody(t *testing.T) {
 	defaultTemplate := NotificationTemplate{}
 	defaultTemplate.Email.Subject = "Default subject"

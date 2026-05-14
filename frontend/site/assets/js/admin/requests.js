@@ -16,6 +16,7 @@
     itemHref: (id) => `/admin/request/?id=${encodeURIComponent(id)}`,
     detailURL: (id) => `/api/admin/requests/${encodeURIComponent(id)}`,
     actionURL: (id) => `/api/admin/requests/${encodeURIComponent(id)}/actions`,
+    emailAlertBadge: true,
     errorMessage: "Requests unavailable.",
   });
 })();

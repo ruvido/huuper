@@ -22,6 +22,15 @@ func BuildOnboardingURL(app *pocketbase.PocketBase, token string) string {
 	return base + "/onboarding/?token=" + url.QueryEscape(strings.TrimSpace(token))
 }
 
+func OnboardingCompleteForUser(app *pocketbase.PocketBase, user *core.Record) bool {
+	if user == nil {
+		return false
+	}
+
+	data := backendinternal.ParseJSONMap(user.Get("data"))
+	return strings.TrimSpace(backendinternal.AnyToString(data["onboarding_completed_at"])) != ""
+}
+
 func GenerateOnboardingToken(app *pocketbase.PocketBase, userID string) (string, error) {
 	if strings.TrimSpace(userID) == "" {
 		return "", apis.NewBadRequestError("missing_user", nil)
