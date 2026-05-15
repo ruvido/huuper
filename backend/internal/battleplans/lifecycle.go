@@ -8,7 +8,6 @@ import (
 	backendinternal "members/backend/internal"
 	groupinternal "members/backend/internal/groups"
 
-	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tools/types"
@@ -21,6 +20,19 @@ type Input struct {
 	Visibility   string `json:"visibility"`
 	Status       string `json:"status,omitempty"`
 	Data         Data   `json:"data"`
+}
+
+type StatusCollisionError struct {
+	Status     string
+	ExistingID string
+}
+
+func (e StatusCollisionError) Error() string {
+	return fmt.Sprintf("battleplan_%s_exists", e.Status)
+}
+
+func IsValidInitialStatus(status string) bool {
+	return status == StatusActive || status == StatusDraft
 }
 
 func validateInput(in Input, cfg *Config) error {
@@ -114,7 +126,7 @@ func stampNewRoutines(existing Data, incoming Data, now string) Data {
 	return out
 }
 
-func Create(app *pocketbase.PocketBase, userID string, in Input) (*core.Record, error) {
+func Create(app core.App, userID string, in Input) (*core.Record, error) {
 	if strings.TrimSpace(userID) == "" {
 		return nil, fmt.Errorf("missing user")
 	}
@@ -146,6 +158,12 @@ func Create(app *pocketbase.PocketBase, userID string, in Input) (*core.Record, 
 	if !IsValidStatus(status) {
 		return nil, fmt.Errorf("invalid status %q", status)
 	}
+	if !IsValidInitialStatus(status) {
+		return nil, fmt.Errorf("invalid initial status %q", status)
+	}
+	if err := ensureUniqueUserStatus(app, userID, status, ""); err != nil {
+		return nil, err
+	}
 
 	record := core.NewRecord(collection)
 	record.Set("user", userID)
@@ -161,7 +179,7 @@ func Create(app *pocketbase.PocketBase, userID string, in Input) (*core.Record, 
 	return record, nil
 }
 
-func Update(app *pocketbase.PocketBase, record *core.Record, in Input) error {
+func Update(app core.App, record *core.Record, in Input) error {
 	if !IsEditable(record.GetString("status")) {
 		return fmt.Errorf("only active or draft battleplans can be edited")
 	}
@@ -185,7 +203,7 @@ func Update(app *pocketbase.PocketBase, record *core.Record, in Input) error {
 	return app.Save(record)
 }
 
-func AddNote(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, note string) error {
+func AddNote(app core.App, actor *core.Record, record *core.Record, note string) error {
 	if record == nil {
 		return fmt.Errorf("missing battleplan")
 	}
@@ -206,22 +224,106 @@ func AddNote(app *pocketbase.PocketBase, actor *core.Record, record *core.Record
 	return app.Save(record)
 }
 
-func SetStatus(app *pocketbase.PocketBase, record *core.Record, status string) error {
+func SetStatus(app core.App, record *core.Record, status string) error {
+	if record == nil {
+		return fmt.Errorf("missing battleplan")
+	}
+	status = strings.TrimSpace(status)
 	if !IsValidStatus(status) {
 		return fmt.Errorf("invalid status")
+	}
+	current := strings.TrimSpace(record.GetString("status"))
+	if !CanTransition(current, status) {
+		return fmt.Errorf("invalid status transition %s -> %s", current, status)
+	}
+	if err := ensureUniqueUserStatus(app, record.GetString("user"), status, record.Id); err != nil {
+		return err
 	}
 	record.Set("status", status)
 	return app.Save(record)
 }
 
-func Delete(app *pocketbase.PocketBase, record *core.Record) error {
+func Activate(app core.App, record *core.Record) error {
+	if record == nil {
+		return fmt.Errorf("missing battleplan")
+	}
+	return app.RunInTransaction(func(txApp core.App) error {
+		target, err := txApp.FindRecordById("battleplans", record.Id)
+		if err != nil {
+			return err
+		}
+		current := strings.TrimSpace(target.GetString("status"))
+		if current == StatusActive {
+			return nil
+		}
+		if !CanTransition(current, StatusActive) {
+			return fmt.Errorf("invalid status transition %s -> %s", current, StatusActive)
+		}
+		userID := strings.TrimSpace(target.GetString("user"))
+		if userID == "" {
+			return fmt.Errorf("missing user")
+		}
+		active, err := txApp.FindRecordsByFilter(
+			"battleplans",
+			"user = {:user} && status = {:status} && id != {:id}",
+			"",
+			1,
+			0,
+			map[string]any{
+				"user":   userID,
+				"status": StatusActive,
+				"id":     target.Id,
+			},
+		)
+		if err != nil {
+			return err
+		}
+		if len(active) > 0 {
+			active[0].Set("status", StatusArchived)
+			if err := txApp.Save(active[0]); err != nil {
+				return err
+			}
+		}
+		target.Set("status", StatusActive)
+		return txApp.Save(target)
+	})
+}
+
+func ensureUniqueUserStatus(app core.App, userID, status, excludeID string) error {
+	if status != StatusActive && status != StatusDraft {
+		return nil
+	}
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return fmt.Errorf("missing user")
+	}
+	filter := "user = {:user} && status = {:status}"
+	params := map[string]any{
+		"user":   userID,
+		"status": status,
+	}
+	if strings.TrimSpace(excludeID) != "" {
+		filter += " && id != {:id}"
+		params["id"] = excludeID
+	}
+	records, err := app.FindRecordsByFilter("battleplans", filter, "", 1, 0, params)
+	if err != nil {
+		return err
+	}
+	if len(records) > 0 {
+		return StatusCollisionError{Status: status, ExistingID: records[0].Id}
+	}
+	return nil
+}
+
+func Delete(app core.App, record *core.Record) error {
 	if record == nil {
 		return fmt.Errorf("missing battleplan")
 	}
 	return app.Delete(record)
 }
 
-func ListForUser(app *pocketbase.PocketBase, userID string, perPage, offset int) ([]ListItem, error) {
+func ListForUser(app core.App, userID string, perPage, offset int) ([]ListItem, error) {
 	records, err := app.FindRecordsByFilter(
 		"battleplans",
 		"user = {:user}",
@@ -240,7 +342,7 @@ func ListForUser(app *pocketbase.PocketBase, userID string, perPage, offset int)
 	return items, nil
 }
 
-func CanView(app *pocketbase.PocketBase, actor *core.Record, record *core.Record) (bool, error) {
+func CanView(app core.App, actor *core.Record, record *core.Record) (bool, error) {
 	if actor == nil || record == nil {
 		return false, nil
 	}
@@ -256,7 +358,7 @@ func CanView(app *pocketbase.PocketBase, actor *core.Record, record *core.Record
 	return shareGroup(app, actor.Id, record.GetString("user"))
 }
 
-func shareGroup(app *pocketbase.PocketBase, actorID, ownerID string) (bool, error) {
+func shareGroup(app core.App, actorID, ownerID string) (bool, error) {
 	mine, err := app.FindRecordsByFilter(
 		"user_groups",
 		"user = {:user}",

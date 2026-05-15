@@ -2,10 +2,12 @@ package battleplans
 
 import (
 	"encoding/json"
+	"fmt"
+	"strings"
 
 	backendinternal "members/backend/internal"
 
-	"github.com/pocketbase/pocketbase"
+	"github.com/pocketbase/pocketbase/core"
 )
 
 type Config struct {
@@ -50,7 +52,7 @@ type VisibilityDef struct {
 	Default bool   `json:"default,omitempty"`
 }
 
-func LoadConfig(app *pocketbase.PocketBase) (*Config, error) {
+func LoadConfig(app core.App) (*Config, error) {
 	raw, err := backendinternal.FindSettingData(app, "battleplan")
 	if err != nil {
 		return nil, err
@@ -63,7 +65,61 @@ func LoadConfig(app *pocketbase.PocketBase) (*Config, error) {
 	if err := json.Unmarshal(bytes, &cfg); err != nil {
 		return nil, err
 	}
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
 	return &cfg, nil
+}
+
+func (c *Config) Validate() error {
+	if c == nil {
+		return fmt.Errorf("battleplan config missing")
+	}
+	if len(c.Durations) == 0 {
+		return fmt.Errorf("battleplan config missing durations")
+	}
+	for _, item := range c.Durations {
+		if item.Value <= 0 {
+			return fmt.Errorf("battleplan config invalid duration")
+		}
+	}
+	if len(c.Visibility) == 0 {
+		return fmt.Errorf("battleplan config missing visibility")
+	}
+	seenVisibility := map[string]struct{}{}
+	for _, item := range c.Visibility {
+		value := strings.TrimSpace(item.Value)
+		if value == "" {
+			return fmt.Errorf("battleplan config invalid visibility")
+		}
+		if _, ok := seenVisibility[value]; ok {
+			return fmt.Errorf("battleplan config duplicate visibility %q", value)
+		}
+		seenVisibility[value] = struct{}{}
+	}
+	if len(c.Pillars) == 0 {
+		return fmt.Errorf("battleplan config missing pillars")
+	}
+	seenPillars := map[string]struct{}{}
+	for _, item := range c.Pillars {
+		key := strings.TrimSpace(item.Key)
+		if key == "" {
+			return fmt.Errorf("battleplan config invalid pillar")
+		}
+		if _, ok := seenPillars[key]; ok {
+			return fmt.Errorf("battleplan config duplicate pillar %q", key)
+		}
+		seenPillars[key] = struct{}{}
+	}
+	if len(c.Cadences) == 0 {
+		return fmt.Errorf("battleplan config missing cadences")
+	}
+	for _, item := range c.Cadences {
+		if !IsValidCadence(Cadence{Type: item.Type, Days: []string{"mon"}, Times: 1}) {
+			return fmt.Errorf("battleplan config invalid cadence %q", item.Type)
+		}
+	}
+	return nil
 }
 
 func (c *Config) IsValidPillarKey(key string) bool {

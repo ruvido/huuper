@@ -67,10 +67,8 @@
     if (!nextBtn || nextBtn.disabled) return;
     nextBtn.disabled = true;
     try {
-      await auth.apiFetch(`/api/me/battleplans/${encodeURIComponent(state.viewId)}/status`, {
+      await auth.apiFetch(`/api/me/battleplans/${encodeURIComponent(state.viewId)}/activate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "active" }),
       });
       window.location.href = `${basePath()}/`;
     } catch { nextBtn.disabled = false; }
@@ -88,13 +86,13 @@
       dom.sticky.insertBefore(button, dom.sticky.firstChild);
     }
     const viewCopy = (((window.appCopy || {}).battleplan || {}).view) || {};
-    button.textContent = (viewCopy.addNoteLabel || "+ Add Note").toUpperCase();
+    button.textContent = (viewCopy.addNoteLabel || "").toUpperCase();
     button.onclick = () => {
       if (!window.appRequestNoteSheet) return;
       window.appRequestNoteSheet.open({
-        title: viewCopy.addNoteTitle || "Add battleplan note",
-        submitLabel: viewCopy.addNoteSubmitLabel || "Add",
-        emptyStatus: viewCopy.addNoteEmptyStatus || "Write a note.",
+        title: viewCopy.addNoteTitle || "",
+        submitLabel: viewCopy.addNoteSubmitLabel || "",
+        emptyStatus: viewCopy.addNoteEmptyStatus || "",
         statusNode: dom.status,
         onSubmit: async (note, sheetButton) => {
           sheetButton.disabled = true;
@@ -133,7 +131,7 @@
     if (!nextBtn || !nextLabel) return;
     nextBtn.setAttribute("type", "button");
     nextBtn.removeAttribute("form");
-    if (status === "draft" && !state.hasExistingActive) {
+    if (status === "draft") {
       nextLabel.textContent = (viewCopy.activateLabel || "").toUpperCase();
       setNextIcon("edit", PREFIX);
       nextBtn.onclick = () => activateCurrentView(deps);

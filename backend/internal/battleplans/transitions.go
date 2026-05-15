@@ -9,6 +9,9 @@ var allowedTransitions = map[string]map[string]bool{
 
 // CanTransition reports whether moving a record from `from` to `to` is allowed.
 func CanTransition(from, to string) bool {
+	if !IsValidStatus(from) || !IsValidStatus(to) {
+		return false
+	}
 	if from == to {
 		return true
 	}

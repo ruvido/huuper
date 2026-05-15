@@ -1,6 +1,7 @@
 package me
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -95,7 +96,7 @@ func CreateBattleplanHandler(app *pocketbase.PocketBase) func(e *core.RequestEve
 		}
 		record, err := battleplans.Create(app, actor.Id, input)
 		if err != nil {
-			return apis.NewBadRequestError("failed_battleplan_create", err)
+			return battleplanBadRequest("failed_battleplan_create", err)
 		}
 		return e.JSON(http.StatusCreated, battleplans.MapItem(record))
 	}
@@ -139,10 +140,35 @@ func BattleplanStatusHandler(app *pocketbase.PocketBase) func(e *core.RequestEve
 			return apis.NewBadRequestError("invalid_status_transition", nil)
 		}
 		if err := battleplans.SetStatus(app, record, next); err != nil {
-			return apis.NewBadRequestError("failed_battleplan_status", err)
+			return battleplanBadRequest("failed_battleplan_status", err)
 		}
 		return e.JSON(http.StatusOK, battleplans.MapItem(record))
 	}
+}
+
+func ActivateBattleplanHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		_, record, err := requireOwnedBattleplan(app, e)
+		if err != nil {
+			return err
+		}
+		if err := battleplans.Activate(app, record); err != nil {
+			return battleplanBadRequest("failed_battleplan_activate", err)
+		}
+		refreshed, err := loadBattleplan(app, record.Id)
+		if err != nil {
+			return err
+		}
+		return e.JSON(http.StatusOK, battleplans.MapItem(refreshed))
+	}
+}
+
+func battleplanBadRequest(fallback string, err error) error {
+	var collision battleplans.StatusCollisionError
+	if errors.As(err, &collision) {
+		return apis.NewBadRequestError(collision.Error(), nil)
+	}
+	return apis.NewBadRequestError(fallback, err)
 }
 
 func BattleplanNoteHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {

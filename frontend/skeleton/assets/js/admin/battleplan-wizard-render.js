@@ -136,13 +136,14 @@
     const customSelected = !!state.input.use_end_date;
     const customDate = state.input.end_date || "";
     const sharedCopy = (window.appCopy && window.appCopy.battleplan && window.appCopy.battleplan.wizardShared) || {};
-    const titleText = sharedCopy.endDateTitle || copy.labels.durationField || "End Date";
+    const titleText = sharedCopy.endDateTitle || copy.labels.durationField;
     const descText = sharedCopy.endDateDescription || "";
+    const placeholder = sharedCopy.endDatePlaceholder || "";
     const introBlock = descText ? `<div class="intro-quote"><p>${esc(descText)}</p></div>` : "";
     const durationOpts = state.cfg.durations.map((item) => `
       <label class="wizard-end-date-preset segmented-option">
         <input type="radio" name="duration_choice" value="${item.value}" ${!customSelected && state.input.duration_days === item.value ? "checked" : ""} />
-        <span>${item.value}${esc(copy.daysSuffix || "D")}</span>
+        <span>${item.value}${esc(copy.daysSuffix)}</span>
       </label>
     `).join("");
     dom.stage.innerHTML = `
@@ -154,7 +155,7 @@
         <div class="wizard-end-date-presets segmented">${durationOpts}</div>
         <div class="wizard-end-date-custom segmented-option${customSelected ? "" : " is-empty"}">
           <input type="radio" name="duration_choice" value="custom" ${customSelected ? "checked" : ""} />
-          <input type="text" name="duration_end_date" inputmode="numeric" autocomplete="off" placeholder="yyyy-mm-dd" maxlength="10" value="${esc(customDate)}" />
+          <input type="text" name="duration_end_date" inputmode="numeric" autocomplete="off" placeholder="${esc(placeholder)}" maxlength="10" value="${esc(customDate)}" />
         </div>
       </section>
     `;
@@ -286,7 +287,7 @@
     return raw.slice(0, 10);
   }
 
-  function renderNotesHTML(notes) {
+  function renderNotesHTML(notes, label) {
     if (!Array.isArray(notes) || notes.length === 0) return "";
     const items = notes.map((note) => {
       const noteText = String((note && note.text) || "").trim();
@@ -313,7 +314,7 @@
     }).filter(Boolean).join("");
     return items ? `
       <div>
-        <label class="field-label wizard-summary-tag">Notes</label>
+        <label class="field-label wizard-summary-tag">${esc(label || "")}</label>
         <div class="battleplan-notes-history">${items}</div>
       </div>
     ` : "";
@@ -396,7 +397,8 @@
     const priorityTargetAttrs = summaryView
       ? ""
       : ` class="wizard-summary-edit-target" data-action="go-step" data-step="1"`;
-    const notesHTML = summaryView ? renderNotesHTML(state.input.data.notes) : "";
+    const viewCopy = (window.appCopy && window.appCopy.battleplan && window.appCopy.battleplan.view) || {};
+    const notesHTML = summaryView ? renderNotesHTML(state.input.data.notes, viewCopy.notesLabel) : "";
 
     const topErrorSlot = document.getElementById(`${PREFIX}-top-error`);
     if (topErrorSlot) {

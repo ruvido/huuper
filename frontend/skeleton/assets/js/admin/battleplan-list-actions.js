@@ -17,7 +17,12 @@
       && window.appCopy.battleplan
       && window.appCopy.battleplan.placeholder
       && window.appCopy.battleplan.placeholder.label;
+    const aria = window.appCopy
+      && window.appCopy.battleplan
+      && window.appCopy.battleplan.list
+      && window.appCopy.battleplan.list.sectionAriaLabel;
     if (labelEl && labelText) labelEl.textContent = labelText;
+    if (aria) placeholder.setAttribute("aria-label", aria);
     placeholder.hidden = false;
     const fab = document.querySelector('[data-wizard-new]');
     if (fab) fab.hidden = true;
@@ -34,7 +39,12 @@
         const hero = document.getElementById("battleplan-hero");
         const target = document.getElementById("battleplan-hero-title");
         if (!hero || !target) return;
-        target.innerHTML = `${title} <span class="dashboard-title-comingsoon">(Coming soon!)</span>`;
+        const label = ((window.appCopy || {}).battleplan || {}).list.heroComingSoonLabel || "";
+        target.textContent = `${title} `;
+        const soon = document.createElement("span");
+        soon.className = "dashboard-title-comingsoon";
+        soon.textContent = label;
+        target.appendChild(soon);
         hero.hidden = false;
       } catch (_) {
         /* hero is optional */

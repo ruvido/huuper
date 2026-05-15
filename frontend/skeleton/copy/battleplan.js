@@ -8,6 +8,7 @@ window.appCopy = Object.assign({}, window.appCopy || {}, {
       archiveSectionLabel: "Archive",
       duplicateLabel: "Duplicate",
       newPlanLabel: "New Plan",
+      heroComingSoonLabel: "(Coming soon!)",
       emptyLabel: "No battleplan yet",
       errorMessage: "Battleplan unavailable.",
       sectionAriaLabel: "Battleplan",
@@ -30,6 +31,7 @@ window.appCopy = Object.assign({}, window.appCopy || {}, {
       addNoteSubmitLabel: "Add",
       addNoteEmptyStatus: "Write a note.",
       activateLabel: "Activate",
+      notesLabel: "Notes",
       deleteLabel: "Delete",
       deleteDialog: {
         title: "Delete this battleplan?",
@@ -51,6 +53,7 @@ window.appCopy = Object.assign({}, window.appCopy || {}, {
       summaryDraftBadge: "DRAFT",
       endDateTitle: "End Date",
       endDateDescription: "Choose when the battleplan ends.",
+      endDatePlaceholder: "yyyy-mm-dd",
     },
     placeholder: {
       label: "sharpening the blades",

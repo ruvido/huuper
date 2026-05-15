@@ -188,7 +188,7 @@
     if (state.step === 1) return String(cfgmod.priorityCopy(state).title || "").toUpperCase();
     if (isEndDateStep()) {
       const sharedCopy = (window.appCopy && window.appCopy.battleplan && window.appCopy.battleplan.wizardShared) || {};
-      return String(sharedCopy.endDateTitle || copy.labels.durationField || "End Date").toUpperCase();
+      return String(sharedCopy.endDateTitle || copy.labels.durationField).toUpperCase();
     }
     const def = state.cfg.pillars[state.step - 2];
     return def ? def.label.toUpperCase() : "";
@@ -791,9 +791,11 @@
             target.objective = String(src.objective || "");
             if (Array.isArray(src.routines)) {
               target.routines = src.routines.map((r) => ({
+                id: String((r && r.id) || ""),
                 title: String((r && r.title) || ""),
                 trigger: String((r && r.trigger) || ""),
                 cadence: (r && r.cadence && typeof r.cadence === "object") ? r.cadence : { type: cfgmod.defaultCadenceType(state.cfg) },
+                created: String((r && r.created) || ""),
               }));
             }
           }
