@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	backendinternal "members/backend/internal"
+	backendrequests "members/backend/internal/requests"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
@@ -18,6 +19,31 @@ func RegisterUsersNormalization(app *pocketbase.PocketBase) {
 		}
 		if err := normalizeUserProfileData(e.Record); err != nil {
 			return err
+		}
+		return e.Next()
+	})
+}
+
+// RegisterUsersAuthGate blocks authentication for users that haven't
+// finished the onboarding flow yet. This is defense-in-depth: under
+// normal flow such users have a random unknown password and cannot
+// log in via password, but the hook also blocks OAuth2 and any path
+// that bypasses password verification, so it is impossible to reach
+// the API as an authenticated user with an empty profile.
+func RegisterUsersAuthGate(app *pocketbase.PocketBase) {
+	app.OnRecordAuthRequest("users").BindFunc(func(e *core.RecordAuthRequestEvent) error {
+		if e.Record == nil {
+			return e.Next()
+		}
+		data := backendinternal.ParseJSONMap(e.Record.Get("data"))
+		if strings.TrimSpace(backendinternal.AnyToString(data["onboarding_completed_at"])) == "" {
+			token, err := backendrequests.EnsureOnboardingToken(e.App, e.Record.Id)
+			if err != nil {
+				return apis.NewForbiddenError("onboarding_incomplete", map[string]any{"error": err.Error()})
+			}
+			return apis.NewForbiddenError("onboarding_incomplete", map[string]any{
+				"onboarding_url": backendrequests.BuildOnboardingURL(e.App, token),
+			})
 		}
 		return e.Next()
 	})

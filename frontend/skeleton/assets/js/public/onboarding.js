@@ -45,7 +45,9 @@
     fields: [],
     values: {},
     fileFields: new Set(),
-    stepIndex: -2,
+    stepIndex: -1,
+    password: "",
+    passwordConfirm: "",
     passwordMin: 0,
     ready: false,
     submitting: false,
@@ -90,14 +92,14 @@
     if (isStartScreen()) {
       return 0;
     }
-    if (isPasswordScreen()) {
-      return 1;
-    }
     if (isConfirmationScreen()) {
       return state.fields.length + 2;
     }
+    if (isPasswordScreen()) {
+      return state.fields.length + 1;
+    }
     if (state.stepIndex >= 0) {
-      return state.stepIndex + 2;
+      return state.stepIndex + 1;
     }
     return hasStartPage() ? 0 : 1;
   }
@@ -112,25 +114,25 @@
     const rawStep = new URLSearchParams(window.location.search).get("step");
     const parsedStep = Number(rawStep);
     if (!Number.isInteger(parsedStep) || parsedStep < 0) {
-      return hasStartPage() ? -1 : -2;
+      return hasStartPage() ? -1 : 0;
     }
 
     if (parsedStep === 0) {
-      return hasStartPage() ? -1 : -2;
+      return hasStartPage() ? -1 : 0;
     }
-    if (parsedStep === 1) {
-      return -2;
-    }
-    if (hasConfirmationPage() && parsedStep === state.fields.length + 2) {
+    if (parsedStep === state.fields.length + 1) {
       return state.fields.length;
     }
+    if (hasConfirmationPage() && parsedStep === state.fields.length + 2) {
+      return state.fields.length + 1;
+    }
 
-    const fieldIndex = parsedStep - 2;
+    const fieldIndex = parsedStep - 1;
     if (fieldIndex >= 0 && fieldIndex < state.fields.length) {
       return fieldIndex;
     }
 
-    return hasStartPage() ? -1 : -2;
+    return hasStartPage() ? -1 : 0;
   }
 
   function hasStartPage() {
@@ -142,7 +144,7 @@
   }
 
   function isPasswordScreen() {
-    return state.stepIndex === -2;
+    return state.stepIndex === state.fields.length;
   }
 
   function isStartScreen() {
@@ -150,7 +152,7 @@
   }
 
   function isConfirmationScreen() {
-    return hasConfirmationPage() && state.stepIndex === state.fields.length;
+    return hasConfirmationPage() && state.stepIndex === state.fields.length + 1;
   }
 
   function currentField() {
@@ -178,15 +180,15 @@
     progressNode.hidden = startScreen || confirmationScreen;
     if (fieldScreen) {
       progressNode.hidden = false;
-      progressNode.textContent = `Step ${state.stepIndex + 2} / ${totalSteps()}`;
+      progressNode.textContent = `Step ${state.stepIndex + 1} / ${totalSteps()}`;
     } else if (passwordScreen) {
       progressNode.hidden = false;
-      progressNode.textContent = `Step 1 / ${totalSteps()}`;
+      progressNode.textContent = `Step ${state.fields.length + 1} / ${totalSteps()}`;
     } else {
       progressNode.textContent = "";
     }
 
-    backButton.hidden = (passwordScreen && !hasStartPage()) || (!fieldScreen && !confirmationScreen && !startScreen && !passwordScreen);
+    backButton.hidden = startScreen || (state.stepIndex === 0 && !hasStartPage());
     backButton.disabled = state.submitting;
     topbarNode.hidden = startScreen || confirmationScreen;
     actionsNode.hidden = !startScreen;
@@ -369,7 +371,7 @@
     errorButton.className = "onboarding-confirmation-error meta-text is-error";
     errorButton.hidden = true;
     errorButton.addEventListener("click", () => {
-      state.stepIndex = hasStartPage() ? -1 : -2;
+      state.stepIndex = hasStartPage() ? -1 : 0;
       setStatus("", true);
       render();
     });
@@ -380,8 +382,8 @@
   }
 
   function renderFieldScreen(field) {
-    if (field && field.key === "avatar" && field.type === "file") {
-      renderAvatarScreen(field);
+    if (field && field.type === "file") {
+      renderFileScreen(field);
       return;
     }
 
@@ -407,7 +409,7 @@
     updateActions();
   }
 
-  function renderAvatarScreen(field) {
+  function renderFileScreen(field) {
     clearFieldStatus();
     currentFieldErrorNode = fieldErrorNode;
     stepNode.innerHTML = "";
@@ -419,7 +421,7 @@
     const preview = document.createElement("div");
     preview.className = "avatar-preview";
     const previewImg = document.createElement("img");
-    previewImg.alt = "Anteprima avatar";
+    previewImg.alt = "Anteprima immagine";
     preview.appendChild(previewImg);
     preview.hidden = true;
     wrapper.appendChild(preview);
@@ -595,7 +597,7 @@
     }
   }
 
-  async function submitPassword() {
+  function validateAndStorePassword() {
     const passwordField = document.querySelector("#onboarding-password");
     const passwordConfirmField = document.querySelector("#onboarding-password-confirm");
     const passwordStatusNode = document.querySelector("#onboarding-password-error");
@@ -633,56 +635,17 @@
       return false;
     }
 
-    state.submitting = true;
-    updateActions();
-
-    try {
-      const response = await fetch(`/api/public/onboarding/${encodeURIComponent(token)}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          password,
-          password_confirm: passwordConfirm,
-        }),
-      });
-      if (!response.ok) {
-        let message = "Unable to set your password.";
-        try {
-          const payload = await response.json();
-          message = text(payload && payload.message) || message;
-        } catch (_) {}
-        throw new Error(message);
-      }
-      const payload = await response.json();
-      const email = text(payload.email || state.email).toLowerCase();
-      if (!email) {
-        throw new Error("missing_email");
-      }
-      await window.appAuth.login(email, password);
-      state.stepIndex = 0;
-      state.submitting = false;
-      setStatus("", true);
-      render();
-      return true;
-    } catch (error) {
-      state.submitting = false;
-      updateActions();
-      setStatus(error && error.message ? error.message : "Unable to set your password.", false);
-      return false;
-    }
+    state.password = password;
+    state.passwordConfirm = passwordConfirm;
+    return true;
   }
 
   async function finalizeOnboarding() {
-    const auth = window.appAuth.read();
-    if (!auth || !auth.token) {
-      throw new Error("missing_auth");
-    }
-
     const payload = collectProfileData();
     const formData = new FormData();
     formData.append("data", JSON.stringify(payload));
+    formData.append("password", state.password);
+    formData.append("password_confirm", state.passwordConfirm);
     for (const [key, value] of Object.entries(state.values)) {
       if (value instanceof File) {
         formData.append(key, value, value.name || `${key}.png`);
@@ -693,51 +656,81 @@
       method: "POST",
       body: formData,
     });
+
     if (!response.ok) {
-      throw new Error("failed_to_finalize_onboarding");
+      let errorMessage = "Unable to complete onboarding.";
+      let missingFields = null;
+      try {
+        const errorPayload = await response.json();
+        if (errorPayload && errorPayload.message === "missing_onboarding_fields" && errorPayload.data && Array.isArray(errorPayload.data.missing)) {
+          missingFields = errorPayload.data.missing;
+          errorMessage = `Missing required fields: ${missingFields.join(", ")}`;
+        } else {
+          errorMessage = text(errorPayload && errorPayload.message) || errorMessage;
+        }
+      } catch (_) {}
+      throw new Error(errorMessage);
     }
 
     const result = await response.json();
+    await window.appAuth.login(state.email, state.password);
     return result;
+  }
+
+  function showFinalizationError(errorMessage) {
+    if (confirmationErrorNode) {
+      confirmationErrorNode.innerHTML = [
+        "Oh no! There is an error.<br>",
+        errorMessage || "Start again the onboarding to fix the error.",
+        ' <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-counterclockwise" viewBox="0 0 16 16" aria-hidden="true" focusable="false">',
+        '  <path fill-rule="evenodd" d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2z"/>',
+        '  <path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466"/>',
+        "</svg>",
+      ].join("");
+      confirmationErrorNode.hidden = false;
+      confirmationErrorNode.classList.add("is-error");
+    }
+  }
+
+  async function runFinalize() {
+    state.submitting = true;
+    updateActions();
+    try {
+      await finalizeOnboarding();
+      window.location.replace("/me/");
+    } catch (err) {
+      state.submitting = false;
+      updateActions();
+      showFinalizationError(err && err.message ? err.message : null);
+    }
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
     setStatus("", true);
 
-    if (isPasswordScreen()) {
-      await submitPassword();
-      return;
-    }
-
     if (isStartScreen()) {
-      state.stepIndex = -2;
+      state.stepIndex = 0;
       render();
       return;
     }
 
-    if (isConfirmationScreen()) {
-      state.submitting = true;
-      updateActions();
-      try {
-        await finalizeOnboarding();
-        window.location.replace("/me/");
-      } catch (_) {
-        state.submitting = false;
-        updateActions();
-        if (confirmationErrorNode) {
-          confirmationErrorNode.innerHTML = [
-            "Oh no! There is an error.<br>",
-            "Start again the onboarding to fix the error.",
-            ' <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-counterclockwise" viewBox="0 0 16 16" aria-hidden="true" focusable="false">',
-            '  <path fill-rule="evenodd" d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2z"/>',
-            '  <path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466"/>',
-            "</svg>",
-          ].join("");
-          confirmationErrorNode.hidden = false;
-          confirmationErrorNode.classList.add("is-error");
-        }
+    if (isPasswordScreen()) {
+      const ok = validateAndStorePassword();
+      if (!ok) {
+        return;
       }
+      if (hasConfirmationPage()) {
+        state.stepIndex = state.fields.length + 1;
+        render();
+      } else {
+        await runFinalize();
+      }
+      return;
+    }
+
+    if (isConfirmationScreen()) {
+      await runFinalize();
       return;
     }
 
@@ -757,9 +750,7 @@
       return;
     }
     if (!publicCommon.isFieldComplete(field, state.values[field.key])) {
-      const message = field.key === "avatar" && field.type === "file"
-        ? "Load an image."
-        : "This field is required.";
+      const message = field.type === "file" ? "Load an image." : "This field is required.";
       if (currentFieldErrorNode) {
         currentFieldErrorNode.textContent = message;
         currentFieldErrorNode.hidden = false;
@@ -773,33 +764,8 @@
     }
 
     if (state.stepIndex >= state.fields.length - 1) {
-      if (hasConfirmationPage()) {
-        state.stepIndex = state.fields.length;
-        render();
-        return;
-      }
-
-      state.submitting = true;
-      updateActions();
-      try {
-        await finalizeOnboarding();
-        window.location.replace("/me/");
-      } catch (_) {
-        state.submitting = false;
-        updateActions();
-        if (confirmationErrorNode) {
-          confirmationErrorNode.innerHTML = [
-            "Oh no! There is an error.<br>",
-            "Start again the onboarding to fix the error.",
-            ' <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-counterclockwise" viewBox="0 0 16 16" aria-hidden="true" focusable="false">',
-            '  <path fill-rule="evenodd" d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2z"/>',
-            '  <path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466"/>',
-            "</svg>",
-          ].join("");
-          confirmationErrorNode.hidden = false;
-          confirmationErrorNode.classList.add("is-error");
-        }
-      }
+      state.stepIndex = state.fields.length;
+      render();
       return;
     }
 
@@ -809,19 +775,17 @@
 
   backButton.addEventListener("click", () => {
     setStatus("", true);
+    if (isStartScreen()) {
+      return;
+    }
     if (isConfirmationScreen()) {
-      state.stepIndex = state.fields.length - 1;
+      state.stepIndex = state.fields.length;
       render();
       return;
     }
     if (isPasswordScreen()) {
-      if (hasStartPage()) {
-        state.stepIndex = -1;
-        render();
-      }
-      return;
-    }
-    if (isStartScreen()) {
+      state.stepIndex = state.fields.length - 1;
+      render();
       return;
     }
     if (state.stepIndex > 0) {
@@ -829,8 +793,8 @@
       render();
       return;
     }
-    if (state.stepIndex === 0) {
-      state.stepIndex = -2;
+    if (state.stepIndex === 0 && hasStartPage()) {
+      state.stepIndex = -1;
       render();
     }
   });
@@ -838,7 +802,7 @@
   startButton.addEventListener("click", () => {
     setStatus("", true);
     if (isStartScreen()) {
-      state.stepIndex = -2;
+      state.stepIndex = 0;
       render();
     }
   });
@@ -848,11 +812,6 @@
   loadFlow()
     .then(() => {
       setLoading("", false);
-      if (isPasswordScreen()) {
-        render();
-        return;
-      }
-      form.hidden = false;
       render();
     })
     .catch(() => {

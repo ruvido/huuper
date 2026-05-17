@@ -19,8 +19,6 @@ func RegisterRoutes(app *pocketbase.PocketBase, se *core.ServeEvent) {
 		RequestsOTPVerify:  publicroutes.VerifyRequestEmailOTPHandler(app),
 		RequestsCreate:     publicroutes.SubmitRequestHandler(app),
 		OnboardingGet:      publicroutes.OnboardingGetHandler(app),
-		OnboardingComplete: publicroutes.OnboardingCompleteHandler(app),
-		OnboardingProfile:  publicroutes.OnboardingProfileHandler(app),
 		OnboardingFinalize: publicroutes.OnboardingFinalizeHandler(app),
 	})
 

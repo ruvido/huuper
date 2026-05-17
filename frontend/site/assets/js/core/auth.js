@@ -96,8 +96,13 @@ window.appAuth = (() => {
     });
 
     if (!response.ok) {
-      const error = new Error("auth_failed");
+      let payload = null;
+      try {
+        payload = await response.json();
+      } catch (_) {}
+      const error = new Error((payload && payload.message) || "auth_failed");
       error.status = response.status;
+      error.data = payload && payload.data ? payload.data : null;
       throw error;
     }
 

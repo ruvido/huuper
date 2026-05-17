@@ -69,7 +69,9 @@ func CancelUserHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) er
 
 		tginternal.RevokeAndDeleteUserInviteTokens(app, userID)
 		tginternal.DeleteUserTelegramAuthTokens(app, userID)
-		requestinternal.DeleteOnboardingTokensForUser(app, userID)
+		if err := requestinternal.DeleteOnboardingTokensForUser(app, userID); err != nil {
+			return apis.NewBadRequestError("failed_cleanup_onboarding_tokens", err)
+		}
 
 		removedMemberships, err := deleteUserGroupMemberships(app, userID)
 		if err != nil {
@@ -110,7 +112,9 @@ func DeleteUserHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) er
 
 		tginternal.RevokeAndDeleteUserInviteTokens(app, userID)
 		tginternal.DeleteUserTelegramAuthTokens(app, userID)
-		requestinternal.DeleteOnboardingTokensForUser(app, userID)
+		if err := requestinternal.DeleteOnboardingTokensForUser(app, userID); err != nil {
+			return apis.NewBadRequestError("failed_cleanup_onboarding_tokens", err)
+		}
 
 		removedMemberships, err := deleteUserGroupMemberships(app, userID)
 		if err != nil {

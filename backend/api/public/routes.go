@@ -10,8 +10,6 @@ type Handlers struct {
 	RequestsOTPVerify  func(e *core.RequestEvent) error
 	RequestsCreate     func(e *core.RequestEvent) error
 	OnboardingGet      func(e *core.RequestEvent) error
-	OnboardingComplete func(e *core.RequestEvent) error
-	OnboardingProfile  func(e *core.RequestEvent) error
 	OnboardingFinalize func(e *core.RequestEvent) error
 }
 
@@ -23,7 +21,5 @@ func Register(se *core.ServeEvent, h Handlers) {
 	se.Router.POST("/api/public/requests/email-otp/verify", h.RequestsOTPVerify)
 	se.Router.POST("/api/public/requests", h.RequestsCreate)
 	se.Router.GET("/api/public/onboarding/{token}", h.OnboardingGet)
-	se.Router.POST("/api/public/onboarding/{token}", h.OnboardingComplete)
-	se.Router.POST("/api/public/onboarding/{token}/profile", h.OnboardingProfile)
 	se.Router.POST("/api/public/onboarding/{token}/finalize", h.OnboardingFinalize)
 }

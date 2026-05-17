@@ -85,7 +85,7 @@ func LoadProfileSchemaSettings(app *pocketbase.PocketBase) (ProfileSchemaConfig,
 	return cfg, nil
 }
 
-func LoadOnboardingSettings(app *pocketbase.PocketBase) (OnboardingSettingsConfig, error) {
+func LoadOnboardingSettings(app core.App) (OnboardingSettingsConfig, error) {
 	raw, err := FindSettingData(app, "onboarding")
 	if err != nil {
 		return OnboardingSettingsConfig{}, err

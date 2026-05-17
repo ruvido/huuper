@@ -316,7 +316,9 @@ func resetExistingUserOnboarding(app *pocketbase.PocketBase, user *core.Record, 
 		return apis.NewBadRequestError("failed_to_reset_onboarding_user", err)
 	}
 
-	DeleteOnboardingTokensForUser(app, user.Id)
+	if err := DeleteOnboardingTokensForUser(app, user.Id); err != nil {
+		return apis.NewBadRequestError("failed_to_delete_onboarding_tokens", err)
+	}
 	onboardingToken, err := GenerateOnboardingToken(app, user.Id)
 	if err != nil {
 		return apis.NewBadRequestError("failed_to_create_onboarding_token", err)
@@ -409,7 +411,9 @@ func rollbackPromotedUser(app *pocketbase.PocketBase, userID string, inviteGroup
 		}
 		_ = tginternal.DeleteInviteToken(app, userID, groupID)
 	}
-	DeleteOnboardingTokensForUser(app, userID)
+	if err := DeleteOnboardingTokensForUser(app, userID); err != nil {
+		log.Printf("[rollback] user=%s onboarding token cleanup failed: %v", userID, err)
+	}
 	user, err := app.FindRecordById("users", userID)
 	if err == nil && user != nil {
 		_ = app.Delete(user)

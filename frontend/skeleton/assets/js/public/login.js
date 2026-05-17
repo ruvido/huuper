@@ -71,7 +71,14 @@
     try {
       const result = await window.appAuth.login(email, password);
       window.location.href = window.appAuth.redirectAfterLogin(result.scope);
-    } catch (_) {
+    } catch (error) {
+      const onboardingURL = error && error.data && typeof error.data.onboarding_url === "string"
+        ? error.data.onboarding_url.trim()
+        : "";
+      if (onboardingURL) {
+        window.location.href = onboardingURL;
+        return;
+      }
       setStatus(loginErrorNode, "Invalid credentials.", true);
     }
   });

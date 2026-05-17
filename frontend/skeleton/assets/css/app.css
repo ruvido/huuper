@@ -3561,37 +3561,126 @@ body.has-section-banner .app-shell {
   background: rgba(18, 18, 14, 0.66);
 }
 
-.wizard-end-date-custom {
-  border: 1px solid var(--line);
-  background: rgba(18, 18, 14, 0.66);
-  padding: 4px;
+.wizard-end-date-custom-prompt {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-4);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-faint);
+  font-family: var(--font-family-ui);
+  font-size: var(--font-ui-s);
+  font-weight: 400;
+  letter-spacing: normal;
+  line-height: 1.4;
+  text-align: center;
+  text-transform: none;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.18);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  transition: color 120ms ease, text-decoration-color 120ms ease;
+}
+
+.wizard-end-date-custom-prompt:hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+
+.wizard-end-date-mask {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  min-height: var(--button-height-md);
+  padding: var(--space-2) 0;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: var(--font-ui-base);
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  line-height: 1;
   cursor: text;
 }
 
-.wizard-end-date-custom > input[type="radio"] {
-  display: none;
-}
-
-.wizard-end-date-custom > input[type="text"] {
-  width: 100%;
-  min-height: var(--button-height-md);
+.wizard-end-date-mask > input[type="text"] {
   border: 0;
-  padding: 0 var(--space-2);
+  padding: 0;
   margin: 0;
   background: transparent;
   color: var(--accent);
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: var(--font-ui-xs);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-align: center;
-  text-transform: uppercase;
+  font: inherit;
+  letter-spacing: 0;
+  text-transform: inherit;
+  text-align: left;
   outline: none;
+  caret-color: var(--accent);
+  min-width: 2px;
 }
 
-.wizard-end-date-custom > input[type="text"]::placeholder {
+.wizard-end-date-mask-ghost {
   color: var(--text-faint);
-  font-weight: 700;
+  white-space: pre;
+  pointer-events: none;
+  font: inherit;
+  letter-spacing: 0;
+  text-transform: inherit;
+}
+
+.wizard-page .wizard-end-date-summary,
+.wizard-page .wizard-end-date-summary > span {
+  font-family: var(--font-family-ui);
+  font-style: italic;
+  font-size: var(--font-ui-s);
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.wizard-end-date-summary {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--sticky-actions-height) + env(safe-area-inset-bottom));
+  width: min(calc(100% - (var(--shell-inline-padding) * 2)), var(--page-width));
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  color: var(--text-muted);
+  z-index: 39;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-50%) translateY(100%);
+  transition: opacity 180ms ease, transform 240ms ease, visibility 0s linear 240ms;
+}
+
+.wizard-end-date-summary.is-ok,
+.wizard-end-date-summary.is-error {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+  transition: opacity 180ms ease, transform 240ms ease, visibility 0s linear 0s;
+}
+
+.wizard-end-date-summary > svg {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  display: none;
+}
+
+.wizard-end-date-summary.is-ok > .icon-check {
+  display: block;
+  color: var(--success);
+}
+
+.wizard-end-date-summary.is-error > .icon-x {
+  display: block;
+  color: var(--danger);
 }
 
 .step-progress-aside .segmented {
@@ -3638,6 +3727,25 @@ body.has-section-banner .app-shell {
   font-family: var(--font-family-ui);
   font-weight: 800;
   letter-spacing: 0;
+}
+
+.wizard-priority-end-date {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-family-ui);
+  font-style: italic;
+  font-size: var(--font-ui-s);
+  color: var(--text-muted);
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.wizard-priority-end-date[data-action] {
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+
+.wizard-priority-end-date[data-action]:hover {
+  color: var(--accent);
 }
 
 /* === Intro Quote (italic callout, yellow left border) === */

@@ -17,6 +17,47 @@
       .replaceAll("'", "&#39;");
   }
 
+  function parseStrictDate(s) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || ""));
+    if (!m) return null;
+    const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+    const date = new Date(Date.UTC(y, mo - 1, d));
+    if (date.getUTCFullYear() !== y || date.getUTCMonth() !== mo - 1 || date.getUTCDate() !== d) return null;
+    return date;
+  }
+
+  const MAX_END_DATE_DAYS = 120;
+
+  function computeEndDateSummary(state, rawValue, sharedCopy) {
+    const value = String(rawValue || "");
+    if (value.length < 10) return { text: "", error: false };
+    const tmpl = sharedCopy.endDateSummary || "";
+    const invalidMsg = sharedCopy.endDateSummaryInvalid || "";
+    const pastMsg = sharedCopy.endDateSummaryPast || "";
+    const tooFarTmpl = sharedCopy.endDateSummaryTooFar || "";
+    const endDate = parseStrictDate(value);
+    const startDate = parseStrictDate(state.input.start_date);
+    if (!endDate || !startDate) return { text: invalidMsg, error: true };
+    const days = Math.round((endDate - startDate) / 86400000);
+    if (days <= 0) return { text: pastMsg, error: true };
+    if (days > MAX_END_DATE_DAYS) return { text: tooFarTmpl.replace("{max}", String(MAX_END_DATE_DAYS)), error: true };
+    return { text: tmpl.replace("{days}", String(days)), error: false };
+  }
+
+  function computeEndDateDisplay(state) {
+    if (state.input.use_end_date && /^\d{4}-\d{2}-\d{2}$/.test(state.input.end_date || "")) {
+      return state.input.end_date;
+    }
+    const startStr = state.input.start_date;
+    const days = Number(state.input.duration_days);
+    if (!startStr || !/^\d{4}-\d{2}-\d{2}$/.test(startStr) || !Number.isFinite(days) || days <= 0) return "";
+    const start = new Date(startStr + "T00:00:00Z");
+    if (isNaN(start.getTime())) return "";
+    const end = new Date(start.getTime() + days * 86400000);
+    if (isNaN(end.getTime())) return "";
+    return end.toISOString().slice(0, 10);
+  }
+
   function setNextIcon(kind, PREFIX) {
     const nextBtn = document.getElementById(`${PREFIX}-next`);
     if (!nextBtn) return;
@@ -138,7 +179,7 @@
     const sharedCopy = (window.appCopy && window.appCopy.battleplan && window.appCopy.battleplan.wizardShared) || {};
     const titleText = sharedCopy.endDateTitle || copy.labels.durationField;
     const descText = sharedCopy.endDateDescription || "";
-    const placeholder = sharedCopy.endDatePlaceholder || "";
+    const promptText = sharedCopy.endDateCustomPrompt || "";
     const introBlock = descText ? `<div class="intro-quote"><p>${esc(descText)}</p></div>` : "";
     const durationOpts = state.cfg.durations.map((item) => `
       <label class="wizard-end-date-preset segmented-option">
@@ -146,17 +187,31 @@
         <span>${item.value}${esc(copy.daysSuffix)}</span>
       </label>
     `).join("");
+    const template = "YYYY-MM-DD";
+    const initialGhost = template.slice(Math.min(customDate.length, template.length));
+    const initialSummary = computeEndDateSummary(state, customDate, sharedCopy);
+    const summaryClass = initialSummary.text ? (initialSummary.error ? " is-error" : " is-ok") : "";
+    const iconCheck = `<svg class="icon-check" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0m-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/></svg>`;
+    const iconX = `<svg class="icon-x" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293z"/></svg>`;
+    const customBlock = customSelected
+      ? `<input type="radio" name="duration_choice" value="custom" checked hidden />
+         <div class="wizard-end-date-mask">
+           <input type="text" name="duration_end_date" inputmode="numeric" autocomplete="off" maxlength="10" value="${esc(customDate)}" style="width:${customDate.length}ch" />
+           <span class="wizard-end-date-mask-ghost" aria-hidden="true">${esc(initialGhost)}</span>
+         </div>
+         <div class="wizard-end-date-summary${summaryClass}">
+           ${iconCheck}${iconX}
+           <span class="wizard-end-date-summary-text">${esc(initialSummary.text)}</span>
+         </div>`
+      : `<div class="wizard-end-date-presets">${durationOpts}</div>
+         <button type="button" class="wizard-end-date-custom-prompt" data-action="open-end-date-custom">${esc(promptText)}</button>`;
     dom.stage.innerHTML = `
       <section class="wizard-step wizard-step-end-date">
         <header class="wizard-step-header">
           <h2 class="display-hero">${esc(titleText)}</h2>
           ${introBlock}
         </header>
-        <div class="wizard-end-date-presets segmented">${durationOpts}</div>
-        <div class="wizard-end-date-custom segmented-option${customSelected ? "" : " is-empty"}">
-          <input type="radio" name="duration_choice" value="custom" ${customSelected ? "checked" : ""} />
-          <input type="text" name="duration_end_date" inputmode="numeric" autocomplete="off" placeholder="${esc(placeholder)}" maxlength="10" value="${esc(customDate)}" />
-        </div>
+        ${customBlock}
       </section>
     `;
   }
@@ -386,8 +441,14 @@
     }
 
     const summaryView = isSummaryView();
+    const endDate = summaryView ? computeEndDateDisplay(state) : "";
+    const endDateTemplate = sharedCopy.priorityEndDateMeta || "";
+    const endDateStep = state.cfg.pillars.length + 1;
+    const endDateBlock = endDate && endDateTemplate
+      ? `<p class="wizard-priority-end-date wizard-summary-edit-target" data-action="edit-end-date" data-step="${endDateStep}">${esc(endDateTemplate.replace("{date}", endDate))}</p>`
+      : "";
     const heroHTML = summaryView
-      ? `<h2 class="display-hero">${esc(priorityText)}</h2>`
+      ? `<h2 class="display-hero">${esc(priorityText)}</h2>${endDateBlock}`
       : (c.text ? `<h2 class="display-hero">${esc(c.text)}</h2>` : "");
     const priorityBodyHTML = summaryView
       ? (priorityWhy ? `<p class="wizard-view-why">${esc(priorityWhy)}</p>` : "")
@@ -445,5 +506,7 @@
     renderRoutine,
     renderPillar,
     renderConfirm,
+    computeEndDateSummary,
+    MAX_END_DATE_DAYS,
   };
 })();

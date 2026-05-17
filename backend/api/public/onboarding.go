@@ -17,7 +17,7 @@ import (
 	"github.com/pocketbase/pocketbase/tools/filesystem"
 )
 
-var allowedAvatarExts = map[string]bool{
+var allowedOnboardingFileExts = map[string]bool{
 	".jpg":  true,
 	".jpeg": true,
 	".png":  true,
@@ -27,7 +27,7 @@ var allowedAvatarExts = map[string]bool{
 	".heif": true,
 }
 
-var allowedAvatarMimes = map[string]bool{
+var allowedOnboardingFileMimes = map[string]bool{
 	"image/jpeg": true,
 	"image/jpg":  true,
 	"image/png":  true,
@@ -37,17 +37,17 @@ var allowedAvatarMimes = map[string]bool{
 	"image/heif": true,
 }
 
-func validateAvatarUpload(fh *multipart.FileHeader) error {
+func validateOnboardingFileUpload(fh *multipart.FileHeader) error {
 	if fh == nil {
-		return apis.NewBadRequestError("invalid_avatar", nil)
+		return apis.NewBadRequestError("invalid_file", nil)
 	}
 	ext := strings.ToLower(filepath.Ext(fh.Filename))
-	if !allowedAvatarExts[ext] {
-		return apis.NewBadRequestError("invalid_avatar_type", nil)
+	if !allowedOnboardingFileExts[ext] {
+		return apis.NewBadRequestError("invalid_file_type", nil)
 	}
 	contentType := strings.ToLower(strings.TrimSpace(fh.Header.Get("Content-Type")))
-	if contentType != "" && !allowedAvatarMimes[contentType] {
-		return apis.NewBadRequestError("invalid_avatar_type", nil)
+	if contentType != "" && !allowedOnboardingFileMimes[contentType] {
+		return apis.NewBadRequestError("invalid_file_type", nil)
 	}
 	return nil
 }
@@ -81,37 +81,35 @@ func OnboardingGetHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 	}
 }
 
-func OnboardingCompleteHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+// OnboardingFinalizeHandler is the atomic terminal step of onboarding.
+// It validates the password and that ALL required profile fields are
+// populated, then sets the user password, marks completion, and deletes
+// the onboarding token. Until this succeeds the user has no usable
+// password and cannot log in (defense-in-depth also enforced by the
+// users auth-gate hook).
+func OnboardingFinalizeHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		token := strings.TrimSpace(e.Request.PathValue("token"))
 		if token == "" {
 			return apis.NewBadRequestError("missing_token", nil)
 		}
 
-		_, user, err := backendrequests.OnboardingUserForToken(app, token)
-		if err != nil {
-			return err
+		data := map[string]any{}
+		rawData := strings.TrimSpace(e.Request.FormValue("data"))
+		if rawData != "" {
+			if err := json.Unmarshal([]byte(rawData), &data); err != nil {
+				return apis.NewBadRequestError("invalid_payload", err)
+			}
 		}
 
-		userData := backendinternal.ParseJSONMap(user.Get("data"))
-
-		var payload struct {
-			Password        string `json:"password"`
-			PasswordConfirm string `json:"password_confirm"`
-		}
-		if err := e.BindBody(&payload); err != nil {
-			return apis.NewBadRequestError("invalid_payload", err)
-		}
-
-		password := strings.TrimSpace(payload.Password)
-		passwordConfirm := strings.TrimSpace(payload.PasswordConfirm)
+		password := strings.TrimSpace(e.Request.FormValue("password"))
+		passwordConfirm := strings.TrimSpace(e.Request.FormValue("password_confirm"))
 		if password == "" || passwordConfirm == "" {
 			return apis.NewBadRequestError("missing_password", nil)
 		}
 		if password != passwordConfirm {
 			return apis.NewBadRequestError("password_mismatch", nil)
 		}
-
 		passwordMin, err := backendrequests.UserPasswordMin(app)
 		if err != nil {
 			return err
@@ -120,184 +118,88 @@ func OnboardingCompleteHandler(app *pocketbase.PocketBase) func(e *core.RequestE
 			return apis.NewBadRequestError(backendrequests.PasswordTooShortMessage(passwordMin), nil)
 		}
 
-		user.Set("password", password)
-		user.Set("passwordConfirm", passwordConfirm)
-		userData["onboarding_password_set_at"] = time.Now().UTC().Format(time.RFC3339)
-		user.Set("data", userData)
-		if err := app.Save(user); err != nil {
-			app.Logger().Error("[onboarding.complete] save failed", "user_id", user.Id, "error", err)
-			return apis.NewBadRequestError("failed_to_set_password", err)
-		}
-
-		return e.JSON(http.StatusOK, map[string]any{
-			"email":   strings.TrimSpace(user.GetString("email")),
-			"user_id": user.Id,
-			"success": true,
-		})
-	}
-}
-
-func OnboardingProfileHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
-	return func(e *core.RequestEvent) error {
-		token := strings.TrimSpace(e.Request.PathValue("token"))
-		if token == "" {
-			return apis.NewBadRequestError("missing_token", nil)
-		}
-
-		_, user, err := backendrequests.OnboardingUserForToken(app, token)
+		onboarding, err := backendrequests.LoadOnboardingSettings(app)
 		if err != nil {
 			return err
 		}
 
-		data := map[string]any{}
-		rawData := strings.TrimSpace(e.Request.FormValue("data"))
-		if rawData != "" {
-			if err := json.Unmarshal([]byte(rawData), &data); err != nil {
-				return apis.NewBadRequestError("invalid_payload", err)
-			}
-		}
-
-		if _, fh, err := e.Request.FormFile("avatar"); err == nil && fh != nil {
-			if err := validateAvatarUpload(fh); err != nil {
+		var finalizedUser *core.Record
+		txErr := app.RunInTransaction(func(txApp core.App) error {
+			_, txUser, err := backendrequests.OnboardingUserForToken(txApp, token)
+			if err != nil {
 				return err
 			}
-			file, err := filesystem.NewFileFromMultipart(fh)
-			if err != nil {
-				return apis.NewBadRequestError("invalid_avatar", err)
+
+			existingData := backendinternal.ParseJSONMap(txUser.Get("data"))
+			mergedData := backendrequests.MergeUserData(existingData, data)
+			if err := applyOnboardingFileUploads(e, txUser, onboarding); err != nil {
+				return err
 			}
-			user.Set("avatar", file)
+			if missing := backendrequests.MissingOnboardingFields(mergedData, onboarding, txUser); len(missing) > 0 {
+				return apis.NewApiError(http.StatusBadRequest, "missing_onboarding_fields", map[string]any{"missing": missing})
+			}
+
+			now := time.Now().UTC().Format(time.RFC3339)
+			mergedData["onboarding_password_set_at"] = now
+			mergedData["onboarding_completed_at"] = now
+
+			txUser.Set("password", password)
+			txUser.Set("passwordConfirm", passwordConfirm)
+			txUser.Set("data", mergedData)
+
+			if err := txApp.Save(txUser); err != nil {
+				return err
+			}
+			if err := backendrequests.DeleteOnboardingToken(txApp, token); err != nil {
+				return err
+			}
+			finalizedUser = txUser
+			return nil
+		})
+		if txErr != nil {
+			app.Logger().Error("[onboarding.finalize] commit failed", "token", token, "error", txErr)
+			return apis.NewBadRequestError("failed_to_finalize_onboarding", txErr)
 		}
 
-		existingData := backendinternal.ParseJSONMap(user.Get("data"))
-		user.Set("data", backendrequests.MergeUserData(existingData, data))
-		if err := app.Save(user); err != nil {
-			app.Logger().Error("[onboarding.profile] save failed", "user_id", user.Id, "error", err)
-			return apis.NewBadRequestError("failed_to_save_profile", err)
-		}
+		app.Logger().Info("[onboarding.finalize] completed", "user_id", finalizedUser.Id, "email", finalizedUser.GetString("email"))
 
 		return e.JSON(http.StatusOK, map[string]any{
-			"email":   strings.TrimSpace(user.GetString("email")),
-			"user_id": user.Id,
-			"avatar":  strings.TrimSpace(user.GetString("avatar")),
 			"success": true,
+			"avatar":  strings.TrimSpace(finalizedUser.GetString("avatar")),
 		})
 	}
 }
 
-func OnboardingFinalizeHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
-	return func(e *core.RequestEvent) error {
-		token := strings.TrimSpace(e.Request.PathValue("token"))
-		if token == "" {
-			return apis.NewBadRequestError("missing_token", nil)
+func applyOnboardingFileUploads(e *core.RequestEvent, user *core.Record, onboarding backendrequests.OnboardingSettingsConfig) error {
+	if e == nil || user == nil || user.Collection() == nil {
+		return nil
+	}
+
+	seen := map[string]bool{}
+	for _, step := range onboarding.Steps {
+		field := strings.TrimSpace(step.Field)
+		if field == "" || seen[field] {
+			continue
+		}
+		seen[field] = true
+
+		if _, ok := user.Collection().Fields.GetByName(field).(*core.FileField); !ok {
+			continue
 		}
 
-		_, user, err := backendrequests.OnboardingUserForToken(app, token)
-		if err != nil {
+		_, fh, err := e.Request.FormFile(field)
+		if err != nil || fh == nil {
+			continue
+		}
+		if err := validateOnboardingFileUpload(fh); err != nil {
 			return err
 		}
-
-		app.Logger().Info(
-			"[onboarding.finalize] start",
-			"token", token,
-			"user_id", user.Id,
-			"content_type", e.Request.Header.Get("Content-Type"),
-			"content_length", e.Request.ContentLength,
-		)
-
-		data := map[string]any{}
-		rawData := strings.TrimSpace(e.Request.FormValue("data"))
-		if rawData != "" {
-			if err := json.Unmarshal([]byte(rawData), &data); err != nil {
-				return apis.NewBadRequestError("invalid_payload", err)
-			}
+		file, err := filesystem.NewFileFromMultipart(fh)
+		if err != nil {
+			return apis.NewBadRequestError("invalid_file", err)
 		}
-		app.Logger().Info(
-			"[onboarding.finalize] parsed payload",
-			"token", token,
-			"user_id", user.Id,
-			"raw_data_bytes", len(rawData),
-			"data_keys", len(data),
-		)
-
-		avatarPresent := false
-		avatarName := ""
-		if _, fh, err := e.Request.FormFile("avatar"); err == nil && fh != nil {
-			avatarPresent = true
-			avatarName = fh.Filename
-			if err := validateAvatarUpload(fh); err != nil {
-				app.Logger().Warn(
-					"[onboarding.finalize] rejected avatar upload",
-					"token", token,
-					"user_id", user.Id,
-					"filename", fh.Filename,
-					"content_type", fh.Header.Get("Content-Type"),
-				)
-				return err
-			}
-			file, err := filesystem.NewFileFromMultipart(fh)
-			if err != nil {
-				app.Logger().Error(
-					"[onboarding.finalize] invalid avatar upload",
-					"token", token,
-					"user_id", user.Id,
-					"filename", fh.Filename,
-					"error", err,
-				)
-				return apis.NewBadRequestError("invalid_avatar", err)
-			}
-			user.Set("avatar", file)
-		} else {
-			app.Logger().Warn(
-				"[onboarding.finalize] no avatar file received",
-				"token", token,
-				"user_id", user.Id,
-			)
-		}
-
-		existingData := backendinternal.ParseJSONMap(user.Get("data"))
-		mergedData := backendrequests.MergeUserData(existingData, data)
-		mergedData["onboarding_completed_at"] = time.Now().UTC().Format(time.RFC3339)
-		user.Set("data", mergedData)
-		if err := app.Save(user); err != nil {
-			app.Logger().Error(
-				"[onboarding.finalize] save failed",
-				"token", token,
-				"user_id", user.Id,
-				"avatar_present", avatarPresent,
-				"avatar_name", avatarName,
-				"error", err,
-			)
-			return apis.NewBadRequestError("failed_to_save_profile", err)
-		}
-
-		app.Logger().Info(
-			"[onboarding.finalize] saved user",
-			"token", token,
-			"user_id", user.Id,
-			"avatar_present", avatarPresent,
-			"avatar_name", avatarName,
-			"avatar_stored", strings.TrimSpace(user.GetString("avatar")),
-		)
-
-		if err := backendrequests.DeleteOnboardingToken(app, token); err != nil {
-			app.Logger().Error(
-				"[onboarding.finalize] token delete failed",
-				"token", token,
-				"user_id", user.Id,
-				"error", err,
-			)
-			return apis.NewBadRequestError("failed_to_finalize_onboarding", err)
-		}
-
-		app.Logger().Info(
-			"[onboarding.finalize] token deleted",
-			"token", token,
-			"user_id", user.Id,
-		)
-
-		return e.JSON(http.StatusOK, map[string]any{
-			"success": true,
-			"avatar":  strings.TrimSpace(user.GetString("avatar")),
-		})
+		user.Set(field, file)
 	}
+
+	return nil
 }

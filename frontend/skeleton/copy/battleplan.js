@@ -53,7 +53,12 @@ window.appCopy = Object.assign({}, window.appCopy || {}, {
       summaryDraftBadge: "DRAFT",
       endDateTitle: "End Date",
       endDateDescription: "Choose when the battleplan ends.",
-      endDatePlaceholder: "yyyy-mm-dd",
+      endDateCustomPrompt: "Or choose a specific end date",
+      endDateSummary: "Your Battleplan will finish in {days} days.",
+      endDateSummaryInvalid: "Invalid end date.",
+      endDateSummaryPast: "End date must be in the future.",
+      endDateSummaryTooFar: "End date too far in the future (max {max} days).",
+      priorityEndDateMeta: "{date}",
     },
     placeholder: {
       label: "sharpening the blades",

@@ -58,6 +58,7 @@ func main() {
 	hooks.RegisterSettingsValidation(app)
 	hooks.RegisterGroupsValidation(app)
 	hooks.RegisterUsersNormalization(app)
+	hooks.RegisterUsersAuthGate(app)
 	hooks.RegisterRequestsNormalization(app)
 
 	app.OnTerminate().BindFunc(func(e *core.TerminateEvent) error {

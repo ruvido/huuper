@@ -78,6 +78,7 @@
     ui: {
       collapsedRoutines: {},
       focusRoutine: null,
+      focusEndDateCustom: false,
     },
     fieldErrors: {},
     input: {
@@ -159,13 +160,13 @@
   function internalStepFromURLStep(urlStep) {
     if (!Number.isFinite(urlStep)) return null;
     if (state.viewId) return null;
-    if (urlStep < 1 || urlStep > state.cfg.pillars.length) return null;
+    if (urlStep < 1 || urlStep > state.cfg.pillars.length + 1) return null;
     return urlStep + 1;
   }
 
   function urlStepFromInternalStep() {
-    if (!isPillarStep()) return null;
-    return state.step - 1;
+    if (isPillarStep() || isEndDateStep()) return state.step - 1;
+    return null;
   }
 
   function readStepFromURL() {
@@ -304,6 +305,15 @@
       }
       state.ui.focusRoutine = null;
     }
+    if (state.ui.focusEndDateCustom && dom.stage) {
+      const input = dom.stage.querySelector('[name="duration_end_date"]');
+      if (input) {
+        input.focus({ preventScroll: true });
+        const len = input.value.length;
+        try { input.setSelectionRange(len, len); } catch (_) {}
+      }
+      state.ui.focusEndDateCustom = false;
+    }
     syncViewOverflow();
   }
 
@@ -394,6 +404,8 @@
         const endTs = Date.parse(state.input.end_date + "T00:00:00Z");
         const startTs = Date.parse(state.input.start_date + "T00:00:00Z");
         if (isNaN(endTs) || !(endTs > startTs)) return copy.errors.invalidDuration;
+        const days = Math.round((endTs - startTs) / 86400000);
+        if (days > rndmod.MAX_END_DATE_DAYS) return copy.errors.invalidDuration;
       } else if (!state.cfg.durations.some((item) => item.value === state.input.duration_days)) {
         return copy.errors.invalidDuration;
       }
@@ -680,7 +692,7 @@
       state.step = clampStep(step);
       state.confirmAttempted = false;
       render();
-    } else if (action === "edit-pillar") {
+    } else if (action === "edit-pillar" || action === "edit-end-date") {
       const step = Number(target.dataset.step);
       const id = state.viewId || state.editId;
       if (!id || !Number.isFinite(step)) return;
@@ -730,22 +742,55 @@
   }
 
   dom.stage.addEventListener("click", (e) => {
-    const block = e.target.closest(".wizard-end-date-custom");
-    if (!block) return;
+    const mask = e.target.closest('.wizard-end-date-mask');
+    if (mask) {
+      const inp = mask.querySelector('input[type="text"]');
+      if (inp && document.activeElement !== inp) inp.focus();
+      return;
+    }
+    const prompt = e.target.closest('[data-action="open-end-date-custom"]');
+    if (!prompt) return;
     state.input.use_end_date = true;
-    const customRadio = dom.stage.querySelector('[name="duration_choice"][value="custom"]');
-    if (customRadio) customRadio.checked = true;
-    const textInput = block.querySelector('input[type="text"]');
-    if (textInput && document.activeElement !== textInput) textInput.focus();
+    state.ui.focusEndDateCustom = true;
+    render();
   });
 
   dom.stage.addEventListener("input", (e) => {
     if (!e.target || e.target.name !== "duration_end_date") return;
+    const input = e.target;
+    const isDelete = typeof e.inputType === "string" && e.inputType.startsWith("delete");
+    const digits = input.value.replace(/\D/g, "").slice(0, 8);
+    let formatted = digits.slice(0, 4);
+    const yearDone = isDelete ? digits.length > 4 : digits.length >= 4;
+    const monthDone = isDelete ? digits.length > 6 : digits.length >= 6;
+    if (yearDone) formatted += "-" + digits.slice(4, 6);
+    if (monthDone) formatted += "-" + digits.slice(6, 8);
+    if (input.value !== formatted) {
+      input.value = formatted;
+      const len = formatted.length;
+      try { input.setSelectionRange(len, len); } catch (_) {}
+    }
+    syncEndDateMask(input);
     state.input.use_end_date = true;
-    const customRadio = dom.stage.querySelector('[name="duration_choice"][value="custom"]');
-    if (customRadio) customRadio.checked = true;
     syncFromDOM();
   });
+
+  function syncEndDateMask(input) {
+    const template = "YYYY-MM-DD";
+    const len = input.value.length;
+    input.style.width = len + "ch";
+    const ghost = input.parentElement && input.parentElement.querySelector(".wizard-end-date-mask-ghost");
+    if (ghost) ghost.textContent = template.slice(Math.min(len, template.length));
+    const summary = dom.stage.querySelector(".wizard-end-date-summary");
+    if (summary) {
+      const sharedCopy = (window.appCopy && window.appCopy.battleplan && window.appCopy.battleplan.wizardShared) || {};
+      const result = rndmod.computeEndDateSummary(state, input.value, sharedCopy);
+      const textEl = summary.querySelector(".wizard-end-date-summary-text");
+      if (textEl) textEl.textContent = result.text;
+      summary.classList.toggle("is-error", !!(result.text && result.error));
+      summary.classList.toggle("is-ok", !!(result.text && !result.error));
+    }
+  }
 
   dom.stage.addEventListener("change", (e) => {
     if (!e.target || e.target.name !== "duration_choice") return;
