@@ -270,7 +270,7 @@ func sendEmailOTP(app *pocketbase.PocketBase, email string, code string) EmailDe
 		return EmailDelivery{Failed: 1}
 	}
 	values := map[string]string{"otp_code": code}
-	sent, failed := sendNotificationEmail(app, []mail.Address{recipient}, template, values)
+	sent, failed := sendNotificationEmail(app, []mail.Address{recipient}, template, values, emailOTPTemplateKind, "")
 	return EmailDelivery{Sent: sent, Failed: failed}
 }
 

@@ -256,8 +256,7 @@ func ApplyPromoteAction(app *pocketbase.PocketBase, actor *core.Record, record *
 	user.Set("passwordConfirm", tempPassword)
 	user.Set("status", "approved")
 
-	userData := BuildUserData(data)
-	userData["request"] = promotedRequestSnapshot(app, record, data)
+	userData := buildPromotedUserData(app, record, data)
 	if len(userData) > 0 {
 		user.Set("data", userData)
 	}
@@ -307,8 +306,7 @@ func resetExistingUserOnboarding(app *pocketbase.PocketBase, user *core.Record, 
 		return apis.NewBadRequestError("failed_to_generate_password", nil)
 	}
 
-	userData := BuildUserData(data)
-	userData["request"] = promotedRequestSnapshot(app, record, data)
+	userData := buildPromotedUserData(app, record, data)
 	user.Set("password", tempPassword)
 	user.Set("passwordConfirm", tempPassword)
 	user.Set("status", "approved")

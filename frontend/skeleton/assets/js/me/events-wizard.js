@@ -39,6 +39,20 @@
   };
   const cancelEditButton = document.querySelector("[data-wizard-cancel-edit]");
 
+  // Mirror the measured .step-progress height onto .wizard-page as
+  // --step-progress-h so CSS can reserve matching padding-top. The bar is
+  // position:fixed at the viewport top, so without this the page content
+  // would slide under it.
+  function syncProgressHeight() {
+    if (!dom.page || !dom.progress) return;
+    const h = dom.progress.hidden ? 0 : Math.ceil(dom.progress.getBoundingClientRect().height);
+    dom.page.style.setProperty("--step-progress-h", `${h}px`);
+  }
+  if (dom.progress && typeof ResizeObserver !== "undefined") {
+    const ro = new ResizeObserver(syncProgressHeight);
+    ro.observe(dom.progress);
+  }
+
   // /me/events/... vs /admin/events/...
   const pathParts = window.location.pathname.split("/").filter(Boolean);
   const scope = pathParts[0] === "admin" ? "admin" : "me";
@@ -167,6 +181,7 @@
     if (dom.form) dom.form.classList.toggle("wizard-form-confirm", onConfirm);
     if (dom.progress) dom.progress.hidden = onConfirm;
     if (dom.aside) dom.aside.hidden = true;
+    syncProgressHeight();
     if (dom.back) dom.back.hidden = false;
   }
 

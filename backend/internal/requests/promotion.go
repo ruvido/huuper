@@ -9,6 +9,15 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
+func buildPromotedUserData(app *pocketbase.PocketBase, record *core.Record, data map[string]any) map[string]any {
+	userData := BuildUserData(data)
+	userData["request"] = promotedRequestSnapshot(app, record, data)
+	if rawSnapshot, ok := data[RequestFlowDataKey].(map[string]any); ok {
+		userData["request_flow"] = backendinternal.DeepCopyJSONMap(rawSnapshot)
+	}
+	return userData
+}
+
 func promotedRequestSnapshot(app *pocketbase.PocketBase, record *core.Record, data map[string]any) map[string]any {
 	if record == nil {
 		return nil

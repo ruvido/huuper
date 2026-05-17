@@ -41,6 +41,20 @@
   };
   const cancelEditButton = document.querySelector("[data-wizard-cancel-edit]");
 
+  // The .step-progress is position:fixed at the viewport top. Write its
+  // measured height onto .wizard-page as --step-progress-h so the page can
+  // reserve matching padding-top via CSS. Height varies with the visibility
+  // aside, so a ResizeObserver keeps the value accurate.
+  function syncProgressHeight() {
+    if (!dom.page || !dom.progress) return;
+    const h = dom.progress.hidden ? 0 : Math.ceil(dom.progress.getBoundingClientRect().height);
+    dom.page.style.setProperty("--step-progress-h", `${h}px`);
+  }
+  if (dom.progress && typeof ResizeObserver !== "undefined") {
+    const ro = new ResizeObserver(syncProgressHeight);
+    ro.observe(dom.progress);
+  }
+
   function idFromPath(kind) {
     const parts = window.location.pathname.split("/").filter(Boolean);
     const idx = parts.findIndex((part, i) => part === kind && parts[i - 1] === "battleplan");
@@ -241,6 +255,7 @@
       dom.progress.classList.toggle("step-progress-aside-only", state.step === 1);
     }
     if (dom.aside) dom.aside.hidden = state.step === 0 || isConfirm();
+    syncProgressHeight();
     if (dom.back) dom.back.hidden = onIntro;
     if (dom.sticky) dom.sticky.classList.toggle("sticky-actions-intro", onIntro);
   }

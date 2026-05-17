@@ -10,6 +10,7 @@ X note per il piano
 - centrare textarea anche rispetto al fatto che si apre la tastiera in basso
 - bug: titolo mancante alla fine del processo
 X bug: spazio in alto sopra al titolo
+- bug: non appare il trattino per mettere la data
 
 ### settings
 - descrizione pilastri mancante
@@ -23,4 +24,4 @@ X bug: spazio in alto sopra al titolo
 Le routine dovrebbero essere salvate in una collection a parte. Nei campi ci deve essere anche relation to user. Un altro campo deve contenere l'array di quanti user stanno usando quella routine. Perché le routine possono essere condivisibili cioè leggibili da tutti. 
 
 ## Requests
-- messaggio Telegram quando viene accettato da admin request
+- messaggio Telegram a gruppo locale quando viene accettato da admin request

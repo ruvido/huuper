@@ -40,7 +40,14 @@
         const target = document.getElementById("battleplan-hero-title");
         if (!hero || !target) return;
         const label = ((window.appCopy || {}).battleplan || {}).list.heroComingSoonLabel || "";
-        target.textContent = `${title} `;
+        // settings.data.title is admin-controlled copy that intentionally
+        // contains inline HTML (e.g. <em>) for emphasis, so it goes through
+        // innerHTML. The "coming soon" label is hardcoded copy.
+        target.innerHTML = "";
+        const titleSpan = document.createElement("span");
+        titleSpan.innerHTML = title;
+        target.appendChild(titleSpan);
+        target.appendChild(document.createTextNode(" "));
         const soon = document.createElement("span");
         soon.className = "dashboard-title-comingsoon";
         soon.textContent = label;

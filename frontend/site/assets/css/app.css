@@ -3971,8 +3971,11 @@ textarea.field-input {
   align-content: start;
 }
 
+/* When the fixed .step-progress is visible, reserve its measured height
+   as page-top padding so content below never slides under the bar.
+   --step-progress-h is set by JS via ResizeObserver in battleplan-wizard.js. */
 .wizard-page.wizard-page-has-progress {
-  padding-top: var(--space-4);
+  padding-top: var(--step-progress-h, 60px);
 }
 
 .wizard-page.wizard-page-confirm {

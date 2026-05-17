@@ -65,7 +65,7 @@ func NotifyNewRequest(app *pocketbase.PocketBase, record *core.Record, data map[
 	}
 
 	values := requestNotificationValues(app, record, data, nil, "", "", nil, nil, nil)
-	_, _ = sendNotificationEmail(app, []mail.Address{recipient}, template, values)
+	_, _ = sendNotificationEmail(app, []mail.Address{recipient}, template, values, templateKindNewRequest, requestIDForLog(record))
 }
 
 func NotifyRequestSubmitted(app *pocketbase.PocketBase, record *core.Record, data map[string]any) EmailDelivery {
@@ -89,7 +89,7 @@ func NotifyRequestSubmitted(app *pocketbase.PocketBase, record *core.Record, dat
 	}
 
 	values := requestNotificationValues(app, record, data, nil, "", "", nil, nil, nil)
-	sent, failed := sendNotificationEmail(app, []mail.Address{recipient}, template, values)
+	sent, failed := sendNotificationEmail(app, []mail.Address{recipient}, template, values, templateKindRequestSubmitted, requestIDForLog(record))
 	return EmailDelivery{Sent: sent, Failed: failed}
 }
 
@@ -116,7 +116,7 @@ func NotifyRequestStep(app *pocketbase.PocketBase, actor *core.Record, record *c
 		if !ok {
 			app.Logger().Warn("Missing request notification recipient", "kind", templateKind, "email_to", step.EmailTo, "request", record.Id)
 		} else {
-			_, _ = sendNotificationEmail(app, []mail.Address{recipient}, template, values)
+			_, _ = sendNotificationEmail(app, []mail.Address{recipient}, template, values, templateKind, record.Id)
 		}
 	}
 
@@ -202,16 +202,23 @@ func mergeNotificationTemplate(defaultTemplate NotificationTemplate, template No
 	return template
 }
 
-func sendNotificationEmail(app *pocketbase.PocketBase, recipients []mail.Address, template NotificationTemplate, values map[string]string) (int, int) {
+func sendNotificationEmail(app *pocketbase.PocketBase, recipients []mail.Address, template NotificationTemplate, values map[string]string, kind string, requestID string) (int, int) {
 	subject := strings.TrimSpace(backendinternal.RenderTemplate(template.Email.Subject, values))
 	body := strings.TrimSpace(backendinternal.RenderTemplate(template.Email.Body, values))
+	recipientAddresses := make([]string, 0, len(recipients))
+	for _, r := range recipients {
+		recipientAddresses = append(recipientAddresses, r.Address)
+	}
 	if subject == "" || body == "" {
-		app.Logger().Warn("Skipping request email notification with empty content", "subject", subject)
+		app.Logger().Warn("Skipping request email notification with empty content", "kind", kind, "request", requestID, "subject", subject, "recipients", recipientAddresses)
 		return 0, len(recipients)
 	}
 	sent, failed := backendinternal.SendPlainEmailToRecipients(app, recipients, subject, body, backendinternal.EmailSenderKeyGeneral)
 	if failed > 0 {
-		app.Logger().Warn("Failed to send request email notification", "subject", subject, "sent", sent, "failed", failed)
+		app.Logger().Warn("Failed to send request email notification", "kind", kind, "request", requestID, "subject", subject, "recipients", recipientAddresses, "sent", sent, "failed", failed)
+	}
+	if sent > 0 {
+		app.Logger().Info("Sent request email notification", "kind", kind, "request", requestID, "subject", subject, "recipients", recipientAddresses, "sent", sent)
 	}
 	return sent, failed
 }
@@ -230,11 +237,21 @@ func sendNotificationTelegram(app *pocketbase.PocketBase, group *core.Record, te
 
 	body := strings.TrimSpace(backendinternal.RenderTemplate(template.Telegram.Body, values))
 	if body == "" {
+		app.Logger().Warn("Empty body for request telegram notification", "kind", kind, "request", requestID, "group", group.Id, "chat_id", chatID)
 		return
 	}
 	if err := bot.SendMessage(chatID, body); err != nil {
-		app.Logger().Warn("Failed to send request telegram notification", "kind", kind, "request", requestID, "error", err)
+		app.Logger().Warn("Failed to send request telegram notification", "kind", kind, "request", requestID, "group", group.Id, "chat_id", chatID, "error", err)
+		return
 	}
+	app.Logger().Info("Sent request telegram notification", "kind", kind, "request", requestID, "group", group.Id, "chat_id", chatID)
+}
+
+func requestIDForLog(record *core.Record) string {
+	if record == nil {
+		return ""
+	}
+	return record.Id
 }
 
 func requestNotificationValues(app *pocketbase.PocketBase, record *core.Record, data map[string]any, group *core.Record, action string, actionLabel string, actor *core.Record, assistant *core.Record, guardian *core.Record) map[string]string {
