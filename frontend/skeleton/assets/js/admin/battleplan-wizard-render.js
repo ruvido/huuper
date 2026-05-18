@@ -26,7 +26,12 @@
     return date;
   }
 
-  const MAX_END_DATE_DAYS = 120;
+  function endDateMaxDays(state) {
+    const durations = state && state.cfg && state.cfg.durations;
+    if (!Array.isArray(durations)) return null;
+    const def = durations.find((d) => d && d.default && Number.isFinite(d.max_days));
+    return def ? def.max_days : null;
+  }
 
   function computeEndDateSummary(state, rawValue, sharedCopy) {
     const value = String(rawValue || "");
@@ -40,8 +45,24 @@
     if (!endDate || !startDate) return { text: invalidMsg, error: true };
     const days = Math.round((endDate - startDate) / 86400000);
     if (days <= 0) return { text: pastMsg, error: true };
-    if (days > MAX_END_DATE_DAYS) return { text: tooFarTmpl.replace("{max}", String(MAX_END_DATE_DAYS)), error: true };
+    const maxDays = endDateMaxDays(state);
+    if (maxDays !== null && days > maxDays) return { text: tooFarTmpl.replace("{max}", String(maxDays)), error: true };
     return { text: tmpl.replace("{days}", String(days)), error: false };
+  }
+
+  function formatShortDate(s) {
+    const date = parseStrictDate(s);
+    if (!date) return "";
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return `${date.getUTCDate()} ${months[date.getUTCMonth()]}`;
+  }
+
+  function computeDaysRemaining(endStr) {
+    const end = parseStrictDate(endStr);
+    if (!end) return null;
+    const now = new Date();
+    const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    return Math.round((end - today) / 86400000);
   }
 
   function computeEndDateDisplay(state) {
@@ -180,6 +201,7 @@
     const titleText = sharedCopy.endDateTitle || copy.labels.durationField;
     const descText = sharedCopy.endDateDescription || "";
     const promptText = sharedCopy.endDateCustomPrompt || "";
+    const presetsPromptText = sharedCopy.endDatePresetsPrompt || "";
     const introBlock = descText ? `<div class="intro-quote"><p>${esc(descText)}</p></div>` : "";
     const durationOpts = state.cfg.durations.map((item) => `
       <label class="wizard-end-date-preset segmented-option">
@@ -190,18 +212,21 @@
     const template = "YYYY-MM-DD";
     const initialGhost = template.slice(Math.min(customDate.length, template.length));
     const initialSummary = computeEndDateSummary(state, customDate, sharedCopy);
-    const summaryClass = initialSummary.text ? (initialSummary.error ? " is-error" : " is-ok") : "";
+    const stateClass = initialSummary.text ? (initialSummary.error ? " is-error" : " is-ok") : "";
     const iconCheck = `<svg class="icon-check" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0m-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/></svg>`;
     const iconX = `<svg class="icon-x" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293z"/></svg>`;
+    const shownClass = initialSummary.text ? " is-shown" : "";
     const customBlock = customSelected
       ? `<input type="radio" name="duration_choice" value="custom" checked hidden />
          <div class="wizard-end-date-mask">
            <input type="text" name="duration_end_date" inputmode="numeric" autocomplete="off" maxlength="10" value="${esc(customDate)}" style="width:${customDate.length}ch" />
            <span class="wizard-end-date-mask-ghost" aria-hidden="true">${esc(initialGhost)}</span>
          </div>
-         <div class="wizard-end-date-summary${summaryClass}">
+         <button type="button" class="wizard-end-date-custom-prompt" data-action="close-end-date-custom">${esc(presetsPromptText)}</button>
+         <button type="button" class="wizard-end-date-feedback-backdrop" aria-label="Dismiss" data-action="dismiss-end-date-error"></button>
+         <div class="request-bottom-actions wizard-end-date-feedback${stateClass}${shownClass}">
            ${iconCheck}${iconX}
-           <span class="wizard-end-date-summary-text">${esc(initialSummary.text)}</span>
+           <span class="wizard-end-date-feedback-text">${esc(initialSummary.text)}</span>
          </div>`
       : `<div class="wizard-end-date-presets">${durationOpts}</div>
          <button type="button" class="wizard-end-date-custom-prompt" data-action="open-end-date-custom">${esc(promptText)}</button>`;
@@ -441,11 +466,13 @@
     }
 
     const summaryView = isSummaryView();
-    const endDate = summaryView ? computeEndDateDisplay(state) : "";
-    const endDateTemplate = sharedCopy.priorityEndDateMeta || "";
+    const endDateISO = summaryView ? computeEndDateDisplay(state) : "";
+    const daysRemaining = endDateISO ? computeDaysRemaining(endDateISO) : null;
+    const shortDate = endDateISO ? formatShortDate(endDateISO) : "";
+    const endDateTemplate = (daysRemaining === 1 ? sharedCopy.priorityEndDateMetaSingular : sharedCopy.priorityEndDateMeta) || sharedCopy.priorityEndDateMeta || "";
     const endDateStep = state.cfg.pillars.length + 1;
-    const endDateBlock = endDate && endDateTemplate
-      ? `<p class="wizard-priority-end-date wizard-summary-edit-target" data-action="edit-end-date" data-step="${endDateStep}">${esc(endDateTemplate.replace("{date}", endDate))}</p>`
+    const endDateBlock = endDateISO && endDateTemplate && daysRemaining !== null
+      ? `<p class="wizard-priority-end-date wizard-summary-edit-target" data-action="edit-end-date" data-step="${endDateStep}">${esc(endDateTemplate.replace("{days}", String(daysRemaining)).replace("{date}", shortDate))}</p>`
       : "";
     const heroHTML = summaryView
       ? `<h2 class="display-hero">${esc(priorityText)}</h2>${endDateBlock}`
@@ -507,6 +534,6 @@
     renderPillar,
     renderConfirm,
     computeEndDateSummary,
-    MAX_END_DATE_DAYS,
+    endDateMaxDays,
   };
 })();

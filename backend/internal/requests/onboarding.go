@@ -20,7 +20,15 @@ func BuildOnboardingURL(app core.App, token string) string {
 	if base == "" || strings.TrimSpace(token) == "" {
 		return ""
 	}
-	return base + "/onboarding/?token=" + url.QueryEscape(strings.TrimSpace(token))
+	return base + BuildRelativeOnboardingURL(token)
+}
+
+func BuildRelativeOnboardingURL(token string) string {
+	trimmed := strings.TrimSpace(token)
+	if trimmed == "" {
+		return ""
+	}
+	return "/onboarding/?token=" + url.QueryEscape(trimmed)
 }
 
 // MissingOnboardingFields returns the field names from the onboarding

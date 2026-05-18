@@ -13,6 +13,7 @@ Deploy is deterministic and release-based:
 - `SERVICE_NAME=huuper`
 - `APP_HOST_PORT=8090`
 - `TARGET_GOARCH=amd64`
+- `DEPLOY_URL=https://branco.realmen.it`
 
 ## Remote Layout
 
@@ -44,7 +45,8 @@ The local deploy helper `deploy/local.sh` starts PocketBase with `--disable-tele
 ## Required on VPS
 
 Create `.env` locally in project root before deploy.
-`deploy/rsync.sh` copies it automatically to `$VPS_PATH/shared/.env`.
+`deploy/rsync.sh` copies it automatically to `$VPS_PATH/shared/.env`, replacing `URL`
+with `DEPLOY_URL` for the VPS runtime. This keeps local `.env` free to use localhost.
 
 ```bash
 cp .env.example .env
@@ -71,6 +73,10 @@ Rollback to a release:
 
 ```bash
 VPS_HOST=ruvido@fiber VPS_PATH=/home/ruvido/apps/huuper ./deploy/rsync.sh
+```
+
+```bash
+DEPLOY_URL=https://branco.realmen.it ./deploy/rsync.sh
 ```
 
 ## Troubleshooting

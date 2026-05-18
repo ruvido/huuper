@@ -281,6 +281,11 @@
     setStatus("");
     const errSlot = document.getElementById(`${PREFIX}-top-error`);
     if (errSlot) errSlot.textContent = "";
+    if (!isEndDateStep()) {
+      endDateErrorDismissed = false;
+      endDateLastErrorMessage = null;
+      document.body.classList.remove("has-end-date-error");
+    }
     const ctx = makeRenderCtx();
     if (state.step === 0) {
       rndmod.renderIntro(ctx);
@@ -293,6 +298,7 @@
     } else if (isEndDateStep()) {
       rndmod.renderVisibilityAside(ctx);
       rndmod.renderEndDate(ctx);
+      applyEndDateFeedbackVisibility();
     } else {
       rndmod.renderConfirm(ctx);
     }
@@ -405,7 +411,8 @@
         const startTs = Date.parse(state.input.start_date + "T00:00:00Z");
         if (isNaN(endTs) || !(endTs > startTs)) return copy.errors.invalidDuration;
         const days = Math.round((endTs - startTs) / 86400000);
-        if (days > rndmod.MAX_END_DATE_DAYS) return copy.errors.invalidDuration;
+        const maxDays = rndmod.endDateMaxDays(state);
+        if (maxDays !== null && days > maxDays) return copy.errors.invalidDuration;
       } else if (!state.cfg.durations.some((item) => item.value === state.input.duration_days)) {
         return copy.errors.invalidDuration;
       }
@@ -742,10 +749,27 @@
   }
 
   dom.stage.addEventListener("click", (e) => {
+    const dismiss = e.target.closest('[data-action="dismiss-end-date-error"]');
+    if (dismiss) {
+      endDateErrorDismissed = true;
+      applyEndDateFeedbackVisibility();
+      const inp = dom.stage.querySelector('[name="duration_end_date"]');
+      if (inp) inp.focus();
+      return;
+    }
     const mask = e.target.closest('.wizard-end-date-mask');
     if (mask) {
       const inp = mask.querySelector('input[type="text"]');
       if (inp && document.activeElement !== inp) inp.focus();
+      return;
+    }
+    const closePrompt = e.target.closest('[data-action="close-end-date-custom"]');
+    if (closePrompt) {
+      state.input.use_end_date = false;
+      state.input.end_date = "";
+      endDateErrorDismissed = false;
+      endDateLastErrorMessage = null;
+      render();
       return;
     }
     const prompt = e.target.closest('[data-action="open-end-date-custom"]');
@@ -754,6 +778,28 @@
     state.ui.focusEndDateCustom = true;
     render();
   });
+
+  let endDateErrorDismissed = false;
+  let endDateLastErrorMessage = null;
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    if (!document.body.classList.contains("has-end-date-error")) return;
+    endDateErrorDismissed = true;
+    applyEndDateFeedbackVisibility();
+    const inp = dom.stage.querySelector('[name="duration_end_date"]');
+    if (inp) inp.focus();
+  });
+
+  function applyEndDateFeedbackVisibility() {
+    const feedback = dom.stage.querySelector(".wizard-end-date-feedback");
+    if (!feedback) return;
+    const isError = feedback.classList.contains("is-error");
+    const isOk = feedback.classList.contains("is-ok");
+    const shouldShow = isOk || (isError && !endDateErrorDismissed);
+    feedback.classList.toggle("is-shown", shouldShow);
+    document.body.classList.toggle("has-end-date-error", isError && !endDateErrorDismissed);
+  }
 
   dom.stage.addEventListener("input", (e) => {
     if (!e.target || e.target.name !== "duration_end_date") return;
@@ -781,14 +827,24 @@
     input.style.width = len + "ch";
     const ghost = input.parentElement && input.parentElement.querySelector(".wizard-end-date-mask-ghost");
     if (ghost) ghost.textContent = template.slice(Math.min(len, template.length));
-    const summary = dom.stage.querySelector(".wizard-end-date-summary");
-    if (summary) {
+    const feedback = dom.stage.querySelector(".wizard-end-date-feedback");
+    if (feedback) {
       const sharedCopy = (window.appCopy && window.appCopy.battleplan && window.appCopy.battleplan.wizardShared) || {};
       const result = rndmod.computeEndDateSummary(state, input.value, sharedCopy);
-      const textEl = summary.querySelector(".wizard-end-date-summary-text");
+      const isError = !!(result.text && result.error);
+      const isOk = !!(result.text && !result.error);
+      if (!isError) {
+        endDateErrorDismissed = false;
+        endDateLastErrorMessage = null;
+      } else if (endDateLastErrorMessage !== result.text) {
+        endDateErrorDismissed = false;
+        endDateLastErrorMessage = result.text;
+      }
+      const textEl = feedback.querySelector(".wizard-end-date-feedback-text");
       if (textEl) textEl.textContent = result.text;
-      summary.classList.toggle("is-error", !!(result.text && result.error));
-      summary.classList.toggle("is-ok", !!(result.text && !result.error));
+      feedback.classList.toggle("is-error", isError);
+      feedback.classList.toggle("is-ok", isOk);
+      applyEndDateFeedbackVisibility();
     }
   }
 

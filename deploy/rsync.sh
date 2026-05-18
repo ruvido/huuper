@@ -12,9 +12,11 @@ APP_HOST_PORT="${APP_HOST_PORT:-8090}"
 TARGET_GOOS="${TARGET_GOOS:-linux}"
 TARGET_GOARCH="${TARGET_GOARCH:-amd64}"
 FRONTEND_ARCHIVE_DIR="${FRONTEND_ARCHIVE_DIR:-$VPS_PATH/shared/frontend-history}"
+DEPLOY_URL="${DEPLOY_URL:-https://branco.realmen.it}"
 
 RELEASE_ID="${RELEASE_ID:-$(date +%Y%m%d-%H%M%S)-$(git -C "$ROOT_DIR" rev-parse --short HEAD)}"
 TMP_RELEASE_DIR="/tmp/huuper-release-$RELEASE_ID"
+REMOTE_ENV_FILE="$TMP_RELEASE_DIR/shared.env"
 
 echo "release: $RELEASE_ID"
 echo "remote: prepare release layout"
@@ -47,6 +49,22 @@ echo "prepare: copy runtime artifacts"
 rsync -a --delete "$ROOT_DIR/backend/migrations/" "$TMP_RELEASE_DIR/backend/migrations/"
 rsync -a --delete "$ROOT_DIR/frontend/site/" "$TMP_RELEASE_DIR/frontend/site/"
 
+echo "prepare: remote env URL=$DEPLOY_URL"
+awk -v url="$DEPLOY_URL" '
+  BEGIN { done = 0 }
+  /^URL=/ {
+    print "URL=" url
+    done = 1
+    next
+  }
+  { print }
+  END {
+    if (!done) {
+      print "URL=" url
+    }
+  }
+' "$ROOT_DIR/.env" > "$REMOTE_ENV_FILE"
+
 echo "rsync: release -> $VPS_HOST:$VPS_PATH/releases/$RELEASE_ID/"
 rsync -avz --progress --delete \
   "$TMP_RELEASE_DIR/" \
@@ -60,7 +78,7 @@ rsync -avz --progress --delete \
 
 echo "rsync: shared .env -> $VPS_HOST:$VPS_PATH/shared/.env"
 rsync -avz --progress \
-  "$ROOT_DIR/.env" \
+  "$REMOTE_ENV_FILE" \
   "$VPS_HOST:$VPS_PATH/shared/.env"
 
 echo "remote: validate shared env"

@@ -42,7 +42,7 @@ func RegisterUsersAuthGate(app *pocketbase.PocketBase) {
 				return apis.NewForbiddenError("onboarding_incomplete", map[string]any{"error": err.Error()})
 			}
 			return apis.NewForbiddenError("onboarding_incomplete", map[string]any{
-				"onboarding_url": backendrequests.BuildOnboardingURL(e.App, token),
+				"onboarding_url": backendrequests.BuildRelativeOnboardingURL(token),
 			})
 		}
 		return e.Next()
