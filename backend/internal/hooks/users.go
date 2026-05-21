@@ -39,14 +39,26 @@ func RegisterUsersAuthGate(app *pocketbase.PocketBase) {
 		if strings.TrimSpace(backendinternal.AnyToString(data["onboarding_completed_at"])) == "" {
 			token, err := backendrequests.EnsureOnboardingToken(e.App, e.Record.Id)
 			if err != nil {
-				return apis.NewForbiddenError("onboarding_incomplete", map[string]any{"error": err.Error()})
+				return apis.NewForbiddenError("onboarding_incomplete", map[string]any{"error": rawErrorValue{err.Error()}})
 			}
 			return apis.NewForbiddenError("onboarding_incomplete", map[string]any{
-				"onboarding_url": backendrequests.BuildRelativeOnboardingURL(token),
+				"onboarding_url": rawErrorValue{backendrequests.BuildRelativeOnboardingURL(token)},
 			})
 		}
 		return e.Next()
 	})
+}
+
+// rawErrorValue passes a raw value through PocketBase's safeErrorsData
+// transform without being rewritten as {code, message}. PocketBase treats
+// every entry in an ApiError data map as a validation error by default;
+// implementing SafeErrorResolver lets us return the raw value verbatim.
+type rawErrorValue struct {
+	value any
+}
+
+func (r rawErrorValue) Resolve(_ map[string]any) any {
+	return r.value
 }
 
 func normalizeUserEmailAndValidateUnique(app core.App, record *core.Record) error {

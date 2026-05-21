@@ -10,7 +10,7 @@ x centrare textarea anche rispetto al fatto che si apre la tastiera in basso
 x bug: titolo mancante alla fine del processo
 X bug: spazio in alto sopra al titolo
 x bug: non appare il trattino per mettere la data
-- Uniforma la disposizione dei bottoni in battle plan view sia se è active sia se è draft. Quando il battle plan è un draft, metti tre bottoni: 1. edit largo tratteggiato poi 2 archivo e 3 activate. 
+x Uniforma la disposizione dei bottoni in battle plan view sia se è active sia se è draft. Quando il battle plan è un draft, metti tre bottoni: 1. edit largo tratteggiato poi 2 archivo e 3 activate. 
 - margine sx sputtanato tra topbar e resto della pagina!
 - timeline : quadratino deve avere prima un padding in alto dove si vede un pezzo di trattino verticale poi dopo si vede il quadratino. ora inizia da quadratino
 - cosmetic fixes!!
@@ -29,9 +29,12 @@ Le routine dovrebbero essere salvate in una collection a parte. Nei campi ci dev
 
 ## Onboarding
 - gruppo locale "greyed out" se non sei entrato nel gruppo generale (breve spiegazione in copy) prima entri in default poi dpuoi entrare in other groups. come si definisce questo comportamento in maniera data-driven?
+- foto png spiuttanata allonboardign avatar!!
 
 
 ## request
+- se un utente appartiene gia ad un gruppo => token deve essere cacnellato
+
 il json e' ancora un fritto misto di admin_approved= e name=
 
  1. Verifica end-to-end reale

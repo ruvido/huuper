@@ -15,10 +15,6 @@ window.appRequestDetail = (() => {
     return (window.appCopy && window.appCopy.ui && window.appCopy.ui.requests) || {};
   }
 
-  function cancelIconHTML() {
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708"/></svg>`;
-  }
-
   function row(label, value) {
     const rendered = text(value);
     if (!rendered) {
@@ -388,21 +384,12 @@ window.appRequestDetail = (() => {
         return;
       }
       buttonNode.addEventListener("click", () => {
-        const assistantCancel = buttonNode.dataset.requestReject === "cancel";
-        const requestCopy = copy();
-        const rejectDialog = requestCopy.rejectDialog || {};
-        const cancelDialog = requestCopy.cancelGroupAdmissionDialog || {};
+        const rejectDialog = copy().rejectDialog || {};
         window.appRequestNoteSheet.open({
-          title: assistantCancel
-            ? (cancelDialog.title || "Cancel group admission?")
-            : (rejectDialog.title || "Are you sure you want to reject candidate?"),
-          submitLabel: assistantCancel
-            ? (cancelDialog.submitLabel || "Cancel")
-            : (rejectDialog.submitLabel || "Reject"),
+          title: rejectDialog.title || "Are you sure you want to reject candidate?",
+          submitLabel: rejectDialog.submitLabel || "Reject",
           submitTone: "danger",
-          emptyStatus: assistantCancel
-            ? (cancelDialog.emptyStatus || "Write cancel note.")
-            : (rejectDialog.emptyStatus || "Write reason."),
+          emptyStatus: rejectDialog.emptyStatus || "Write reason.",
           statusNode,
           onSubmit: async (reason) => {
             await window.appRequestActions.submitAndRedirect({
@@ -418,11 +405,18 @@ window.appRequestDetail = (() => {
       });
     }
 
-    bindRejectButton(rejectButtonNode);
+    if (rejectButtonNode) {
+      rejectButtonNode.hidden = true;
+      bindRejectButton(rejectButtonNode);
+    }
 
     function applyPayload(payload) {
       summaryNode.hidden = false;
       summaryNode.innerHTML = window.appRequestItem.renderDetail(payload);
+      if (rejectButtonNode) {
+        const workflow = payload && typeof payload.workflow === "object" ? payload.workflow : {};
+        rejectButtonNode.hidden = workflow.can_reject !== true;
+      }
       renderWorkflow(payload);
       window.appListPage.setStatus(statusNode, "");
     }
@@ -449,7 +443,6 @@ window.appRequestDetail = (() => {
       const mentoringNotesCount = Array.isArray(mentoringState.notes) ? mentoringState.notes.length : 0;
       const isMentoringStep = requiredField === "mentoring_notes";
       const canCloseMentoring = !isMentoringStep || mentoringNotesCount > 0;
-      const canRejectInline = config.inlineGroupApprovalCancel === true && workflow.can_reject === true && action === "set_group_approved";
       const parts = [`<article class="request-workflow-card">`];
       if (processApproval) {
         parts.push(processApproval);
@@ -463,11 +456,6 @@ window.appRequestDetail = (() => {
         const actionLabel = isMentoringStep
           ? (requestCopy.mentoringActionLabel || "Finalize mentoring")
           : (text(workflow.pending_action_label) || actionText(action));
-        if (canRejectInline) {
-          const cancelDialog = copy().cancelGroupAdmissionDialog || {};
-          const ariaLabel = text(cancelDialog.ariaLabel) || "Cancel group admission";
-          actions.push(`<button class="request-cancel-inline" type="button" aria-label="${escapeHTML(ariaLabel)}" data-request-reject="cancel">${cancelIconHTML()}</button>`);
-        }
         actions.push(`<button id="request-action" class="primary" type="button">${window.appListPage.escapeHTML(actionLabel)}</button>`);
       }
       if (actions.length === 0 && !processApproval) {
@@ -507,7 +495,6 @@ window.appRequestDetail = (() => {
 
       const button = workflowNode.querySelector("#request-action");
       const addNoteButton = workflowNode.querySelector("#request-action-add-note");
-      workflowNode.querySelectorAll("[data-request-reject]").forEach(bindRejectButton);
 
       if (addNoteButton) {
         addNoteButton.addEventListener("click", () => {

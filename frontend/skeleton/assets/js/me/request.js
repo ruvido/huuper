@@ -9,6 +9,5 @@
     requestsURL: "/me/requests/",
     assignGroupURL: (id) => `/me/request/assign-group/?id=${encodeURIComponent(id)}`,
     assignGuardianURL: (id) => `/me/request/assign-guardian/?id=${encodeURIComponent(id)}`,
-    inlineGroupApprovalCancel: true,
   });
 })();

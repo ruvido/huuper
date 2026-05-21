@@ -2838,28 +2838,6 @@ body.request-page .request-workflow-card .action-row .primary {
   gap: var(--space-2);
 }
 
-.request-bottom-actions-row:has(.request-cancel-inline) {
-  grid-template-columns: var(--button-height-md) minmax(0, 1fr);
-}
-
-.request-cancel-inline {
-  display: inline-grid;
-  place-items: center;
-  width: var(--button-height-md);
-  height: var(--button-height-md);
-  padding: 0;
-  border: 1px solid rgba(239, 68, 68, 0.46);
-  border-radius: var(--button-radius-md);
-  background: rgba(239, 68, 68, 0.1);
-  color: rgb(248, 113, 113);
-}
-
-.request-cancel-inline svg {
-  width: var(--icon-md);
-  height: var(--icon-md);
-  fill: currentColor;
-}
-
 .request-alert-badge {
   display: inline-grid;
   place-items: center;
@@ -4109,7 +4087,7 @@ textarea.field-input {
   gap: 0;
 }
 
-.wizard-page:has(+ .sticky-actions .battleplan-view-note-button) {
+.wizard-page:has(+ .sticky-actions .battleplan-view-wide-button) {
   --sticky-actions-height: calc((var(--button-height-md) * 2) + var(--space-2) + (var(--space-3) * 2));
   padding-bottom: calc(var(--sticky-actions-height) + env(safe-area-inset-bottom));
 }
@@ -4136,7 +4114,7 @@ textarea.field-input {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
 }
 
-.battleplan-view-note-button {
+.battleplan-view-wide-button {
   grid-column: 1 / -1;
   width: 100%;
   height: var(--button-height-md);
@@ -4157,13 +4135,14 @@ textarea.field-input {
   text-transform: uppercase;
 }
 
-.sticky-actions:has(.battleplan-view-note-button) .wizard-btn-dark {
+.sticky-actions:has(.battleplan-view-wide-button) .wizard-btn-dark {
   border: 1px solid var(--accent);
   background: transparent;
   color: var(--accent);
 }
 
-.sticky-actions:has(.battleplan-view-note-button) {
+.sticky-actions:has(.battleplan-view-wide-button) {
+  padding-inline: 24px;
   padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
 }
 
@@ -4229,12 +4208,13 @@ textarea.field-input {
   padding-bottom: calc(var(--sticky-actions-height) + env(safe-area-inset-bottom));
 }
 
-.wizard-page:has(+ .sticky-actions .battleplan-view-note-button) .wizard-form-view.wizard-form-view-overflow {
+.wizard-page:has(+ .sticky-actions .battleplan-view-wide-button) .wizard-form-view.wizard-form-view-overflow {
   padding-bottom: 0;
 }
 
 .wizard-stage-view {
   flex: 0 0 auto;
+  min-width: 0;
 }
 
 .wizard-step-confirm .wizard-step-header {
@@ -4288,6 +4268,7 @@ textarea.field-input {
 
 .wizard-step-view {
   gap: var(--space-2);
+  min-width: 0;
 }
 
 .wizard-step-view .wizard-step-header {
@@ -5010,6 +4991,10 @@ textarea.field-input {
   display: grid;
   align-content: center;
   justify-items: stretch;
+}
+
+.wizard-form-view#battleplan-wizard-form {
+  padding-inline: 24px;
 }
 
 /* === EVENTS PAGE === */

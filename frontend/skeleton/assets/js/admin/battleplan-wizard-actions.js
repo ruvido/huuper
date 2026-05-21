@@ -81,7 +81,7 @@
     if (!button) {
       button = document.createElement("button");
       button.id = `${PREFIX}-add-note`;
-      button.className = "battleplan-view-note-button";
+      button.className = "battleplan-view-wide-button battleplan-view-note-button";
       button.type = "button";
       dom.sticky.insertBefore(button, dom.sticky.firstChild);
     }
@@ -108,6 +108,25 @@
     return button;
   }
 
+  function ensureDraftEditButton(deps) {
+    const { state, dom, basePath, PREFIX } = deps;
+    if (!dom.sticky || state.loadedStatus !== "draft") return null;
+    let button = document.getElementById(`${PREFIX}-draft-edit`);
+    if (!button) {
+      button = document.createElement("button");
+      button.id = `${PREFIX}-draft-edit`;
+      button.className = "battleplan-view-wide-button";
+      button.type = "button";
+      dom.sticky.insertBefore(button, dom.sticky.firstChild);
+    }
+    const viewCopy = (((window.appCopy || {}).battleplan || {}).view) || {};
+    button.textContent = (viewCopy.editLabel || "").toUpperCase();
+    button.onclick = () => {
+      window.location.href = `${basePath()}/edit/${encodeURIComponent(state.viewId)}/`;
+    };
+    return button;
+  }
+
   function configureViewActions(deps) {
     const { state, dom, basePath, PREFIX } = deps;
     const bpCopy = (window.appCopy && window.appCopy.battleplan) || {};
@@ -115,6 +134,7 @@
     const listCopy = bpCopy.list || {};
     const status = state.loadedStatus || "";
     ensureAddNoteButton(deps);
+    ensureDraftEditButton(deps);
 
     if (dom.back) {
       if (status === "archived") {

@@ -46,12 +46,6 @@ window.appCopy = Object.assign({}, window.appCopy || {}, {
         submitLabel: "Reject",
         emptyStatus: "Write reason.",
       },
-      cancelGroupAdmissionDialog: {
-        title: "Cancel group admission?",
-        submitLabel: "Cancel",
-        emptyStatus: "Write cancel note.",
-        ariaLabel: "Cancel group admission",
-      },
       closeMentoringDialog: {
         title: "Mentoring completed?",
         submitLabel: "Confirm",
