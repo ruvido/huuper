@@ -9,7 +9,10 @@
   {{ end }}
   <div class="top-bar-title">{{ .Title }}</div>
   {{ if .RightActionTrash }}
-    <button class="topbar-action topbar-action-danger" type="button" aria-label="{{ if .RightActionTrashAria }}{{ .RightActionTrashAria }}{{ else }}Archive candidate{{ end }}" data-request-reject hidden>{{ template "icon-trash-fill" . }}</button>
+    <button class="topbar-action topbar-action-danger" type="button" aria-label="{{ if .RightActionTrashAria }}{{ .RightActionTrashAria }}{{ else }}Cancel{{ end }}" data-request-reject hidden>{{ template "icon-trash-fill" . }}</button>
+  {{ else if .RightActionArchive }}
+    <button class="topbar-action topbar-action-danger" type="button" aria-label="Archive candidate" data-request-archive hidden>{{ template "icon-archive-fill" . }}</button>
+    <button class="topbar-action topbar-action-accent" type="button" aria-label="Unarchive candidate" data-request-unarchive hidden>{{ template "icon-arrow-counterclockwise" . }}</button>
   {{ else if .RightActionCancel }}
     <button class="topbar-action topbar-action-cancel" type="button" aria-label="Cancel" data-wizard-cancel-edit>{{ template "icon-x" . }}</button>
   {{ else if .RightActionShuffle }}

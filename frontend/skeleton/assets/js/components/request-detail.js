@@ -367,7 +367,8 @@ window.appRequestDetail = (() => {
     const statusNode = document.querySelector("#request-status");
     const summaryNode = document.querySelector("#request-summary");
     const workflowNode = document.querySelector("#request-workflow");
-    const rejectButtonNode = document.querySelector("[data-request-reject]");
+    const archiveButtonNode = document.querySelector("[data-request-archive]");
+    const unarchiveButtonNode = document.querySelector("[data-request-unarchive]");
     if (!statusNode || !summaryNode || !workflowNode || !window.appAuth || !window.appListPage || !window.appRequestItem || !window.appActionSheet || !window.appRequestActions || !window.appRequestNoteSheet) {
       return;
     }
@@ -405,17 +406,39 @@ window.appRequestDetail = (() => {
       });
     }
 
-    if (rejectButtonNode) {
-      rejectButtonNode.hidden = true;
-      bindArchiveButton(rejectButtonNode);
+    function bindUnarchiveButton(buttonNode) {
+      if (!buttonNode) {
+        return;
+      }
+      buttonNode.addEventListener("click", async () => {
+        await window.appRequestActions.submitAndRedirect({
+          actionURL: config.actionURL(id),
+          body: {
+            action: "unarchive",
+          },
+          redirectURL: config.requestsURL,
+        });
+      });
+    }
+
+    if (archiveButtonNode) {
+      archiveButtonNode.hidden = true;
+      bindArchiveButton(archiveButtonNode);
+    }
+    if (unarchiveButtonNode) {
+      unarchiveButtonNode.hidden = true;
+      bindUnarchiveButton(unarchiveButtonNode);
     }
 
     function applyPayload(payload) {
       summaryNode.hidden = false;
       summaryNode.innerHTML = window.appRequestItem.renderDetail(payload);
-      if (rejectButtonNode) {
-        const workflow = payload && typeof payload.workflow === "object" ? payload.workflow : {};
-        rejectButtonNode.hidden = workflow.can_archive !== true;
+      const workflow = payload && typeof payload.workflow === "object" ? payload.workflow : {};
+      if (archiveButtonNode) {
+        archiveButtonNode.hidden = workflow.can_archive !== true;
+      }
+      if (unarchiveButtonNode) {
+        unarchiveButtonNode.hidden = workflow.can_unarchive !== true;
       }
       renderWorkflow(payload);
       window.appListPage.setStatus(statusNode, "");
