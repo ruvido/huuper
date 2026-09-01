@@ -43,7 +43,7 @@ fi
 echo "backend: build linux binary"
 mkdir -p "$TMP_RELEASE_DIR/bin" "$TMP_RELEASE_DIR/backend/migrations" "$TMP_RELEASE_DIR/frontend/site"
 cd "$ROOT_DIR"
-CGO_ENABLED=0 GOOS="$TARGET_GOOS" GOARCH="$TARGET_GOARCH" go build -a -installsuffix cgo -o "$TMP_RELEASE_DIR/bin/$BIN_NAME" ./backend
+CGO_ENABLED=0 GOOS="$TARGET_GOOS" GOARCH="$TARGET_GOARCH" go build -installsuffix cgo -o "$TMP_RELEASE_DIR/bin/$BIN_NAME" ./backend
 
 echo "prepare: copy runtime artifacts"
 rsync -a --delete "$ROOT_DIR/backend/migrations/" "$TMP_RELEASE_DIR/backend/migrations/"
