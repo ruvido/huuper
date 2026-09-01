@@ -15,7 +15,7 @@ func MapItem(record *core.Record) ListItem {
 		ID:       record.Id,
 		Email:    record.GetString("email"),
 		Status:   "",
-		Rejected: record.GetBool("rejected"),
+		Archived: record.GetBool("archived"),
 		GroupID:  record.GetString("group"),
 		Guardian: record.GetString("guardian"),
 		Created:  record.GetString("created"),
@@ -30,7 +30,7 @@ func MapItemWithWorkflow(app *pocketbase.PocketBase, actor *core.Record, record 
 	if err != nil {
 		return ListItem{}, err
 	}
-	state, err := BuildWorkflowState(app, actor, record, item.Data, item.Rejected, flow)
+	state, err := BuildWorkflowState(app, actor, record, item.Data, item.Archived, flow)
 	if err != nil {
 		return ListItem{}, err
 	}
@@ -48,7 +48,7 @@ func StatusForRecord(app *pocketbase.PocketBase, record *core.Record) (string, e
 		return "", err
 	}
 	stepIndex := EffectiveStepIndex(record, item.Data, flow)
-	return StatusForItem(item.Rejected, stepIndex, flow.Steps), nil
+	return StatusForItem(item.Archived, stepIndex, flow.Steps), nil
 }
 
 func RecordMatchesStatus(app *pocketbase.PocketBase, record *core.Record, status string) (bool, error) {
@@ -76,7 +76,8 @@ func BuildWorkflowPayload(state WorkflowState, flow FlowConfig) map[string]any {
 		"required_field":          state.RequiredField,
 		"can_take_pending_action": state.CanTakeAction,
 		"actor_is_assigned":       state.ActorIsAssigned,
-		"can_reject":              state.CanReject,
+		"can_archive":             state.CanArchive,
+		"can_unarchive":           state.CanUnarchive,
 		"flow_version":            flow.Version,
 	}
 }
@@ -105,15 +106,16 @@ type WorkflowState struct {
 	RequiredField      string
 	CanTakeAction      bool
 	ActorIsAssigned    bool
-	CanReject          bool
+	CanArchive         bool
+	CanUnarchive       bool
 	CurrentAction      string
 	CurrentActionLabel string
 }
 
-func BuildWorkflowState(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any, rejected bool, flow FlowConfig) (WorkflowState, error) {
+func BuildWorkflowState(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any, archived bool, flow FlowConfig) (WorkflowState, error) {
 	stepIndex := EffectiveStepIndex(record, data, flow)
 	nextStep, hasNext := FlowStepAt(flow, stepIndex)
-	status := StatusForItem(rejected, stepIndex, flow.Steps)
+	status := StatusForItem(archived, stepIndex, flow.Steps)
 
 	state := WorkflowState{
 		StepIndex: stepIndex,
@@ -129,25 +131,31 @@ func BuildWorkflowState(app *pocketbase.PocketBase, actor *core.Record, record *
 		state.CurrentActionLabel = strings.ReplaceAll(NormalizeStatus(status), "_", " ")
 	}
 	assigned := false
-	if hasNext && !rejected {
+	if hasNext && !archived {
 		state.RequiredField = RequiredFieldForAction(nextStep.Action)
-		ok, err := backendinternal.HasRoleForRequest(app, actor, record, nextStep.Role, RoleAdmin, RoleGuardian, RoleAssistant)
+		ok, err := CanTakeFlowStepAction(app, actor, record, nextStep)
 		if err != nil {
 			return WorkflowState{}, err
 		}
 		state.CanTakeAction = ok
-		assigned, err = backendinternal.IsActorAssignedForRole(app, actor, record, nextStep.Role, RoleAdmin, RoleGuardian, RoleAssistant)
+		assigned, err = IsPrimaryActorForFlowStep(app, actor, record, nextStep)
 		if err != nil {
 			return WorkflowState{}, err
 		}
 		state.ActorIsAssigned = assigned
 	}
-	if !rejected {
-		canReject, err := canRejectRequestForFlow(app, actor, record, data, flow)
+	if !archived {
+		canArchive, err := CanArchiveRequest(app, actor, record)
 		if err != nil {
 			return WorkflowState{}, err
 		}
-		state.CanReject = canReject
+		state.CanArchive = canArchive
+	} else {
+		canUnarchive, err := CanUnarchiveRequest(app, actor, record)
+		if err != nil {
+			return WorkflowState{}, err
+		}
+		state.CanUnarchive = canUnarchive
 	}
 	return state, nil
 }

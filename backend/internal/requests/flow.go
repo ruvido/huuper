@@ -41,7 +41,7 @@ const (
 	StatusMentoring        = "4-mentoring"
 	StatusGroupApproved    = "5-group_approved"
 	StatusAdminApproved    = "6-admin_approved"
-	StatusRejected         = "rejected"
+	StatusArchived         = "archived"
 )
 
 type FlowStep struct {
@@ -371,9 +371,9 @@ func StatusForStepIndex(stepIndex int, steps []FlowStep) string {
 	return StatusSubmitted
 }
 
-func StatusForItem(rejected bool, stepIndex int, steps []FlowStep) string {
-	if rejected {
-		return StatusRejected
+func StatusForItem(archived bool, stepIndex int, steps []FlowStep) string {
+	if archived {
+		return StatusArchived
 	}
 	return StatusForStepIndex(stepIndex, steps)
 }

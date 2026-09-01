@@ -48,7 +48,7 @@ func GroupRequestsCountHandler(app *pocketbase.PocketBase) func(e *core.RequestE
 
 		records, err := app.FindRecordsByFilter(
 			"requests",
-			"group = {:group} && rejected = false",
+			"group = {:group} && archived = false",
 			"",
 			0,
 			0,
@@ -130,7 +130,7 @@ func GroupGetHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) erro
 		requestsCount := 0
 		pendingRequests := []groupinternal.PendingRequestItem{}
 		if requestsVisible {
-			requests, err := app.FindRecordsByFilter("requests", "group = {:group} && rejected = false", "", 500, 0, map[string]any{"group": group.Id})
+			requests, err := app.FindRecordsByFilter("requests", "group = {:group} && archived = false", "", 500, 0, map[string]any{"group": group.Id})
 			if err != nil {
 				return apis.NewBadRequestError("failed_group_requests", err)
 			}

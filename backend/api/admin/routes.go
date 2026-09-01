@@ -8,31 +8,32 @@ import (
 )
 
 type Handlers struct {
-	Settings             func(e *core.RequestEvent) error
-	Summary              func(e *core.RequestEvent) error
-	GroupsList           func(e *core.RequestEvent) error
-	GroupGet             func(e *core.RequestEvent) error
-	GroupAssistant       func(e *core.RequestEvent) error
-	EventsList           func(e *core.RequestEvent) error
-	EventCreate          func(e *core.RequestEvent) error
-	EventUpdate          func(e *core.RequestEvent) error
-	EventReschedule      func(e *core.RequestEvent) error
-	EventCancel          func(e *core.RequestEvent) error
+	Settings              func(e *core.RequestEvent) error
+	Summary               func(e *core.RequestEvent) error
+	GroupsList            func(e *core.RequestEvent) error
+	GroupGet              func(e *core.RequestEvent) error
+	GroupAssistant        func(e *core.RequestEvent) error
+	EventsList            func(e *core.RequestEvent) error
+	EventCreate           func(e *core.RequestEvent) error
+	EventUpdate           func(e *core.RequestEvent) error
+	EventReschedule       func(e *core.RequestEvent) error
+	EventCancel           func(e *core.RequestEvent) error
 	EventCancelOccurrence func(e *core.RequestEvent) error
-	EventAttendance      func(e *core.RequestEvent) error
-	RequestsList         func(e *core.RequestEvent) error
-	RequestGet           func(e *core.RequestEvent) error
-	RequestAction        func(e *core.RequestEvent) error
-	EventDetails         func(e *core.RequestEvent) error
-	UserGet              func(e *core.RequestEvent) error
-	EventEmail           func(e *core.RequestEvent) error
-	RegistrationApprove  func(e *core.RequestEvent) error
-	RegistrationReject   func(e *core.RequestEvent) error
-	RegistrationCancel   func(e *core.RequestEvent) error
-	GroupSyncMemberships func(e *core.RequestEvent) error
-	UsersList            func(e *core.RequestEvent) error
-	UserDelete           func(e *core.RequestEvent) error
-	UserCancel           func(e *core.RequestEvent) error
+	EventAttendance       func(e *core.RequestEvent) error
+	RequestsList          func(e *core.RequestEvent) error
+	RequestCreate         func(e *core.RequestEvent) error
+	RequestGet            func(e *core.RequestEvent) error
+	RequestAction         func(e *core.RequestEvent) error
+	EventDetails          func(e *core.RequestEvent) error
+	UserGet               func(e *core.RequestEvent) error
+	EventEmail            func(e *core.RequestEvent) error
+	RegistrationApprove   func(e *core.RequestEvent) error
+	RegistrationReject    func(e *core.RequestEvent) error
+	RegistrationCancel    func(e *core.RequestEvent) error
+	GroupSyncMemberships  func(e *core.RequestEvent) error
+	UsersList             func(e *core.RequestEvent) error
+	UserDelete            func(e *core.RequestEvent) error
+	UserCancel            func(e *core.RequestEvent) error
 }
 
 func Register(se *core.ServeEvent, h Handlers) {
@@ -49,6 +50,7 @@ func Register(se *core.ServeEvent, h Handlers) {
 	se.Router.POST("/api/admin/events/{id}/cancel-occurrence", backendinternal.AdminOnly(h.EventCancelOccurrence)).Bind(apis.RequireAuth())
 	se.Router.POST("/api/admin/registrations/{id}/attendance", backendinternal.AdminOnly(h.EventAttendance)).Bind(apis.RequireAuth())
 	se.Router.GET("/api/admin/requests", backendinternal.AdminOnly(h.RequestsList)).Bind(apis.RequireAuth())
+	se.Router.POST("/api/admin/requests", backendinternal.AdminOnly(h.RequestCreate)).Bind(apis.RequireAuth())
 	se.Router.GET("/api/admin/requests/{id}", backendinternal.AdminOnly(h.RequestGet)).Bind(apis.RequireAuth())
 	se.Router.POST("/api/admin/requests/{id}/actions", backendinternal.AdminOnly(h.RequestAction)).Bind(apis.RequireAuth())
 	se.Router.GET("/api/admin/events/{id}", backendinternal.AdminOnly(h.EventDetails)).Bind(apis.RequireAuth())

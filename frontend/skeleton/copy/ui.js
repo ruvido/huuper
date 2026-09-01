@@ -41,11 +41,12 @@ window.appCopy = Object.assign({}, window.appCopy || {}, {
         failed_to_check_email_otp: "Unable to send verification code. Please try again.",
       },
       submitError: "Unable to submit request. Please try again.",
-      rejectDialog: {
-        title: "Are you sure you want to reject candidate?",
-        submitLabel: "Reject",
+      archiveDialog: {
+        title: "Are you sure you want to archive this request?",
+        submitLabel: "Archive",
         emptyStatus: "Write reason.",
       },
+      unarchiveActionLabel: "Unarchive request",
       closeMentoringDialog: {
         title: "Mentoring completed?",
         submitLabel: "Confirm",

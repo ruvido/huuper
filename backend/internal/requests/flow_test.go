@@ -26,13 +26,13 @@ func testRequestRecord() *core.Record {
 		&core.TextField{Name: "email"},
 		&core.TextField{Name: "group"},
 		&core.TextField{Name: "guardian"},
-		&core.BoolField{Name: "rejected"},
+		&core.BoolField{Name: "archived"},
 		&core.JSONField{Name: "data"},
 	)
 	record := core.NewRecord(collection)
 	record.Set("email", "candidate@example.com")
 	record.Set("data", map[string]any{})
-	record.Set("rejected", false)
+	record.Set("archived", false)
 	return record
 }
 
@@ -60,6 +60,29 @@ func testPocketBase(t *testing.T) *pocketbase.PocketBase {
 		t.Fatalf("failed to bootstrap test app: %v", err)
 	}
 	return app
+}
+
+func testGroupsCollection(t *testing.T, app *pocketbase.PocketBase) *core.Collection {
+	t.Helper()
+
+	groups := core.NewBaseCollection("groups")
+	groups.Fields.Add(&core.TextField{Name: "assistant"})
+	if err := app.Save(groups); err != nil {
+		t.Fatalf("failed to save groups collection: %v", err)
+	}
+	return groups
+}
+
+func testGroupWithAssistant(t *testing.T, app *pocketbase.PocketBase, groups *core.Collection, id string, assistantID string) *core.Record {
+	t.Helper()
+
+	group := core.NewRecord(groups)
+	group.Set("id", id)
+	group.Set("assistant", assistantID)
+	if err := app.Save(group); err != nil {
+		t.Fatalf("failed to save group: %v", err)
+	}
+	return group
 }
 
 func TestEffectiveStepIndexTracksSatisfiedSteps(t *testing.T) {
@@ -136,7 +159,7 @@ func TestBuildWorkflowPayloadUsesExplicitPendingFields(t *testing.T) {
 		NextStep:           FlowStep{Role: RoleAssistant, Action: FlowActionAssignGuardian, Label: "Assign guardian", Notes: "Pick a guardian"},
 		RequiredField:      "guardian",
 		CanTakeAction:      true,
-		CanReject:          true,
+		CanArchive:         true,
 		CurrentAction:      ActionSetGuardian,
 		CurrentActionLabel: "Assign guardian",
 	}
@@ -295,6 +318,43 @@ func TestBuildWorkflowStateAllowsAssignedGuardianOnly(t *testing.T) {
 	}
 }
 
+func TestBuildWorkflowStateAllowsGroupAssistantToCompleteMentoring(t *testing.T) {
+	app := testPocketBase(t)
+	groups := testGroupsCollection(t, app)
+
+	assistant := testUserRecord("assistant000001", false)
+	group := testGroupWithAssistant(t, app, groups, "group0000000001", assistant.Id)
+
+	record := testRequestRecord()
+	record.Set("group", group.Id)
+	record.Set("guardian", "guardian0000001")
+	data := map[string]any{
+		"guardian": map[string]any{
+			"name":        "Guardian",
+			"assigned_at": "2026-04-09T10:00:00Z",
+		},
+	}
+	record.Set("data", SetRequestFlowSnapshot(data, testFlow()))
+
+	state, err := BuildWorkflowState(app, assistant, record, data, false, testFlow())
+	if err != nil {
+		t.Fatalf("unexpected error for group assistant on mentoring step: %v", err)
+	}
+	if !state.CanTakeAction {
+		t.Fatalf("expected group assistant to complete mentoring in own group")
+	}
+	if state.ActorIsAssigned {
+		t.Fatalf("expected group assistant not to be primary actor for guardian mentoring step")
+	}
+
+	if err := ApplyAddMentoringNoteAction(app, assistant, record, data, ActionPayload{MentoringNotes: "Assistant note"}); err != nil {
+		t.Fatalf("expected group assistant to add mentoring note: %v", err)
+	}
+	if err := ApplySetMentoringAction(app, assistant, record, data, ActionPayload{}); err != nil {
+		t.Fatalf("expected group assistant to finalize mentoring: %v", err)
+	}
+}
+
 func TestBuildWorkflowStateAdminNotAssignedToGuardianStep(t *testing.T) {
 	record := testRequestRecord()
 	record.Set("group", "group-1")
@@ -377,8 +437,8 @@ func TestBuildWorkflowStateAllowsAdminOverride(t *testing.T) {
 	if !state.CanTakeAction {
 		t.Fatalf("expected admin override to allow current step action")
 	}
-	if !state.CanReject {
-		t.Fatalf("expected admin to be allowed to reject")
+	if !state.CanArchive {
+		t.Fatalf("expected admin to be allowed to archive")
 	}
 	if state.CurrentAction != ActionSetGroup {
 		t.Fatalf("expected current action %q, got %q", ActionSetGroup, state.CurrentAction)
@@ -387,28 +447,18 @@ func TestBuildWorkflowStateAllowsAdminOverride(t *testing.T) {
 		t.Fatalf("expected admin on admin-role step to have ActorIsAssigned=true")
 	}
 
-	if err := ApplyRejectAction(nil, admin, record, data, "No fit"); err != nil {
-		t.Fatalf("expected admin reject to remain allowed without flow lookup: %v", err)
+	if err := ApplyArchiveAction(nil, admin, record, data, "No fit"); err != nil {
+		t.Fatalf("expected admin archive to remain allowed without flow lookup: %v", err)
 	}
 }
 
-func TestAssignedAssistantCanRejectOnlyOnGroupApprovedStep(t *testing.T) {
+func TestAssistantCanArchiveOwnGroupRequest(t *testing.T) {
 	app := testPocketBase(t)
-
-	groups := core.NewBaseCollection("groups")
-	groups.Fields.Add(&core.TextField{Name: "assistant"})
-	if err := app.Save(groups); err != nil {
-		t.Fatalf("failed to save groups collection: %v", err)
-	}
+	groups := testGroupsCollection(t, app)
 
 	assistant := testUserRecord("assistant000001", false)
 	other := testUserRecord("assistant000002", false)
-	group := core.NewRecord(groups)
-	group.Set("id", "group0000000001")
-	group.Set("assistant", assistant.Id)
-	if err := app.Save(group); err != nil {
-		t.Fatalf("failed to save group: %v", err)
-	}
+	group := testGroupWithAssistant(t, app, groups, "group0000000001", assistant.Id)
 
 	record := testRequestRecord()
 	record.Set("group", group.Id)
@@ -429,11 +479,11 @@ func TestAssignedAssistantCanRejectOnlyOnGroupApprovedStep(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error for assigned assistant: %v", err)
 	}
-	if !state.CanReject {
-		t.Fatalf("expected assigned assistant to reject while group approval is pending")
+	if !state.CanArchive {
+		t.Fatalf("expected assigned assistant to archive while group approval is pending")
 	}
-	if err := ApplyRejectAction(app, assistant, record, data, "No fit"); err != nil {
-		t.Fatalf("expected assigned assistant reject to succeed: %v", err)
+	if err := ApplyArchiveAction(app, assistant, record, data, "No fit"); err != nil {
+		t.Fatalf("expected assigned assistant archive to succeed: %v", err)
 	}
 
 	record = testRequestRecord()
@@ -451,13 +501,15 @@ func TestAssignedAssistantCanRejectOnlyOnGroupApprovedStep(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error before group approval step: %v", err)
 	}
-	if state.CanReject {
-		t.Fatalf("expected assigned assistant reject to be blocked before group approval is pending")
+	if !state.CanArchive {
+		t.Fatalf("expected assigned assistant archive to be allowed before group approval is pending")
 	}
-	if err := ApplyRejectAction(app, assistant, record, data, "No fit"); err == nil {
-		t.Fatalf("expected assigned assistant reject to fail before group approval is pending")
+	if err := ApplyArchiveAction(app, assistant, record, data, "No fit"); err != nil {
+		t.Fatalf("expected assigned assistant archive to succeed before group approval is pending: %v", err)
 	}
 
+	record = testRequestRecord()
+	record.Set("group", group.Id)
 	record.Set("guardian", "guardian0000001")
 	data = map[string]any{
 		"guardian": map[string]any{
@@ -475,19 +527,94 @@ func TestAssignedAssistantCanRejectOnlyOnGroupApprovedStep(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error for other assistant: %v", err)
 	}
-	if state.CanReject {
-		t.Fatalf("expected non-assigned assistant reject to be blocked")
+	if state.CanArchive {
+		t.Fatalf("expected non-assigned assistant archive to be blocked")
 	}
-	if err := ApplyRejectAction(app, other, record, data, "No fit"); err == nil {
-		t.Fatalf("expected non-assigned assistant reject to fail")
+	if err := ApplyArchiveAction(app, other, record, data, "No fit"); err == nil {
+		t.Fatalf("expected non-assigned assistant archive to fail")
 	}
 }
 
-func TestBuildWorkflowStateRejectedRequestDisablesActions(t *testing.T) {
+func TestGuardianCanArchiveAssignedRequest(t *testing.T) {
 	record := testRequestRecord()
-	record.Set("rejected", true)
+	record.Set("group", "group-1")
+	record.Set("guardian", "guardian-1")
 	data := map[string]any{
-		"rejected": map[string]any{
+		"guardian": map[string]any{
+			"name":        "Guardian",
+			"assigned_at": "2026-04-09T10:00:00Z",
+		},
+	}
+	record.Set("data", SetRequestFlowSnapshot(data, testFlow()))
+
+	guardian := testUserRecord("guardian-1", false)
+
+	state, err := BuildWorkflowState(nil, guardian, record, data, false, testFlow())
+	if err != nil {
+		t.Fatalf("unexpected error for assigned guardian: %v", err)
+	}
+	if !state.CanArchive {
+		t.Fatalf("expected assigned guardian to be allowed to archive")
+	}
+	if err := ApplyArchiveAction(nil, guardian, record, data, "No fit"); err != nil {
+		t.Fatalf("expected assigned guardian archive to succeed: %v", err)
+	}
+
+	unarchiveState, err := BuildWorkflowState(nil, guardian, record, data, true, testFlow())
+	if err != nil {
+		t.Fatalf("unexpected error for archived request: %v", err)
+	}
+	if !unarchiveState.CanUnarchive {
+		t.Fatalf("expected assigned guardian to be allowed to unarchive")
+	}
+	if err := ApplyUnarchiveAction(nil, guardian, record, data); err != nil {
+		t.Fatalf("expected assigned guardian unarchive to succeed: %v", err)
+	}
+}
+
+func TestAssistantCannotTakeFinalAdminApproval(t *testing.T) {
+	app := testPocketBase(t)
+	groups := testGroupsCollection(t, app)
+
+	assistant := testUserRecord("assistant000001", false)
+	group := testGroupWithAssistant(t, app, groups, "group0000000001", assistant.Id)
+
+	record := testRequestRecord()
+	record.Set("group", group.Id)
+	record.Set("guardian", "guardian0000001")
+	data := map[string]any{
+		"guardian": map[string]any{
+			"name":        "Guardian",
+			"assigned_at": "2026-04-09T10:00:00Z",
+		},
+		"mentoring": map[string]any{
+			"notes":   []any{map[string]any{"text": "done", "at": "2026-04-09T10:30:00Z"}},
+			"done_at": "2026-04-09T10:30:00Z",
+		},
+		"group_approved_at": "2026-04-09T11:00:00Z",
+	}
+	record.Set("data", SetRequestFlowSnapshot(data, testFlow()))
+
+	state, err := BuildWorkflowState(app, assistant, record, data, false, testFlow())
+	if err != nil {
+		t.Fatalf("unexpected error for assistant on final approval step: %v", err)
+	}
+	if state.CanTakeAction {
+		t.Fatalf("expected assistant not to take final admin approval")
+	}
+	if err := ApplySetAdminApprovedAction(app, assistant, record, data, ActionPayload{}); err == nil {
+		t.Fatalf("expected assistant final admin approval to fail")
+	}
+	if _, err := ApplyPromoteAction(app, assistant, record, data); err == nil {
+		t.Fatalf("expected assistant promote to fail")
+	}
+}
+
+func TestBuildWorkflowStateArchivedRequestDisablesActions(t *testing.T) {
+	record := testRequestRecord()
+	record.Set("archived", true)
+	data := map[string]any{
+		"archived": map[string]any{
 			"reason": "No fit",
 		},
 	}
@@ -505,18 +632,81 @@ func TestBuildWorkflowStateRejectedRequestDisablesActions(t *testing.T) {
 
 	state, err := BuildWorkflowState(nil, admin, record, data, true, testFlow())
 	if err != nil {
-		t.Fatalf("unexpected error for rejected request: %v", err)
+		t.Fatalf("unexpected error for archived request: %v", err)
 	}
-	if state.Status != StatusRejected {
-		t.Fatalf("expected rejected status, got %q", state.Status)
+	if state.Status != StatusArchived {
+		t.Fatalf("expected archived status, got %q", state.Status)
 	}
 	if state.CanTakeAction {
-		t.Fatalf("expected rejected request to block step actions")
+		t.Fatalf("expected archived request to block step actions")
 	}
-	if state.CanReject {
-		t.Fatalf("expected rejected request to block reject action")
+	if state.CanArchive {
+		t.Fatalf("expected archived request to block re-archive action")
+	}
+	if !state.CanUnarchive {
+		t.Fatalf("expected admin to be allowed to unarchive")
 	}
 	if state.ActorIsAssigned {
-		t.Fatalf("expected rejected request to have ActorIsAssigned=false")
+		t.Fatalf("expected archived request to have ActorIsAssigned=false")
+	}
+}
+
+func TestApplyUnarchiveActionRestoresPriorFlowStatus(t *testing.T) {
+	app := testPocketBase(t)
+	groups := testGroupsCollection(t, app)
+
+	assistant := testUserRecord("assistant000001", false)
+	group := testGroupWithAssistant(t, app, groups, "group0000000001", assistant.Id)
+
+	record := testRequestRecord()
+	record.Set("group", group.Id)
+	record.Set("guardian", "guardian0000001")
+	data := map[string]any{
+		"guardian": map[string]any{
+			"name":        "Guardian",
+			"assigned_at": "2026-04-09T10:00:00Z",
+		},
+		"mentoring": map[string]any{
+			"notes":   []any{map[string]any{"text": "in progress", "at": "2026-04-09T10:30:00Z"}},
+			"done_at": "2026-04-09T11:00:00Z",
+		},
+	}
+	record.Set("data", SetRequestFlowSnapshot(data, testFlow()))
+
+	statusBefore, err := StatusForRecord(app, record)
+	if err != nil {
+		t.Fatalf("unexpected error computing status before archive: %v", err)
+	}
+	if statusBefore != StatusMentoring {
+		t.Fatalf("expected status before archive to be mentoring, got %q", statusBefore)
+	}
+
+	if err := ApplyArchiveAction(app, assistant, record, data, "Interrupted"); err != nil {
+		t.Fatalf("expected assistant archive to succeed: %v", err)
+	}
+
+	statusArchived, err := StatusForRecord(app, record)
+	if err != nil {
+		t.Fatalf("unexpected error computing status while archived: %v", err)
+	}
+	if statusArchived != StatusArchived {
+		t.Fatalf("expected archived status while archived, got %q", statusArchived)
+	}
+
+	if err := ApplyUnarchiveAction(app, assistant, record, data); err != nil {
+		t.Fatalf("expected assistant unarchive to succeed: %v", err)
+	}
+
+	statusAfter, err := StatusForRecord(app, record)
+	if err != nil {
+		t.Fatalf("unexpected error computing status after unarchive: %v", err)
+	}
+	if statusAfter != StatusMentoring {
+		t.Fatalf("expected status to be restored to mentoring after unarchive, got %q", statusAfter)
+	}
+
+	notes := mentoringNotes(data)
+	if len(notes) != 1 {
+		t.Fatalf("expected mentoring notes to survive archive/unarchive, got %d notes", len(notes))
 	}
 }

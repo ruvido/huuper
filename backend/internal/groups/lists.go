@@ -167,7 +167,7 @@ func requestCountsByGroup(app *pocketbase.PocketBase, groupIDs []string) (map[st
 	for _, groupID := range groupIDs {
 		records, err := app.FindRecordsByFilter(
 			"requests",
-			"group = {:group} && rejected = false",
+			"group = {:group} && archived = false",
 			"",
 			500,
 			0,

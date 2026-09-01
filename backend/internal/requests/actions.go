@@ -21,8 +21,8 @@ type PromoteResult struct {
 }
 
 func expectedCurrentStep(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any, expectedAction string) (FlowConfig, FlowStep, error) {
-	if record.GetBool("rejected") {
-		return FlowConfig{}, FlowStep{}, apis.NewBadRequestError("request_rejected", nil)
+	if record.GetBool("archived") {
+		return FlowConfig{}, FlowStep{}, apis.NewBadRequestError("request_archived", nil)
 	}
 
 	flow, err := LoadFlowForRequest(app, data)
@@ -39,7 +39,7 @@ func expectedCurrentStep(app *pocketbase.PocketBase, actor *core.Record, record 
 		return FlowConfig{}, FlowStep{}, apis.NewBadRequestError("invalid_current_step", nil)
 	}
 
-	ok, err := backendinternal.HasRoleForRequest(app, actor, record, nextStep.Role, RoleAdmin, RoleGuardian, RoleAssistant)
+	ok, err := CanTakeFlowStepAction(app, actor, record, nextStep)
 	if err != nil {
 		return FlowConfig{}, FlowStep{}, apis.NewBadRequestError("role_resolution_failed", err)
 	}
@@ -93,60 +93,71 @@ func ApplySetAdminApprovedAction(app *pocketbase.PocketBase, actor *core.Record,
 	return applyExpectedStepAction(app, actor, record, data, payload, FlowActionAdminApproved)
 }
 
-func canRejectRequestForFlow(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any, flow FlowConfig) (bool, error) {
+func canApplyArchiveAction(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any) (bool, error) {
 	if actor == nil {
 		return false, nil
 	}
 	if actor.GetBool("admin") {
-		return true, nil
-	}
-	if record == nil || record.GetBool("rejected") {
-		return false, nil
+		return CanArchiveRequest(app, actor, record)
 	}
 
-	stepIndex := EffectiveStepIndex(record, data, flow)
-	nextStep, hasNext := FlowStepAt(flow, stepIndex)
-	if !hasNext || nextStep.Action != FlowActionGroupApproved {
-		return false, nil
-	}
-
-	return backendinternal.IsActorAssignedForRole(app, actor, record, RoleAssistant, RoleAdmin, RoleGuardian, RoleAssistant)
-}
-
-func canRejectRequest(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any) (bool, error) {
-	if actor == nil {
-		return false, nil
-	}
-	if actor.GetBool("admin") {
-		return true, nil
-	}
-
-	flow, err := LoadFlowForRequest(app, data)
-	if err != nil {
+	if _, err := LoadFlowForRequest(app, data); err != nil {
 		return false, err
 	}
-	return canRejectRequestForFlow(app, actor, record, data, flow)
+	return CanArchiveRequest(app, actor, record)
 }
 
-func ApplyRejectAction(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any, reason string) error {
+func ApplyArchiveAction(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any, reason string) error {
 	if reason == "" {
-		return apis.NewBadRequestError("missing_reject_reason", nil)
+		return apis.NewBadRequestError("missing_archive_reason", nil)
 	}
 
-	ok, err := canRejectRequest(app, actor, record, data)
+	ok, err := canApplyArchiveAction(app, actor, record, data)
 	if err != nil {
 		return apis.NewBadRequestError("invalid_requests_flow_settings", err)
 	}
 	if !ok {
-		return apis.NewForbiddenError("forbidden_reject", nil)
+		return apis.NewForbiddenError("forbidden_archive", nil)
 	}
 
-	data["rejected"] = map[string]any{
+	data["archived"] = map[string]any{
 		"reason":      reason,
-		"rejected_at": time.Now().UTC().Format(time.RFC3339),
-		"rejected_by": actorDisplayName(actor),
+		"archived_at": time.Now().UTC().Format(time.RFC3339),
+		"archived_by": actorDisplayName(actor),
 	}
-	record.Set("rejected", true)
+	record.Set("archived", true)
+	record.Set("data", data)
+	return nil
+}
+
+func canApplyUnarchiveAction(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any) (bool, error) {
+	if actor == nil {
+		return false, nil
+	}
+	if actor.GetBool("admin") {
+		return CanUnarchiveRequest(app, actor, record)
+	}
+
+	if _, err := LoadFlowForRequest(app, data); err != nil {
+		return false, err
+	}
+	return CanUnarchiveRequest(app, actor, record)
+}
+
+func ApplyUnarchiveAction(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, data map[string]any) error {
+	ok, err := canApplyUnarchiveAction(app, actor, record, data)
+	if err != nil {
+		return apis.NewBadRequestError("invalid_requests_flow_settings", err)
+	}
+	if !ok {
+		return apis.NewForbiddenError("forbidden_unarchive", nil)
+	}
+
+	if archived, ok := data["archived"]; ok {
+		data["last_archived"] = archived
+	}
+	delete(data, "archived")
+	record.Set("archived", false)
 	record.Set("data", data)
 	return nil
 }
@@ -195,8 +206,8 @@ func ApplyPromoteAction(app *pocketbase.PocketBase, actor *core.Record, record *
 	if !actor.GetBool("admin") {
 		return PromoteResult{}, apis.NewForbiddenError("forbidden_promote", nil)
 	}
-	if record.GetBool("rejected") {
-		return PromoteResult{}, apis.NewBadRequestError("request_rejected", nil)
+	if record.GetBool("archived") {
+		return PromoteResult{}, apis.NewBadRequestError("request_archived", nil)
 	}
 
 	flow, err := LoadFlowForRequest(app, data)
@@ -209,7 +220,7 @@ func ApplyPromoteAction(app *pocketbase.PocketBase, actor *core.Record, record *
 		if !hasNext || nextStep.Action != FlowActionAdminApproved {
 			return PromoteResult{}, apis.NewBadRequestError("invalid_promote_status", nil)
 		}
-		ok, err := backendinternal.HasRoleForRequest(app, actor, record, nextStep.Role, RoleAdmin, RoleGuardian, RoleAssistant)
+		ok, err := CanTakeFlowStepAction(app, actor, record, nextStep)
 		if err != nil {
 			return PromoteResult{}, apis.NewBadRequestError("role_resolution_failed", err)
 		}

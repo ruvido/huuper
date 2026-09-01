@@ -5,11 +5,14 @@
 
   window.appRequestListPage.init({
     statusSelector: "#requests-status",
+    searchSelector: "#requests-search",
     tabsSelector: "#requests-tabs",
     allTabSelector: "#requests-tab-all",
     allCountSelector: "#requests-count-all",
     urgentTabSelector: "#requests-tab-urgent",
     urgentCountSelector: "#requests-count-urgent",
+    archivedTabSelector: "#requests-tab-archived",
+    archivedCountSelector: "#requests-count-archived",
     listSelector: "#requests-list",
     loadURL: "/api/me/requests",
     requestsURL: "/me/requests/",

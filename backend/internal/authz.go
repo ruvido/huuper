@@ -22,6 +22,9 @@ func RequireAdmin(e *core.RequestEvent) (*core.Record, error) {
 	if err != nil {
 		return nil, err
 	}
+	if authRecord.Collection().Name == core.CollectionNameSuperusers {
+		return authRecord, nil
+	}
 	if !authRecord.GetBool("admin") {
 		return nil, apis.NewForbiddenError("Forbidden", nil)
 	}
@@ -37,19 +40,10 @@ func AdminOnly(next func(e *core.RequestEvent) error) func(e *core.RequestEvent)
 	}
 }
 
-func HasRoleForRequest(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, role string, requestRoleAdmin string, requestRoleGuardian string, requestRoleAssistant string) (bool, error) {
-	if actor != nil && actor.GetBool("admin") {
-		return true, nil
-	}
-	return IsActorAssignedForRole(app, actor, record, role, requestRoleAdmin, requestRoleGuardian, requestRoleAssistant)
-}
-
 // IsActorAssignedForRole reports whether the actor explicitly matches the
-// request's assignee for the given role. Unlike HasRoleForRequest, it does
-// NOT short-circuit on the admin bit: an admin user is considered assigned
-// only when the role is admin, or when they are the literal guardian /
-// group assistant on the record. This lets callers distinguish "actor can
-// act via admin override" from "actor is personally responsible".
+// request's assignee for the given role. It does NOT short-circuit on the
+// admin bit: an admin user is considered assigned only when the role is admin,
+// or when they are the literal guardian / group assistant on the record.
 func IsActorAssignedForRole(app *pocketbase.PocketBase, actor *core.Record, record *core.Record, role string, requestRoleAdmin string, requestRoleGuardian string, requestRoleAssistant string) (bool, error) {
 	if actor == nil || record == nil {
 		return false, nil
@@ -136,66 +130,6 @@ func VisibleRequestsFilter(app *pocketbase.PocketBase, actor *core.Record) (stri
 	}
 
 	return "(" + strings.Join(clauses, " || ") + ")", params, nil
-}
-
-func CanViewRequest(actor *core.Record, request *core.Record, assistantGroups map[string]struct{}) bool {
-	if actor == nil || request == nil {
-		return false
-	}
-	if actor.GetBool("admin") {
-		return true
-	}
-
-	if strings.TrimSpace(request.GetString("guardian")) == actor.Id {
-		return true
-	}
-
-	groupID := strings.TrimSpace(request.GetString("group"))
-	if groupID == "" {
-		return false
-	}
-	_, ok := assistantGroups[groupID]
-	return ok
-}
-
-func VisibleRequestForActor(app *pocketbase.PocketBase, actor *core.Record, requestID string) (*core.Record, error) {
-	if actor == nil {
-		return nil, apis.NewUnauthorizedError("Unauthorized", nil)
-	}
-
-	id := strings.TrimSpace(requestID)
-	if id == "" {
-		return nil, apis.NewBadRequestError("invalid_request", nil)
-	}
-
-	record, err := app.FindRecordById("requests", id)
-	if err != nil || record == nil {
-		return nil, apis.NewNotFoundError("request_not_found", err)
-	}
-
-	if record.GetBool("rejected") && !actor.GetBool("admin") {
-		return nil, apis.NewForbiddenError("forbidden_request", nil)
-	}
-
-	assistantGroups, err := AssistantGroupIDsForUser(app, actor)
-	if err != nil {
-		return nil, apis.NewBadRequestError("failed_groups_lookup", err)
-	}
-	if !CanViewRequest(actor, record, assistantGroups) {
-		groupID := strings.TrimSpace(record.GetString("group"))
-		if groupID == "" {
-			return nil, apis.NewForbiddenError("forbidden_request", nil)
-		}
-		ok, err := IsMemberOfGroup(app, actor.Id, groupID)
-		if err != nil {
-			return nil, apis.NewBadRequestError("failed_group_access_check", err)
-		}
-		if !ok {
-			return nil, apis.NewForbiddenError("forbidden_request", nil)
-		}
-	}
-
-	return record, nil
 }
 
 func RequireGroupVisibility(app *pocketbase.PocketBase, actor *core.Record, group *core.Record) error {

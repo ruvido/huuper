@@ -76,7 +76,15 @@ func ListRequestsHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) 
 			filters = append(filters, "email ~ {:q}")
 			params["q"] = search
 		}
-		filters = append(filters, "rejected = false")
+		archivedRequested := strings.EqualFold(
+			backendrequests.NormalizeStatus(status),
+			backendrequests.NormalizeStatus(backendrequests.StatusArchived),
+		)
+		if archivedRequested {
+			filters = append(filters, "archived = true")
+		} else {
+			filters = append(filters, "archived = false")
+		}
 
 		filter := strings.Join(filters, " && ")
 		items, err := listRequestItems(app, actor, filter, sort, page, perPage, params, status)
@@ -180,7 +188,7 @@ func GetRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) er
 		if err != nil {
 			return err
 		}
-		record, err := backendinternal.VisibleRequestForActor(app, actor, e.Request.PathValue("id"))
+		record, err := backendrequests.VisibleRequestForActor(app, actor, e.Request.PathValue("id"))
 		if err != nil {
 			return err
 		}
@@ -196,7 +204,7 @@ func GetRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) er
 		}
 		liveFlowData = requestFlowResponseData(liveFlowData)
 		flowVersion := backendrequests.FlowVersionFromData(item.Data)
-		state, err := backendrequests.BuildWorkflowState(app, actor, record, item.Data, item.Rejected, flow)
+		state, err := backendrequests.BuildWorkflowState(app, actor, record, item.Data, item.Archived, flow)
 		if err != nil {
 			return apis.NewBadRequestError("failed_requests_workflow", err)
 		}
@@ -227,7 +235,7 @@ func GetRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) er
 			"email":                item.Email,
 			"status":               state.Status,
 			"status_label":         statusLabel,
-			"rejected":             item.Rejected,
+			"archived":             item.Archived,
 			"group":                item.GroupID,
 			"group_name":           groupName,
 			"guardian":             item.Guardian,
@@ -408,7 +416,7 @@ func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 			return apis.NewBadRequestError("invalid_request", nil)
 		}
 
-		record, err := backendinternal.VisibleRequestForActor(app, actor, id)
+		record, err := backendrequests.VisibleRequestForActor(app, actor, id)
 		if err != nil {
 			return err
 		}
@@ -467,8 +475,12 @@ func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 				promotedUserID = promoteResult.UserID
 				promotedUserCreated = promoteResult.Created
 			}
-		case backendrequests.ActionReject:
-			if err := backendrequests.ApplyRejectAction(app, actor, record, data, strings.TrimSpace(payload.Reason)); err != nil {
+		case backendrequests.ActionArchive:
+			if err := backendrequests.ApplyArchiveAction(app, actor, record, data, strings.TrimSpace(payload.Reason)); err != nil {
+				return err
+			}
+		case backendrequests.ActionUnarchive:
+			if err := backendrequests.ApplyUnarchiveAction(app, actor, record, data); err != nil {
 				return err
 			}
 		case backendrequests.ActionPromote:
@@ -525,7 +537,7 @@ func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 			})
 		}
 
-		state, err := backendrequests.BuildWorkflowState(app, actor, record, data, record.GetBool("rejected"), flow)
+		state, err := backendrequests.BuildWorkflowState(app, actor, record, data, record.GetBool("archived"), flow)
 		if err != nil {
 			return apis.NewBadRequestError("failed_requests_workflow", err)
 		}
@@ -533,7 +545,7 @@ func RequestActionHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		return e.JSON(http.StatusOK, map[string]any{
 			"id":       record.Id,
 			"status":   state.Status,
-			"rejected": record.GetBool("rejected"),
+			"archived": record.GetBool("archived"),
 		})
 	}
 }

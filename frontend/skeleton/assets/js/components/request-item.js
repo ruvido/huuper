@@ -60,7 +60,7 @@ window.appRequestItem = (() => {
       mentoring: "Mentoring",
       group_approved: "Group approval",
       admin_approved: "Final review",
-      rejected: "Rejected",
+      archived: "Archived",
       promoted: "Promoted",
     };
 
@@ -85,7 +85,8 @@ window.appRequestItem = (() => {
       set_mentoring_done: "Complete mentoring",
       set_group_approved: "Approve group",
       set_admin_approved: "Approve request",
-      reject: "Reject request",
+      archive: "Archive request",
+      unarchive: "Unarchive request",
       promote: "Promote request",
     };
 

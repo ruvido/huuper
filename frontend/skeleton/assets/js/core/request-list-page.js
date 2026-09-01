@@ -9,13 +9,34 @@ window.appRequestListPage = (() => {
     `;
   }
 
+  function itemSearchText(item) {
+    const data = item && typeof item.data === "object" ? item.data : {};
+    return [item && item.full_name, data.full_name, data.name, item && item.email]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+  }
+
+  function debounce(fn, delayMs) {
+    let timer = null;
+    return (...args) => {
+      if (timer) {
+        window.clearTimeout(timer);
+      }
+      timer = window.setTimeout(() => fn(...args), delayMs);
+    };
+  }
+
   function init(config) {
     const statusNode = document.querySelector(config.statusSelector);
+    const searchNode = config.searchSelector ? document.querySelector(config.searchSelector) : null;
     const tabsNode = document.querySelector(config.tabsSelector);
     const allTabNode = document.querySelector(config.allTabSelector);
     const urgentTabNode = document.querySelector(config.urgentTabSelector);
+    const archivedTabNode = config.archivedTabSelector ? document.querySelector(config.archivedTabSelector) : null;
     const allCountNode = document.querySelector(config.allCountSelector);
     const urgentCountNode = document.querySelector(config.urgentCountSelector);
+    const archivedCountNode = config.archivedCountSelector ? document.querySelector(config.archivedCountSelector) : null;
     const listNode = document.querySelector(config.listSelector);
 
     if (
@@ -35,6 +56,10 @@ window.appRequestListPage = (() => {
 
     let activeTab = "urgent";
     let allItems = [];
+    let archivedItems = [];
+    let archivedLoaded = false;
+    let archivedLoading = false;
+    let searchTerm = "";
 
     function urgentItems(items) {
       return items.filter((item) => {
@@ -43,25 +68,62 @@ window.appRequestListPage = (() => {
       });
     }
 
-    function render() {
-      const urgent = urgentItems(allItems);
-      const visibleItems = activeTab === "urgent" ? urgent : allItems;
+    function filterBySearch(items) {
+      if (!searchTerm) {
+        return items;
+      }
+      return items.filter((item) => itemSearchText(item).includes(searchTerm));
+    }
 
-      allCountNode.textContent = String(allItems.length);
+    function loadArchivedItems() {
+      if (!archivedTabNode || archivedLoading) {
+        return;
+      }
+      archivedLoading = true;
+      const url = new URL(config.loadURL, window.location.origin);
+      url.searchParams.set("status", "archived");
+      window.appAuth.apiFetch(`${url.pathname}${url.search}`).then((payload) => {
+        archivedItems = Array.isArray(payload.items) ? payload.items : [];
+        archivedLoaded = true;
+        archivedLoading = false;
+        render();
+      }).catch(() => {
+        archivedLoading = false;
+        window.appListPage.setStatus(statusNode, config.errorMessage || "Requests unavailable.");
+      });
+    }
+
+    function render() {
+      const urgent = filterBySearch(urgentItems(allItems));
+      const all = filterBySearch(allItems);
+      const archived = filterBySearch(archivedItems);
+      const visibleItems = activeTab === "urgent" ? urgent : activeTab === "archived" ? archived : all;
+
+      allCountNode.textContent = String(all.length);
       urgentCountNode.textContent = String(urgent.length);
+      if (archivedCountNode) {
+        archivedCountNode.textContent = String(archived.length);
+      }
       allTabNode.classList.toggle("section-tab-current", activeTab === "all");
       urgentTabNode.classList.toggle("section-tab-current", activeTab === "urgent");
-      tabsNode.hidden = allItems.length === 0;
+      if (archivedTabNode) {
+        archivedTabNode.classList.toggle("section-tab-current", activeTab === "archived");
+      }
+      tabsNode.hidden = allItems.length === 0 && archivedItems.length === 0;
 
-      if (allItems.length === 0) {
-        listNode.innerHTML = renderEmptyState("No requests");
-        listNode.hidden = false;
-        statusNode.hidden = true;
+      if (activeTab === "archived" && archivedLoading) {
+        listNode.hidden = true;
+        window.appListPage.setStatus(statusNode, "Loading…");
         return;
       }
 
       if (visibleItems.length === 0) {
-        listNode.innerHTML = renderEmptyState(activeTab === "urgent" ? "No urgent requests" : "No requests");
+        const emptyLabel = activeTab === "urgent"
+          ? "No urgent requests"
+          : activeTab === "archived"
+            ? "No archived requests"
+            : "No requests";
+        listNode.innerHTML = renderEmptyState(emptyLabel);
         listNode.hidden = false;
         statusNode.hidden = true;
         return;
@@ -85,6 +147,24 @@ window.appRequestListPage = (() => {
       activeTab = "urgent";
       render();
     });
+
+    if (archivedTabNode) {
+      archivedTabNode.addEventListener("click", () => {
+        activeTab = "archived";
+        if (!archivedLoaded) {
+          loadArchivedItems();
+        }
+        render();
+      });
+    }
+
+    if (searchNode) {
+      const onSearchInput = debounce(() => {
+        searchTerm = searchNode.value.trim().toLowerCase();
+        render();
+      }, 300);
+      searchNode.addEventListener("input", onSearchInput);
+    }
 
     window.appAuth.apiFetch(config.loadURL).then((payload) => {
       allItems = Array.isArray(payload.items) ? payload.items : [];

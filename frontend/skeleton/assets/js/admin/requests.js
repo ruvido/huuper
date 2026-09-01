@@ -5,11 +5,14 @@
 
   window.appRequestListPage.init({
     statusSelector: "#admin-requests-status",
+    searchSelector: "#admin-requests-search",
     tabsSelector: "#admin-requests-tabs",
     allTabSelector: "#admin-requests-tab-all",
     allCountSelector: "#admin-requests-count-all",
     urgentTabSelector: "#admin-requests-tab-urgent",
     urgentCountSelector: "#admin-requests-count-urgent",
+    archivedTabSelector: "#admin-requests-tab-archived",
+    archivedCountSelector: "#admin-requests-count-archived",
     listSelector: "#admin-requests-list",
     loadURL: "/api/admin/requests",
     requestsURL: "/admin/requests/",
