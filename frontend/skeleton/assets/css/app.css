@@ -1432,6 +1432,24 @@ body:has(.top-bar-detail-page) .bottom-nav {
   color: rgba(242, 204, 13, 0.78);
 }
 
+.list-search {
+  margin: 0 0 var(--space-3);
+  padding: 0 var(--space-4);
+}
+
+.list-search-input {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+}
+
+.list-search-input::placeholder {
+  color: var(--text-muted, rgba(244, 240, 227, 0.5));
+}
+
 .section-tabs {
   display: flex;
   align-items: center;

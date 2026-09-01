@@ -367,7 +367,8 @@ window.appRequestDetail = (() => {
     const statusNode = document.querySelector("#request-status");
     const summaryNode = document.querySelector("#request-summary");
     const workflowNode = document.querySelector("#request-workflow");
-    const rejectButtonNode = document.querySelector("[data-request-reject]");
+    const archiveButtonNode = document.querySelector("[data-request-archive]");
+    const unarchiveButtonNode = document.querySelector("[data-request-unarchive]");
     if (!statusNode || !summaryNode || !workflowNode || !window.appAuth || !window.appListPage || !window.appRequestItem || !window.appActionSheet || !window.appRequestActions || !window.appRequestNoteSheet) {
       return;
     }
@@ -379,23 +380,23 @@ window.appRequestDetail = (() => {
       return;
     }
 
-    function bindRejectButton(buttonNode) {
+    function bindArchiveButton(buttonNode) {
       if (!buttonNode) {
         return;
       }
       buttonNode.addEventListener("click", () => {
-        const rejectDialog = copy().rejectDialog || {};
+        const archiveDialog = copy().archiveDialog || {};
         window.appRequestNoteSheet.open({
-          title: rejectDialog.title || "Are you sure you want to reject candidate?",
-          submitLabel: rejectDialog.submitLabel || "Reject",
+          title: archiveDialog.title || "Are you sure you want to archive this request?",
+          submitLabel: archiveDialog.submitLabel || "Archive",
           submitTone: "danger",
-          emptyStatus: rejectDialog.emptyStatus || "Write reason.",
+          emptyStatus: archiveDialog.emptyStatus || "Write reason.",
           statusNode,
           onSubmit: async (reason) => {
             await window.appRequestActions.submitAndRedirect({
               actionURL: config.actionURL(id),
               body: {
-                action: "reject",
+                action: "archive",
                 reason,
               },
               redirectURL: config.requestsURL,
@@ -405,17 +406,39 @@ window.appRequestDetail = (() => {
       });
     }
 
-    if (rejectButtonNode) {
-      rejectButtonNode.hidden = true;
-      bindRejectButton(rejectButtonNode);
+    function bindUnarchiveButton(buttonNode) {
+      if (!buttonNode) {
+        return;
+      }
+      buttonNode.addEventListener("click", async () => {
+        await window.appRequestActions.submitAndRedirect({
+          actionURL: config.actionURL(id),
+          body: {
+            action: "unarchive",
+          },
+          redirectURL: config.requestsURL,
+        });
+      });
+    }
+
+    if (archiveButtonNode) {
+      archiveButtonNode.hidden = true;
+      bindArchiveButton(archiveButtonNode);
+    }
+    if (unarchiveButtonNode) {
+      unarchiveButtonNode.hidden = true;
+      bindUnarchiveButton(unarchiveButtonNode);
     }
 
     function applyPayload(payload) {
       summaryNode.hidden = false;
       summaryNode.innerHTML = window.appRequestItem.renderDetail(payload);
-      if (rejectButtonNode) {
-        const workflow = payload && typeof payload.workflow === "object" ? payload.workflow : {};
-        rejectButtonNode.hidden = workflow.can_reject !== true;
+      const workflow = payload && typeof payload.workflow === "object" ? payload.workflow : {};
+      if (archiveButtonNode) {
+        archiveButtonNode.hidden = workflow.can_archive !== true;
+      }
+      if (unarchiveButtonNode) {
+        unarchiveButtonNode.hidden = workflow.can_unarchive !== true;
       }
       renderWorkflow(payload);
       window.appListPage.setStatus(statusNode, "");
@@ -429,8 +452,9 @@ window.appRequestDetail = (() => {
     function renderWorkflow(payload) {
       const workflow = payload && typeof payload.workflow === "object" ? payload.workflow : {};
       const canTakeAction = workflow.can_take_pending_action === true;
+      const canUnarchive = workflow.can_unarchive === true;
       const processApproval = renderProcessApproval(payload);
-      if (!canTakeAction && !processApproval) {
+      if (!canTakeAction && !processApproval && !canUnarchive) {
         workflowNode.hidden = true;
         workflowNode.innerHTML = "";
         return;
@@ -457,6 +481,10 @@ window.appRequestDetail = (() => {
           ? (requestCopy.mentoringActionLabel || "Finalize mentoring")
           : (text(workflow.pending_action_label) || actionText(action));
         actions.push(`<button id="request-action" class="primary" type="button">${window.appListPage.escapeHTML(actionLabel)}</button>`);
+      }
+      if (canUnarchive) {
+        const unarchiveLabel = copy().unarchiveActionLabel || "Unarchive request";
+        actions.push(`<button id="request-action-unarchive" class="secondary" type="button">${window.appListPage.escapeHTML(unarchiveLabel)}</button>`);
       }
       if (actions.length === 0 && !processApproval) {
         workflowNode.hidden = true;
@@ -495,6 +523,26 @@ window.appRequestDetail = (() => {
 
       const button = workflowNode.querySelector("#request-action");
       const addNoteButton = workflowNode.querySelector("#request-action-add-note");
+      const unarchiveButton = workflowNode.querySelector("#request-action-unarchive");
+
+      if (unarchiveButton) {
+        unarchiveButton.addEventListener("click", async (event) => {
+          try {
+            window.appListPage.setStatus(statusNode, "");
+            await window.appRequestActions.submitAndRedirect({
+              actionURL: config.actionURL(id),
+              body: { action: "unarchive" },
+              button: event.currentTarget,
+              redirectURL: config.requestsURL,
+            });
+          } catch (error) {
+            window.appListPage.setStatus(
+              statusNode,
+              window.appRequestActions.errorMessage(error, "Unarchive unavailable."),
+            );
+          }
+        });
+      }
 
       if (addNoteButton) {
         addNoteButton.addEventListener("click", () => {

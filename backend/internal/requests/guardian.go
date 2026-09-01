@@ -11,7 +11,7 @@ import (
 func GuardianRequestsForUser(app *pocketbase.PocketBase, userID string, visibleGroupIDs map[string]struct{}) ([]GuardianRequestItem, error) {
 	records, err := app.FindRecordsByFilter(
 		"requests",
-		"guardian = {:guardian} && rejected = false",
+		"guardian = {:guardian} && archived = false",
 		"-updated",
 		500,
 		0,
@@ -72,7 +72,7 @@ func GuardianRequestsForUser(app *pocketbase.PocketBase, userID string, visibleG
 			return nil, err
 		}
 		stepIndex := EffectiveStepIndex(record, data, flow)
-		status := StatusForItem(record.GetBool("rejected"), stepIndex, flow.Steps)
+		status := StatusForItem(record.GetBool("archived"), stepIndex, flow.Steps)
 		statusLabel := status
 		if nextStep, hasNext := FlowStepAt(flow, stepIndex); hasNext && strings.TrimSpace(nextStep.Label) != "" {
 			statusLabel = strings.TrimSpace(nextStep.Label)

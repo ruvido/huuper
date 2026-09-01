@@ -58,7 +58,7 @@ type ListItem struct {
 	ID          string         `json:"id"`
 	Email       string         `json:"email"`
 	Status      string         `json:"status"`
-	Rejected    bool           `json:"rejected"`
+	Archived    bool           `json:"archived"`
 	GroupID     string         `json:"group"`
 	Guardian    string         `json:"guardian"`
 	Created     string         `json:"created"`
@@ -94,7 +94,8 @@ type GuardianRequestItem struct {
 }
 
 const (
-	ActionReject           = "reject"
+	ActionArchive          = "archive"
+	ActionUnarchive        = "unarchive"
 	ActionPromote          = "promote"
 	ActionSetGroup         = "set_group"
 	ActionSetGuardian      = "set_guardian"

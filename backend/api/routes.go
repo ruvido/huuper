@@ -74,6 +74,7 @@ func RegisterRoutes(app *pocketbase.PocketBase, se *core.ServeEvent) {
 		EventCancelOccurrence: adminroutes.CancelOccurrenceEventHandler(app),
 		EventAttendance:       adminroutes.MarkAttendanceHandler(app),
 		RequestsList:          meroutes.ListRequestsHandler(app),
+		RequestCreate:         adminroutes.CreateRequestHandler(app),
 		RequestGet:            meroutes.GetRequestHandler(app),
 		RequestAction:         meroutes.RequestActionHandler(app),
 		EventDetails:          adminroutes.EventDetailsHandler(app),

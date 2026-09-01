@@ -11,7 +11,7 @@ import (
 func GuardianCounts(app *pocketbase.PocketBase, groupID string) (map[string]int, error) {
 	records, err := app.FindRecordsByFilter(
 		"requests",
-		"group = {:group} && guardian != '' && rejected = false",
+		"group = {:group} && guardian != '' && archived = false",
 		"",
 		500,
 		0,
@@ -176,7 +176,7 @@ func GuardiansResponseForGroup(app *pocketbase.PocketBase, groupID string) (*Gua
 func GuardianGroupsForUser(app *pocketbase.PocketBase, userID string) ([]GuardianGroupItem, error) {
 	records, err := app.FindRecordsByFilter(
 		"requests",
-		"guardian = {:guardian} && rejected = false",
+		"guardian = {:guardian} && archived = false",
 		"",
 		500,
 		0,

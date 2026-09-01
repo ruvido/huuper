@@ -108,7 +108,7 @@ func SubmitRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 			r := core.NewRecord(requestsCollection)
 			r.Set("email", email)
 			r.Set("data", data)
-			r.Set("rejected", false)
+			r.Set("archived", false)
 			if err := txApp.Save(r); err != nil {
 				if backendrequests.IsDuplicateEmailError(err) {
 					return apis.NewBadRequestError("email_exists_request", nil)
@@ -141,7 +141,7 @@ func SubmitRequestHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 			"id":            record.Id,
 			"email":         record.GetString("email"),
 			"status":        backendrequests.StatusSubmitted,
-			"rejected":      false,
+			"archived":      false,
 			"data":          data,
 			"notifications": notifications,
 		})

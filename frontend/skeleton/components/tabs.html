@@ -1,5 +1,8 @@
 {{ define "status-list-tabs-content" }}
 <p id="{{ .StatusID }}" class="meta-text"></p>
+<div class="list-search">
+  <input id="{{ .SearchID }}" class="list-search-input" type="search" placeholder="Search" autocomplete="off">
+</div>
 <section id="{{ .TabsID }}" class="section-tabs" hidden>
   <button id="{{ .UrgentTabID }}" class="section-tab section-tab-current" type="button">
     <span class="section-tab-text">Urgent</span>
@@ -8,6 +11,10 @@
   <button id="{{ .AllTabID }}" class="section-tab" type="button">
     <span class="section-tab-text">All</span>
     <span id="{{ .AllCountID }}" class="section-tab-count">0</span>
+  </button>
+  <button id="{{ .ArchivedTabID }}" class="section-tab" type="button">
+    <span class="section-tab-text">Archived</span>
+    <span id="{{ .ArchivedCountID }}" class="section-tab-count">0</span>
   </button>
 </section>
 <section id="{{ .ListID }}" class="list-card list-card-default" hidden></section>

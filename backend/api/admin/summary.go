@@ -297,22 +297,22 @@ func requestClosedAt(record *core.Record) time.Time {
 	}
 
 	adminApprovedAt := parseRFC3339(strings.TrimSpace(stringField(data["admin_approved_at"])))
-	if !record.GetBool("rejected") {
+	if !record.GetBool("archived") {
 		return adminApprovedAt
 	}
 
-	rejectedAt := time.Time{}
-	if rejectedData, ok := data["rejected"].(map[string]any); ok {
-		rejectedAt = parseRFC3339(strings.TrimSpace(stringField(rejectedData["rejected_at"])))
+	archivedAt := time.Time{}
+	if archivedData, ok := data["archived"].(map[string]any); ok {
+		archivedAt = parseRFC3339(strings.TrimSpace(stringField(archivedData["archived_at"])))
 	}
-	if rejectedAt.IsZero() {
+	if archivedAt.IsZero() {
 		return adminApprovedAt
 	}
 	if adminApprovedAt.IsZero() {
-		return rejectedAt
+		return archivedAt
 	}
-	if rejectedAt.Before(adminApprovedAt) {
-		return rejectedAt
+	if archivedAt.Before(adminApprovedAt) {
+		return archivedAt
 	}
 	return adminApprovedAt
 }

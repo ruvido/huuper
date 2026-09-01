@@ -111,7 +111,7 @@
       <section class="app-shell">
         {{ $profileHref := .ProfileHref }}
         {{ if eq .TopbarVariantClass "top-bar-detail-page" }}{{ $profileHref = "" }}{{ end }}
-        {{ template "topbar" (dict "BackHref" .BackHref "BackHistory" .BackHistory "Title" .TopbarTitle "ProfileHref" $profileHref "MetaID" .TopbarMetaID "VariantClass" .TopbarVariantClass "MetaClass" .TopbarMetaClass "RightActionTrash" .RightActionTrash "RightActionShuffle" .RightActionShuffle) }}
+        {{ template "topbar" (dict "BackHref" .BackHref "BackHistory" .BackHistory "Title" .TopbarTitle "ProfileHref" $profileHref "MetaID" .TopbarMetaID "VariantClass" .TopbarVariantClass "MetaClass" .TopbarMetaClass "RightActionTrash" .RightActionTrash "RightActionArchive" .RightActionArchive "RightActionShuffle" .RightActionShuffle) }}
         {{ template "content" . }}
       </section>
     </main>
@@ -133,7 +133,7 @@
         {{ $profileHref := .ProfileHref }}
         {{ if eq .TopbarVariantClass "top-bar-detail-page" }}{{ $profileHref = "" }}{{ end }}
         {{ if or .BackHref .BackHistory .TopbarTitle }}
-        {{ template "topbar" (dict "BackHref" .BackHref "BackHistory" .BackHistory "Title" .TopbarTitle "ProfileHref" $profileHref "MetaID" .TopbarMetaID "VariantClass" .TopbarVariantClass "MetaClass" .TopbarMetaClass "RightActionTrash" .RightActionTrash "RightActionCancel" .RightActionCancel "RightActionShuffle" .RightActionShuffle) }}
+        {{ template "topbar" (dict "BackHref" .BackHref "BackHistory" .BackHistory "Title" .TopbarTitle "ProfileHref" $profileHref "MetaID" .TopbarMetaID "VariantClass" .TopbarVariantClass "MetaClass" .TopbarMetaClass "RightActionTrash" .RightActionTrash "RightActionArchive" .RightActionArchive "RightActionCancel" .RightActionCancel "RightActionShuffle" .RightActionShuffle) }}
         {{ end }}
         {{ template "content" . }}
       </section>
