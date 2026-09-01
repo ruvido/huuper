@@ -28,20 +28,30 @@ window.appGroupDetail = (() => {
     const tabsNode = document.querySelector("#group-tabs");
     const tabMembersNode = document.querySelector("#group-tab-members");
     const tabPendingNode = document.querySelector("#group-tab-pending");
+    const tabArchivedNode = document.querySelector("#group-tab-archived");
     const pendingSectionNode = document.querySelector("#group-pending-section");
     const pendingNode = document.querySelector("#group-pending");
+    const archivedSectionNode = document.querySelector("#group-archived-section");
+    const archivedNode = document.querySelector("#group-archived");
     const membersSectionNode = document.querySelector("#group-members-section");
     const membersNode = document.querySelector("#group-members");
     if (!statusNode || !assistantSectionNode || !tabsNode || !tabMembersNode || !tabPendingNode || !pendingSectionNode || !pendingNode || !membersSectionNode || !membersNode || !window.appAuth || !window.appListPage || !window.appRequestItem || !window.appListItem) {
       return;
     }
 
-    function showTab(name, hasPending) {
+    function showTab(name, hasPending, hasArchived) {
       const showingPending = name === "pending" && hasPending;
-      membersSectionNode.hidden = showingPending;
+      const showingArchived = name === "archived" && hasArchived;
+      membersSectionNode.hidden = showingPending || showingArchived;
       pendingSectionNode.hidden = !showingPending;
-      tabMembersNode.classList.toggle("section-tab-current", !showingPending);
+      tabMembersNode.classList.toggle("section-tab-current", !showingPending && !showingArchived);
       tabPendingNode.classList.toggle("section-tab-current", showingPending);
+      if (archivedSectionNode) {
+        archivedSectionNode.hidden = !showingArchived;
+      }
+      if (tabArchivedNode) {
+        tabArchivedNode.classList.toggle("section-tab-current", showingArchived);
+      }
     }
 
     const id = window.appListPage.queryParam("id");
@@ -81,14 +91,27 @@ window.appGroupDetail = (() => {
         topbarTitleNode.textContent = group.name.trim();
       }
 
-      const pendingItems = Array.isArray(group.pending_requests) ? group.pending_requests : [];
+      const allRequestItems = Array.isArray(group.pending_requests) ? group.pending_requests : [];
+      const pendingItems = allRequestItems.filter((item) => item.archived !== true);
+      const archivedItems = allRequestItems.filter((item) => item.archived === true);
       const hasPending = pendingItems.length > 0;
-      tabsNode.hidden = !hasPending;
+      const hasArchived = archivedItems.length > 0;
+      tabsNode.hidden = !hasPending && !hasArchived;
       tabPendingNode.hidden = !hasPending;
       tabMembersNode.innerHTML = tabLabel("Members", Array.isArray(group.members) ? group.members.length : 0);
       tabPendingNode.innerHTML = tabLabel("Pending", pendingItems.length);
+      if (tabArchivedNode) {
+        tabArchivedNode.hidden = !hasArchived;
+        tabArchivedNode.innerHTML = tabLabel("Archived", archivedItems.length);
+      }
       if (pendingItems.length > 0) {
         window.appListPage.renderList(pendingNode, pendingItems, (item) => {
+          const href = `/${config.scope}/request/?id=${encodeURIComponent(item.id)}`;
+          return window.appRequestItem.renderListItem(item, href);
+        });
+      }
+      if (archivedItems.length > 0 && archivedNode) {
+        window.appListPage.renderList(archivedNode, archivedItems, (item) => {
           const href = `/${config.scope}/request/?id=${encodeURIComponent(item.id)}`;
           return window.appRequestItem.renderListItem(item, href);
         });
@@ -130,13 +153,18 @@ window.appGroupDetail = (() => {
       }
 
       if (memberItems.length > 0) {
-        showTab("members", hasPending);
+        showTab("members", hasPending, hasArchived);
       } else if (hasPending) {
-        showTab("pending", hasPending);
+        showTab("pending", hasPending, hasArchived);
+      } else if (hasArchived) {
+        showTab("archived", hasPending, hasArchived);
       }
 
-      tabMembersNode.addEventListener("click", () => showTab("members", hasPending));
-      tabPendingNode.addEventListener("click", () => showTab("pending", hasPending));
+      tabMembersNode.addEventListener("click", () => showTab("members", hasPending, hasArchived));
+      tabPendingNode.addEventListener("click", () => showTab("pending", hasPending, hasArchived));
+      if (tabArchivedNode) {
+        tabArchivedNode.addEventListener("click", () => showTab("archived", hasPending, hasArchived));
+      }
     }).catch(() => {
       window.appListPage.setStatus(statusNode, "Group unavailable.");
     });

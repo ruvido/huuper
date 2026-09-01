@@ -130,11 +130,10 @@ func GroupGetHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) erro
 		requestsCount := 0
 		pendingRequests := []groupinternal.PendingRequestItem{}
 		if requestsVisible {
-			requests, err := app.FindRecordsByFilter("requests", "group = {:group} && archived = false", "", 500, 0, map[string]any{"group": group.Id})
+			requests, err := app.FindRecordsByFilter("requests", "group = {:group}", "", 500, 0, map[string]any{"group": group.Id})
 			if err != nil {
 				return apis.NewBadRequestError("failed_group_requests", err)
 			}
-			requestsCount = len(requests)
 			pendingRequests = make([]groupinternal.PendingRequestItem, 0, len(requests))
 			for _, record := range requests {
 				item, err := backendrequests.MapItemWithWorkflow(app, actor, record)
@@ -158,9 +157,13 @@ func GroupGetHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) erro
 					StatusLabel: statusLabel,
 					Created:     strings.TrimSpace(item.Created),
 					AssignedAt:  requestAssignedAt(item.Data),
+					Archived:    item.Archived,
 					Data:        item.Data,
 					Workflow:    item.Workflow,
 				})
+				if !item.Archived {
+					requestsCount++
+				}
 			}
 		}
 

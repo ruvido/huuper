@@ -46,6 +46,7 @@ type PendingRequestItem struct {
 	StatusLabel string         `json:"status_label"`
 	Created     string         `json:"created"`
 	AssignedAt  string         `json:"assigned_at,omitempty"`
+	Archived    bool           `json:"archived"`
 	Data        map[string]any `json:"data"`
 	Workflow    map[string]any `json:"workflow"`
 }

@@ -266,7 +266,7 @@ window.appRequestItem = (() => {
     const workflow = item && typeof item.workflow === "object" ? item.workflow : {};
     const alertBadge = emailAlertBadge(item, options.emailAlertBadge === true);
     let side;
-    if (options.archived === true) {
+    if (item && item.archived === true) {
       side = `<span class="list-item-side">${alertBadge}${UNARCHIVE_ICON}</span>`;
     } else {
       const status = text(workflow.pending_action_label) || statusText(item.status_label || item.status);
