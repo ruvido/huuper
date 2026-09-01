@@ -91,18 +91,26 @@ ssh "$VPS_HOST" "if [ -d '$VPS_PATH/current/frontend/site' ]; then mkdir -p '$FR
 echo "remote: switch current release"
 ssh "$VPS_HOST" "ln -sfn '$VPS_PATH/releases/$RELEASE_ID' '$VPS_PATH/current'"
 
-echo "docker: remove stale container name if present"
-ssh "$VPS_HOST" "docker rm -f '$SERVICE_NAME' >/dev/null 2>&1 || true"
+for attempt in 1 2 3; do
+  echo "docker: remove stale container name if present (attempt $attempt)"
+  ssh "$VPS_HOST" "docker rm -f '$SERVICE_NAME' >/dev/null 2>&1 || true"
 
-echo "docker: up -d --build --force-recreate"
-ssh "$VPS_HOST" "cd '$VPS_PATH/deploy' && $DOCKER_COMPOSE_CMD -f '$DEPLOY_COMPOSE_FILE' up -d --build --force-recreate $SERVICE_NAME"
+  echo "docker: up -d --build --force-recreate (attempt $attempt)"
+  ssh "$VPS_HOST" "cd '$VPS_PATH/deploy' && $DOCKER_COMPOSE_CMD -f '$DEPLOY_COMPOSE_FILE' up -d --build --force-recreate $SERVICE_NAME"
 
-echo "verify: container was actually recreated with this release"
-CONTAINER_CREATED_EPOCH="$(ssh "$VPS_HOST" "docker inspect '$SERVICE_NAME' --format '{{.Created}}'" | xargs -I{} date -d {} +%s)"
-if [ "$CONTAINER_CREATED_EPOCH" -lt "$DEPLOY_START_EPOCH" ]; then
-  echo "container was not recreated (created before this deploy started) - it's still running the old release" >&2
-  exit 1
-fi
+  echo "verify: container was actually recreated with this release"
+  CONTAINER_CREATED_EPOCH="$(ssh "$VPS_HOST" "docker inspect '$SERVICE_NAME' --format '{{.Created}}'" | xargs -I{} date -d {} +%s)"
+  if [ "$CONTAINER_CREATED_EPOCH" -ge "$DEPLOY_START_EPOCH" ]; then
+    break
+  fi
+
+  echo "container was not recreated (still older than this deploy) - retrying" >&2
+  if [ "$attempt" = 3 ]; then
+    echo "container still not recreated after 3 attempts - giving up" >&2
+    exit 1
+  fi
+  sleep 3
+done
 
 echo "health: wait for container"
 ssh "$VPS_HOST" "cd '$VPS_PATH/deploy' && $DOCKER_COMPOSE_CMD -f '$DEPLOY_COMPOSE_FILE' ps --status running --services | grep -qx '$SERVICE_NAME'"
