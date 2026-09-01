@@ -257,18 +257,25 @@ window.appRequestItem = (() => {
     return parts.join(" • ");
   }
 
+  const UNARCHIVE_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true" class="request-item-unarchive-icon"><path fill-rule="evenodd" d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2z"/><path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466"/></svg>';
+
   function renderListItem(item, href, options = {}) {
     const displayTitle = item.full_name || (item.data && (item.data.full_name || item.data.name)) || item.email || item.id;
     const safeTitle = escapeHTML(displayTitle);
     const meta = requestMeta(item);
     const workflow = item && typeof item.workflow === "object" ? item.workflow : {};
-    const status = text(workflow.pending_action_label) || statusText(item.status_label || item.status);
     const alertBadge = emailAlertBadge(item, options.emailAlertBadge === true);
-    const side = status
-      ? `<span class="list-item-side">${alertBadge}<span class="list-item-side-title request-item-status">${escapeHTML(status)}</span></span>`
-      : alertBadge
-        ? `<span class="list-item-side">${alertBadge}</span>`
-      : "";
+    let side;
+    if (options.archived === true) {
+      side = `<span class="list-item-side">${alertBadge}${UNARCHIVE_ICON}</span>`;
+    } else {
+      const status = text(workflow.pending_action_label) || statusText(item.status_label || item.status);
+      side = status
+        ? `<span class="list-item-side">${alertBadge}<span class="list-item-side-title request-item-status">${escapeHTML(status)}</span></span>`
+        : alertBadge
+          ? `<span class="list-item-side">${alertBadge}</span>`
+        : "";
+    }
 
     return `
       <a href="${escapeHTML(href)}" class="list-item request-item">

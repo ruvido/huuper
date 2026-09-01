@@ -1734,6 +1734,12 @@ body:has(.top-bar-detail-page) .bottom-nav {
   font-weight: 600;
 }
 
+.request-item-unarchive-icon {
+  width: 16px;
+  height: 16px;
+  fill: var(--text-faint);
+}
+
 /* Hide empty status placeholder so it doesn't occupy a grid row before the list.
    Note: `.battleplan-section` shares the rule rather than living in the
    battleplan block at the bottom of the file because the empty-collapse
