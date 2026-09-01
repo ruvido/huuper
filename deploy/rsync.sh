@@ -14,6 +14,7 @@ TARGET_GOARCH="${TARGET_GOARCH:-amd64}"
 FRONTEND_ARCHIVE_DIR="${FRONTEND_ARCHIVE_DIR:-$VPS_PATH/shared/frontend-history}"
 DEPLOY_URL="${DEPLOY_URL:-https://branco.realmen.it}"
 
+DEPLOY_START_EPOCH="$(date +%s)"
 RELEASE_ID="${RELEASE_ID:-$(date +%Y%m%d-%H%M%S)-$(git -C "$ROOT_DIR" rev-parse --short HEAD)}"
 TMP_RELEASE_DIR="/tmp/huuper-release-$RELEASE_ID"
 REMOTE_ENV_FILE="$TMP_RELEASE_DIR/shared.env"
@@ -95,6 +96,13 @@ ssh "$VPS_HOST" "docker rm -f '$SERVICE_NAME' >/dev/null 2>&1 || true"
 
 echo "docker: up -d --build --force-recreate"
 ssh "$VPS_HOST" "cd '$VPS_PATH/deploy' && $DOCKER_COMPOSE_CMD -f '$DEPLOY_COMPOSE_FILE' up -d --build --force-recreate $SERVICE_NAME"
+
+echo "verify: container was actually recreated with this release"
+CONTAINER_CREATED_EPOCH="$(ssh "$VPS_HOST" "docker inspect '$SERVICE_NAME' --format '{{.Created}}'" | xargs -I{} date -d {} +%s)"
+if [ "$CONTAINER_CREATED_EPOCH" -lt "$DEPLOY_START_EPOCH" ]; then
+  echo "container was not recreated (created before this deploy started) - it's still running the old release" >&2
+  exit 1
+fi
 
 echo "health: wait for container"
 ssh "$VPS_HOST" "cd '$VPS_PATH/deploy' && $DOCKER_COMPOSE_CMD -f '$DEPLOY_COMPOSE_FILE' ps --status running --services | grep -qx '$SERVICE_NAME'"
