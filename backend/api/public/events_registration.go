@@ -7,6 +7,7 @@ import (
 
 	backendinternal "members/backend/internal"
 	eventinternal "members/backend/internal/events"
+	paymentsinternal "members/backend/internal/payments"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
@@ -129,8 +130,29 @@ func RegisterEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		if linkedUser != nil {
 			effectiveData = backendinternal.ParseJSONMap(linkedUser.Get("data"))
 		}
+
+		checkoutURL := ""
 		if linkedUser != nil {
-			if err := eventinternal.ActivateRegistration(app, record, eventinternal.TemplateKindUserRegistrationAccepted); err != nil {
+			depositCents := eventinternal.DepositCentsForEvent(app, event)
+			if depositCents > 0 {
+				_, url, err := paymentsinternal.CreateCheckoutSession(app, paymentsinternal.CheckoutInput{
+					PurposeType: "event_registration",
+					PurposeID:   record.Id,
+					Email:       recipient,
+					AmountCents: int64(depositCents),
+					Currency:    "eur",
+					ProductName: strings.TrimSpace(event.GetString("title")) + " - caparra",
+					SuccessURL:  eventinternal.PaymentSuccessURL(app),
+					CancelURL:   eventinternal.PaymentCancelURL(app),
+				})
+				if err != nil {
+					return apis.NewBadRequestError(errGeneric, err)
+				}
+				if err := eventinternal.MarkAwaitingPayment(app, record, url); err != nil {
+					return apis.NewBadRequestError(errGeneric, err)
+				}
+				checkoutURL = url
+			} else if err := eventinternal.ActivateRegistration(app, record, eventinternal.TemplateKindUserRegistrationAccepted); err != nil {
 				return apis.NewBadRequestError(errGeneric, err)
 			}
 		}
@@ -138,8 +160,9 @@ func RegisterEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent)
 		eventinternal.SendAdminNotification(app, event, recipient, record.GetString("accept_token"), effectiveData)
 
 		return e.JSON(http.StatusCreated, map[string]any{
-			"id":         record.Id,
-			"email_sent": emailSent,
+			"id":           record.Id,
+			"email_sent":   emailSent,
+			"checkout_url": checkoutURL,
 		})
 	}
 }

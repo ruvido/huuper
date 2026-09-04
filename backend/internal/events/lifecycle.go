@@ -103,7 +103,10 @@ func Create(app *pocketbase.PocketBase, creator *core.Record, in CreateInput) (*
 	record.Set("event_date", start)
 	record.Set("title", title)
 	record.Set("slug", generateSlug(in.Type, start))
-	record.Set("active", true)
+	// Deposit-gated types (e.g. raduno) start as drafts — admin must explicitly
+	// publish once the payment setup is verified, to avoid exposing a live
+	// registration/checkout flow before it's ready.
+	record.Set("active", typeDef.Registration.DepositCents <= 0)
 	record.Set("created_by", creator.Id)
 	record.Set("cadence", cadence)
 	record.Set("count", strconv.Itoa(count))

@@ -19,6 +19,7 @@ import (
 const (
 	TemplateKindUserRegistrationReceived = "events.user.registration_received"
 	TemplateKindUserRegistrationAccepted = "events.user.registration_accepted"
+	TemplateKindUserPaymentLink          = "events.user.payment_link"
 	TemplateKindAdminNewRegistration     = "events.admin.new_registration"
 	maxRegistrationDataBytes             = 4000
 )

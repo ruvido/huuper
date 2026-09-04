@@ -5,21 +5,31 @@ import (
 	meroutes "members/backend/api/me"
 	publicroutes "members/backend/api/public"
 	staticroutes "members/backend/api/static"
+	eventinternal "members/backend/internal/events"
+	paymentsinternal "members/backend/internal/payments"
+	retreatsinternal "members/backend/internal/retreats"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
 )
 
 func RegisterRoutes(app *pocketbase.PocketBase, se *core.ServeEvent) {
+	paymentsinternal.RegisterConfirmHandler("event_registration", eventinternal.ConfirmPayment)
+	paymentsinternal.RegisterConfirmHandler("retreat_registration", retreatsinternal.ConfirmPayment)
+
 	publicroutes.Register(se, publicroutes.Handlers{
 		Settings:           publicroutes.SettingsHandler(app),
 		EventsAccept:       publicroutes.AcceptEventHandler(app),
+		EventDetails:       publicroutes.EventDetailsHandler(app),
 		EventsRegister:     publicroutes.RegisterEventHandler(app),
+		RetreatDetails:     publicroutes.RetreatDetailsHandler(app),
+		RetreatsRegister:   publicroutes.RegisterRetreatHandler(app),
 		RequestsEmailOTP:   publicroutes.RequestEmailOTPHandler(app),
 		RequestsOTPVerify:  publicroutes.VerifyRequestEmailOTPHandler(app),
 		RequestsCreate:     publicroutes.SubmitRequestHandler(app),
 		OnboardingGet:      publicroutes.OnboardingGetHandler(app),
 		OnboardingFinalize: publicroutes.OnboardingFinalizeHandler(app),
+		StripeWebhook:      publicroutes.StripeWebhookHandler(app),
 	})
 
 	meroutes.Register(se, meroutes.Handlers{
@@ -72,6 +82,7 @@ func RegisterRoutes(app *pocketbase.PocketBase, se *core.ServeEvent) {
 		EventReschedule:       adminroutes.RescheduleEventHandler(app),
 		EventCancel:           adminroutes.CancelEventHandler(app),
 		EventCancelOccurrence: adminroutes.CancelOccurrenceEventHandler(app),
+		EventSetActive:        adminroutes.SetEventActiveHandler(app),
 		EventAttendance:       adminroutes.MarkAttendanceHandler(app),
 		RequestsList:          meroutes.ListRequestsHandler(app),
 		RequestCreate:         adminroutes.CreateRequestHandler(app),
@@ -87,6 +98,18 @@ func RegisterRoutes(app *pocketbase.PocketBase, se *core.ServeEvent) {
 		UsersList:             adminroutes.UsersListHandler(app),
 		UserCancel:            adminroutes.CancelUserHandler(app),
 		UserDelete:            adminroutes.DeleteUserHandler(app),
+
+		RetreatsList:               adminroutes.RetreatsListHandler(app),
+		RetreatCreate:              adminroutes.RetreatCreateHandler(app),
+		RetreatUpdate:              adminroutes.RetreatUpdateHandler(app),
+		RetreatCancel:              adminroutes.RetreatCancelHandler(app),
+		RetreatDetails:             adminroutes.RetreatDetailsAdminHandler(app),
+		RetreatUploadGallery:       adminroutes.RetreatUploadGalleryHandler(app),
+		RetreatRemoveGalleryFile:   adminroutes.RetreatRemoveGalleryFileHandler(app),
+		RetreatBroadcastEmail:      adminroutes.RetreatBroadcastEmailHandler(app),
+		RetreatRegistrationApprove: adminroutes.RetreatRegistrationApproveHandler(app),
+		RetreatRegistrationReject:  adminroutes.RetreatRegistrationRejectHandler(app),
+		RetreatRegistrationCancel:  adminroutes.RetreatRegistrationCancelHandler(app),
 	})
 
 	staticroutes.Register(se)

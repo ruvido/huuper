@@ -37,6 +37,7 @@ type Item struct {
 	Group        string         `json:"group,omitempty"`
 	GroupName    string         `json:"group_name,omitempty"`
 	Registration bool           `json:"registration"`
+	DepositCents int            `json:"deposit_cents,omitempty"`
 	CreatedBy    string         `json:"created_by,omitempty"`
 	Active       bool           `json:"active"`
 	Data         map[string]any `json:"data"`
@@ -51,6 +52,7 @@ func ApplyTypeConfig(item *Item, cfg *Config) {
 	if typeDef, ok := cfg.TypeDef(item.Type); ok {
 		item.TypeLabel = typeDef.Label
 		item.Registration = typeDef.Registration.Enabled
+		item.DepositCents = typeDef.Registration.DepositCents
 	}
 }
 

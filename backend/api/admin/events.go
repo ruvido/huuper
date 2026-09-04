@@ -6,6 +6,7 @@ import (
 
 	backendinternal "members/backend/internal"
 	eventinternal "members/backend/internal/events"
+	paymentsinternal "members/backend/internal/payments"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
@@ -71,6 +72,32 @@ func ApproveRegistrationHandler(app *pocketbase.PocketBase) func(e *core.Request
 
 		if record.GetString("status") == "active" {
 			return e.JSON(http.StatusOK, map[string]any{"status": "already_accepted"})
+		}
+
+		event, err := app.FindRecordById("events", record.GetString("event"))
+		if err != nil || event == nil {
+			return apis.NewBadRequestError("invalid_event", err)
+		}
+
+		depositCents := eventinternal.DepositCentsForEvent(app, event)
+		if depositCents > 0 && record.GetString("status") != "awaiting_payment" {
+			_, url, err := paymentsinternal.CreateCheckoutSession(app, paymentsinternal.CheckoutInput{
+				PurposeType: "event_registration",
+				PurposeID:   record.Id,
+				Email:       record.GetString("email"),
+				AmountCents: int64(depositCents),
+				Currency:    "eur",
+				ProductName: strings.TrimSpace(event.GetString("title")) + " - caparra",
+				SuccessURL:  eventinternal.PaymentSuccessURL(app),
+				CancelURL:   eventinternal.PaymentCancelURL(app),
+			})
+			if err != nil {
+				return apis.NewBadRequestError("failed_checkout", err)
+			}
+			if err := eventinternal.MarkAwaitingPayment(app, record, url); err != nil {
+				return apis.NewBadRequestError("failed_update", err)
+			}
+			return e.JSON(http.StatusOK, map[string]any{"status": "awaiting_payment"})
 		}
 
 		if err := eventinternal.ActivateRegistration(app, record, "events.user.registration_accepted"); err != nil {
@@ -233,6 +260,30 @@ func CancelEventHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) e
 			return apis.NewBadRequestError("failed_event_cancel", err)
 		}
 		return e.JSON(http.StatusOK, map[string]any{"deleted": 1})
+	}
+}
+
+func SetEventActiveHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		record, err := loadEventByID(app, e.Request.PathValue("id"))
+		if err != nil {
+			return err
+		}
+		var payload struct {
+			Active *bool `json:"active"`
+		}
+		if err := e.BindBody(&payload); err != nil || payload.Active == nil {
+			return apis.NewBadRequestError("invalid_payload", err)
+		}
+		record.Set("active", *payload.Active)
+		if err := app.Save(record); err != nil {
+			return apis.NewBadRequestError("failed_update", err)
+		}
+		item := eventinternal.MapItem(record)
+		if cfg, err := eventinternal.LoadConfig(app); err == nil {
+			eventinternal.ApplyTypeConfig(&item, cfg)
+		}
+		return e.JSON(http.StatusOK, item)
 	}
 }
 

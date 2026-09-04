@@ -1,0 +1,116 @@
+{{ define "content" }}
+<div class="retreat-page">
+  <p id="retreat-loading" class="meta-text retreat-loading">…</p>
+  <p id="retreat-error" class="meta-text is-error retreat-loading" hidden></p>
+
+  <div id="retreat-body" hidden>
+    <nav id="retreat-nav" class="retreat-nav">
+      <div class="retreat-nav-row">
+        <span class="retreat-brand" data-copy="brand"></span>
+        <div id="retreat-nav-links" class="retreat-nav-links"></div>
+      </div>
+    </nav>
+
+    <header class="retreat-hero">
+      <div class="retreat-hero-inner">
+        <div id="retreat-kicker" class="retreat-kicker"></div>
+        <h1 id="retreat-title" class="retreat-title"></h1>
+        <p id="retreat-lead" class="retreat-lead"></p>
+      </div>
+    </header>
+
+    <div id="retreat-stat-strip" class="retreat-stat-strip"></div>
+
+    <section id="evento" class="retreat-section">
+      <div class="retreat-section-grid">
+        <div>
+          <div class="retreat-eyebrow" data-copy="event.eyebrow"></div>
+          <h2 id="retreat-about-heading" class="retreat-h2"></h2>
+          <div id="retreat-intro" class="retreat-body-text"></div>
+        </div>
+        <div id="retreat-highlights" class="retreat-feat-list"></div>
+      </div>
+    </section>
+
+    <section id="retreat-gallery-section" class="retreat-section retreat-gallery-section" hidden>
+      <div id="retreat-gallery" class="retreat-gallery"></div>
+    </section>
+
+    <section id="luogo" class="retreat-section" hidden>
+      <div class="retreat-info-card">
+        <h2 class="retreat-h2" id="retreat-place-heading"></h2>
+        <div id="retreat-location-body" class="retreat-body-text"></div>
+        <h3 class="retreat-subheading" data-copy="place.arrivalHeading"></h3>
+        <div id="retreat-arrival" class="retreat-arrival"></div>
+      </div>
+    </section>
+
+    <section id="info" class="retreat-section" hidden>
+      <div class="retreat-info-card">
+        <div class="retreat-eyebrow" data-copy="info.eyebrow"></div>
+        <h2 class="retreat-h2" data-copy="info.heading"></h2>
+        <div class="retreat-info-columns">
+          <div id="retreat-packing-list" class="retreat-info-column" hidden></div>
+          <div id="retreat-included-list" class="retreat-info-column" hidden></div>
+          <div id="retreat-not-included-list" class="retreat-info-column" hidden></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="iscrizione" class="retreat-section">
+      <div class="retreat-signup">
+        <div class="retreat-signup-main">
+          <p id="retreat-register-deadline" class="retreat-signup-kicker" hidden></p>
+          <h2 id="retreat-signup-heading" class="retreat-h2-big"></h2>
+          <p id="retreat-signup-body" class="retreat-body-dark"></p>
+        </div>
+
+        <!-- What it costs comes before the button that commits to it: you read
+             the price, then you act. The card sits inside the form so that
+             order holds on one column and on two. -->
+        <form id="retreat-register-form" class="retreat-form">
+          <div id="retreat-fields-loading" class="retreat-fields-loading" hidden><span class="retreat-spinner"></span></div>
+          <div id="retreat-guest-fields" class="retreat-guest-fields" hidden>
+            <div id="retreat-email-field">
+              {{ template "field" (dict "Label" "Email" "ID" "retreat-email" "ErrorID" "retreat-email-error" "Name" "email" "Type" "email" "Placeholder" "name@domain.com" "Required" true "Autocomplete" "email") }}
+            </div>
+          </div>
+
+          <div id="retreat-signup-card" class="retreat-signup-card" hidden>
+            <div id="retreat-price-list" class="retreat-price-list"></div>
+          </div>
+
+          <p id="retreat-register-status" class="meta-text" hidden></p>
+
+          <!-- Members log in and register in one click; everyone else fills in
+               the pre-registration form. Asking first keeps a member from
+               retyping details we already hold. -->
+          <div id="retreat-start" class="retreat-start" hidden>
+            <button id="retreat-start-button" class="retreat-btn retreat-btn-dark" type="button"></button>
+          </div>
+
+          <div id="retreat-choice" class="retreat-choice" hidden>
+            <p id="retreat-choice-question" class="retreat-choice-question"></p>
+            <button id="retreat-choice-member" class="retreat-btn retreat-btn-dark" type="button"></button>
+            <p id="retreat-choice-or" class="retreat-choice-or"></p>
+            <button id="retreat-choice-guest" class="retreat-btn retreat-btn-outline-dark" type="button"></button>
+          </div>
+
+          <div class="retreat-signup-ctas">
+            <button id="retreat-register-submit" class="retreat-btn retreat-btn-dark" type="submit"></button>
+            <a id="retreat-contact" class="retreat-btn retreat-btn-outline-dark" href="#" data-copy="signup.contactCta" hidden></a>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section id="faq" class="retreat-section" hidden>
+      <div class="retreat-eyebrow" data-copy="faq.eyebrow"></div>
+      <h2 class="retreat-h2" data-copy="faq.heading"></h2>
+      <div id="retreat-faq" class="retreat-faq-grid"></div>
+    </section>
+
+  </div>
+</div>
+{{ end }}
+{{ define "page" }}{{ template "layout-public" (dict "Title" "Huuper / Retreat" "TopbarTitle" "" "BackHref" "" "ExtraCSS" (list "https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700&family=Inter:wght@400;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" "/assets/css/retreat.css") "Scripts" (list "/assets/js/core/auth.js" "/assets/js/core/public-fields.js" "/assets/js/core/copy-i18n.js" "/copy/retreats.it.js" "/assets/js/public/retreat.js")) }}{{ end }}

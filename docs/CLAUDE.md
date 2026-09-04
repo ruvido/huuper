@@ -17,6 +17,12 @@ Self-hosted webapp to manage private telegram/discord groups, including:
 - **Best practices only**: seguire convenzioni ufficiali
 - **Zero ridondanza**: evitare codice complesso e duplicato
 
+## Code language
+Tutto il codice è in inglese, sempre: nomi di collection, campi DB, package/funzioni/variabili Go, route/path API, chiavi JSON, nomi di file/variabili/classi CSS nel frontend, e le label in `frontend/skeleton/copy/*.js`. Nessuna eccezione.
+Solo i **VALORI** dei record (contenuto reale digitato dagli admin: descrizioni, FAQ, testi email, ecc.) possono essere in italiano — mai la struttura/schema/codice.
+- App interna (admin/member, `frontend/skeleton/copy/*.js`): tutte le stringhe SOLO in inglese, definite in `copy/*.js` e referenziate via `appCopy`. Mai stringhe hardcoded inline nei componenti.
+- Pagine pubbliche (`assets/js/public/*.js`, es. registrazione/pagamento evento/retreat): chrome/label di UI in inglese come il resto del codice; il contenuto che viene renderizzato da `data` (testi scritti dall'admin, tipicamente IT) resta quello che l'admin ha digitato, verbatim.
+
 ## pocketbase
 - extend in go
 - custom api e hooks in go (no js sdk server side)

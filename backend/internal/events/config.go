@@ -28,8 +28,9 @@ type TypeDef struct {
 }
 
 type RegistrationDef struct {
-	Enabled  bool `json:"enabled"`
-	Approval bool `json:"approval"`
+	Enabled      bool `json:"enabled"`
+	Approval     bool `json:"approval"`
+	DepositCents int  `json:"deposit_cents"`
 }
 
 func LoadConfig(app *pocketbase.PocketBase) (*Config, error) {

@@ -44,10 +44,19 @@ window.appAuth = (() => {
     return normalizeRedirectTarget(params.get("next"));
   }
 
+  // Public pages a member may be sent to log in *from*, and should land back
+  // on afterwards. Without this a retreat page would bounce them to /me/ and
+  // lose the registration they were in the middle of.
+  const publicReturnPrefixes = ["/retreat/"];
+
   function scopeRedirectPath(scope, next) {
     const normalizedNext = normalizeRedirectTarget(next);
     if (!normalizedNext) {
       return "";
+    }
+
+    if (publicReturnPrefixes.some((prefix) => normalizedNext.startsWith(prefix))) {
+      return normalizedNext;
     }
 
     if (scope === "admin" && normalizedNext.startsWith("/me/")) {

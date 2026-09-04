@@ -96,6 +96,53 @@ window.appEventDetail = (() => {
   // Hosts the post-event attendance roster (admin/assistant) or read-only
   // status (attendee). Inserted just below the tabs so it doesn't collide
   // with the active-registration list.
+  function ensureVisibilityHost(summaryNode) {
+    let host = document.getElementById("event-visibility");
+    if (host) return host;
+    host = document.createElement("section");
+    host.id = "event-visibility";
+    host.className = "event-visibility";
+    if (summaryNode && summaryNode.parentNode) {
+      summaryNode.parentNode.insertBefore(host, summaryNode.nextSibling);
+    }
+    return host;
+  }
+
+  async function postSetActive(eventID, active) {
+    return window.appAuth.apiFetch(`/api/admin/events/${encodeURIComponent(eventID)}/active`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ active }),
+    });
+  }
+
+  function renderVisibilityToggle(summaryNode, event, eventID, reload) {
+    const host = ensureVisibilityHost(summaryNode);
+    const isActive = event.active !== false;
+    const esc = window.appListPage.escapeHTML;
+    const c = detailCopy();
+    const statusLabel = isActive ? (c.publishedLabel || "Published") : (c.draftLabel || "Draft (admin only)");
+    const actionLabel = isActive ? (c.unpublishAction || "Move to draft") : (c.publishAction || "Publish");
+    host.innerHTML = `
+      <article class="detail-card event-visibility-card">
+        <strong>${esc(statusLabel)}</strong>
+        <button type="button" class="wizard-btn wizard-btn-outline" data-toggle-active>${esc(actionLabel)}</button>
+      </article>
+    `;
+    const button = host.querySelector("[data-toggle-active]");
+    if (button) {
+      button.addEventListener("click", async () => {
+        button.disabled = true;
+        try {
+          await postSetActive(eventID, !isActive);
+          await reload();
+        } catch (_) {
+          button.disabled = false;
+        }
+      });
+    }
+  }
+
   function ensureAttendanceHost(referenceNode) {
     let host = document.getElementById("event-attendance");
     if (host) return host;
@@ -312,14 +359,19 @@ window.appEventDetail = (() => {
       const event = payload.event || {};
       const location = window.appListPage.text(event.location);
       const duration = window.appListPage.text(((event.data || {}).duration));
+      const description = window.appListPage.text(((event.data || {}).description));
+      const url = window.appListPage.text(event.url);
       if (topbarTitleNode && event.title) {
         topbarTitleNode.textContent = event.title;
       }
       summaryNode.hidden = false;
-      summaryNode.innerHTML = window.appEventSummary.render(location, duration);
+      summaryNode.innerHTML = window.appEventSummary.render(location, duration, description, url);
 
       const past = isPastEvent(event);
       const scope = config.scope || "me";
+      if (scope === "admin") {
+        renderVisibilityToggle(summaryNode, event, id, load);
+      }
       const canManage = config.canManageRegistrations === true;
       const canEdit = payload.can_edit === true || config.canEdit === true;
       const registered = payload.registered === true;

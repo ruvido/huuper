@@ -33,6 +33,10 @@ window.appCopy = Object.assign({}, window.appCopy || {}, {
       occurrencesLabel: "Occurrences",
       cancelOccurrenceLabel: "Cancel this one",
       cancelledLabel: "Cancelled",
+      publishedLabel: "Published",
+      draftLabel: "Draft (admin only)",
+      publishAction: "Publish",
+      unpublishAction: "Move to draft",
       pastLabel: "Past",
       cancelOccurrenceConfirm: {
         title: "Cancel this occurrence?",

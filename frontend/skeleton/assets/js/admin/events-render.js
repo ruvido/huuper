@@ -31,7 +31,12 @@
   function renderItem(item, ctx) {
     const { esc, basePath, spotlight } = ctx;
     const title = deriveTitle(item);
-    const href = `${basePath}/event/?id=${encodeURIComponent(item.id)}`;
+    // Retreats are a separate module (see docs/CLAUDE.md) with no admin
+    // edit UI — their row in this merged list links to the live public
+    // page, not to an /admin/event/ detail that doesn't exist for them.
+    const href = item.type === "retreat"
+      ? `/retreat/${encodeURIComponent(item.slug || "")}/`
+      : `${basePath}/event/?id=${encodeURIComponent(item.id)}`;
     const meta = cad.metaText(item);
     const tlabel = item.type_label || typeLabel(item.type);
     const side = tlabel

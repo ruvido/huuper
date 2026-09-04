@@ -13,7 +13,11 @@
   <script src="{{ asset "/copy/ui.js" }}"></script>
   <script src="{{ asset "/copy/battleplan.js" }}"></script>
   <script src="{{ asset "/copy/events.js" }}"></script>
+  <script src="{{ asset "/copy/retreats.js" }}"></script>
   <link rel="stylesheet" href="{{ asset "/assets/css/app.css" }}" />
+  {{- range .ExtraCSS }}
+  <link rel="stylesheet" href="{{ asset . }}" />
+  {{- end }}
   <script src="{{ asset "/assets/js/core/topbar.js" }}" defer></script>
   {{- range .Scripts }}
   <script src="{{ asset . }}" defer></script>

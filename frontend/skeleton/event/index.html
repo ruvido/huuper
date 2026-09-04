@@ -1,0 +1,22 @@
+{{ define "content" }}
+<section class="panel">
+  <p id="event-loading" class="meta-text">Caricamento...</p>
+  <div id="event-body" hidden>
+    <h2 id="event-title" class="public-request-title"></h2>
+    <p id="event-meta" class="meta-text"></p>
+    <p id="event-deposit" class="meta-text" hidden></p>
+
+    <form id="event-register-form" class="view-stack">
+      <div id="event-email-field">
+        {{ template "field" (dict "Label" "Email" "HideLabel" true "ID" "event-email" "ErrorID" "event-email-error" "Name" "email" "Type" "email" "Placeholder" "name@domain.com" "Required" true "Autocomplete" "email") }}
+      </div>
+      <p id="event-status" class="meta-text" hidden></p>
+      <div class="action-row">
+        <button id="event-submit" class="primary" type="submit">Richiedi di partecipare</button>
+      </div>
+    </form>
+  </div>
+  <p id="event-error" class="meta-text is-error" hidden></p>
+</section>
+{{ end }}
+{{ define "page" }}{{ template "layout-public" (dict "Title" "Huuper / Raduno" "TopbarTitle" "" "BackHref" "" "Scripts" (list "/assets/js/core/auth.js" "/assets/js/core/public-fields.js" "/assets/js/public/event-register.js")) }}{{ end }}

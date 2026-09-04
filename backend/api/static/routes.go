@@ -69,5 +69,21 @@ func Register(se *core.ServeEvent) {
 	se.Router.GET("/me/battleplan/new/", func(e *core.RequestEvent) error {
 		return e.FileFS(site, "me/battleplan/new/index.html")
 	})
+	se.Router.GET("/event/{slug}", func(e *core.RequestEvent) error {
+		return e.FileFS(site, "event/index.html")
+	})
+	se.Router.GET("/event/{slug}/", func(e *core.RequestEvent) error {
+		return e.FileFS(site, "event/index.html")
+	})
+	se.Router.GET("/retreat/{slug}", func(e *core.RequestEvent) error {
+		return e.FileFS(site, "retreat/index.html")
+	})
+	se.Router.GET("/retreat/{slug}/", func(e *core.RequestEvent) error {
+		return e.FileFS(site, "retreat/index.html")
+	})
+	se.Router.GET("/retreat-payment/", func(e *core.RequestEvent) error {
+		return e.FileFS(site, "retreat-payment/index.html")
+	})
+
 	se.Router.GET("/{path...}", apis.Static(site, false))
 }

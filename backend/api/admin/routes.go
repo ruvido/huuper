@@ -19,6 +19,7 @@ type Handlers struct {
 	EventReschedule       func(e *core.RequestEvent) error
 	EventCancel           func(e *core.RequestEvent) error
 	EventCancelOccurrence func(e *core.RequestEvent) error
+	EventSetActive        func(e *core.RequestEvent) error
 	EventAttendance       func(e *core.RequestEvent) error
 	RequestsList          func(e *core.RequestEvent) error
 	RequestCreate         func(e *core.RequestEvent) error
@@ -34,6 +35,18 @@ type Handlers struct {
 	UsersList             func(e *core.RequestEvent) error
 	UserDelete            func(e *core.RequestEvent) error
 	UserCancel            func(e *core.RequestEvent) error
+
+	RetreatsList               func(e *core.RequestEvent) error
+	RetreatCreate              func(e *core.RequestEvent) error
+	RetreatUpdate              func(e *core.RequestEvent) error
+	RetreatCancel              func(e *core.RequestEvent) error
+	RetreatDetails             func(e *core.RequestEvent) error
+	RetreatUploadGallery       func(e *core.RequestEvent) error
+	RetreatRemoveGalleryFile   func(e *core.RequestEvent) error
+	RetreatBroadcastEmail      func(e *core.RequestEvent) error
+	RetreatRegistrationApprove func(e *core.RequestEvent) error
+	RetreatRegistrationReject  func(e *core.RequestEvent) error
+	RetreatRegistrationCancel  func(e *core.RequestEvent) error
 }
 
 func Register(se *core.ServeEvent, h Handlers) {
@@ -48,6 +61,7 @@ func Register(se *core.ServeEvent, h Handlers) {
 	se.Router.POST("/api/admin/events/{id}/reschedule", backendinternal.AdminOnly(h.EventReschedule)).Bind(apis.RequireAuth())
 	se.Router.POST("/api/admin/events/{id}/cancel", backendinternal.AdminOnly(h.EventCancel)).Bind(apis.RequireAuth())
 	se.Router.POST("/api/admin/events/{id}/cancel-occurrence", backendinternal.AdminOnly(h.EventCancelOccurrence)).Bind(apis.RequireAuth())
+	se.Router.POST("/api/admin/events/{id}/active", backendinternal.AdminOnly(h.EventSetActive)).Bind(apis.RequireAuth())
 	se.Router.POST("/api/admin/registrations/{id}/attendance", backendinternal.AdminOnly(h.EventAttendance)).Bind(apis.RequireAuth())
 	se.Router.GET("/api/admin/requests", backendinternal.AdminOnly(h.RequestsList)).Bind(apis.RequireAuth())
 	se.Router.POST("/api/admin/requests", backendinternal.AdminOnly(h.RequestCreate)).Bind(apis.RequireAuth())
@@ -63,4 +77,16 @@ func Register(se *core.ServeEvent, h Handlers) {
 	se.Router.GET("/api/admin/users/{id}", backendinternal.AdminOnly(h.UserGet)).Bind(apis.RequireAuth())
 	se.Router.POST("/api/admin/users/{id}/cancel", backendinternal.AdminOnly(h.UserCancel)).Bind(apis.RequireAuth())
 	se.Router.DELETE("/api/admin/users/{id}", backendinternal.AdminOnly(h.UserDelete)).Bind(apis.RequireAuth())
+
+	se.Router.GET("/api/admin/retreats", backendinternal.AdminOnly(h.RetreatsList)).Bind(apis.RequireAuth())
+	se.Router.POST("/api/admin/retreats", backendinternal.AdminOnly(h.RetreatCreate)).Bind(apis.RequireAuth())
+	se.Router.GET("/api/admin/retreats/{id}", backendinternal.AdminOnly(h.RetreatDetails)).Bind(apis.RequireAuth())
+	se.Router.PATCH("/api/admin/retreats/{id}", backendinternal.AdminOnly(h.RetreatUpdate)).Bind(apis.RequireAuth())
+	se.Router.DELETE("/api/admin/retreats/{id}", backendinternal.AdminOnly(h.RetreatCancel)).Bind(apis.RequireAuth())
+	se.Router.POST("/api/admin/retreats/{id}/gallery", backendinternal.AdminOnly(h.RetreatUploadGallery)).Bind(apis.RequireAuth())
+	se.Router.DELETE("/api/admin/retreats/{id}/gallery/{filename}", backendinternal.AdminOnly(h.RetreatRemoveGalleryFile)).Bind(apis.RequireAuth())
+	se.Router.POST("/api/admin/retreats/{id}/broadcast-email", backendinternal.AdminOnly(h.RetreatBroadcastEmail)).Bind(apis.RequireAuth())
+	se.Router.POST("/api/admin/retreat-registrations/{id}/approve", backendinternal.AdminOnly(h.RetreatRegistrationApprove)).Bind(apis.RequireAuth())
+	se.Router.POST("/api/admin/retreat-registrations/{id}/reject", backendinternal.AdminOnly(h.RetreatRegistrationReject)).Bind(apis.RequireAuth())
+	se.Router.POST("/api/admin/retreat-registrations/{id}/cancel", backendinternal.AdminOnly(h.RetreatRegistrationCancel)).Bind(apis.RequireAuth())
 }

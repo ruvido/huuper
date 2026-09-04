@@ -24,16 +24,24 @@ func RegisterUsersNormalization(app *pocketbase.PocketBase) {
 	})
 }
 
-// RegisterUsersAuthGate blocks authentication for users that haven't
-// finished the onboarding flow yet. This is defense-in-depth: under
-// normal flow such users have a random unknown password and cannot
-// log in via password, but the hook also blocks OAuth2 and any path
-// that bypasses password verification, so it is impossible to reach
-// the API as an authenticated user with an empty profile.
+// RegisterUsersAuthGate blocks authentication for cancelled users, and for
+// users that haven't finished the onboarding flow yet. This is
+// defense-in-depth: under normal flow such users have a random unknown
+// password and cannot log in via password, but the hook also blocks OAuth2
+// and any path that bypasses password verification, so it is impossible to
+// reach the API as an authenticated user with an empty profile.
 func RegisterUsersAuthGate(app *pocketbase.PocketBase) {
 	app.OnRecordAuthRequest("users").BindFunc(func(e *core.RecordAuthRequestEvent) error {
 		if e.Record == nil {
 			return e.Next()
+		}
+		// Cancelling a user (admin.CancelUser) revokes their invites and
+		// onboarding tokens but leaves the password working, so without this
+		// they could still sign in. Checked before onboarding so a cancelled
+		// account is never handed a fresh onboarding link. The hook also runs
+		// on auth-refresh, which ends any session still open at cancellation.
+		if strings.TrimSpace(e.Record.GetString("status")) == "cancelled" {
+			return apis.NewForbiddenError("account_cancelled", nil)
 		}
 		data := backendinternal.ParseJSONMap(e.Record.Get("data"))
 		if strings.TrimSpace(backendinternal.AnyToString(data["onboarding_completed_at"])) == "" {

@@ -1,0 +1,10 @@
+{{ define "content" }}
+<section class="panel">
+  <h2 id="event-payment-title" class="public-request-title"></h2>
+  <p id="event-payment-message" class="meta-text"></p>
+  <div class="action-row">
+    <a href="/" class="primary">Torna alla home</a>
+  </div>
+</section>
+{{ end }}
+{{ define "page" }}{{ template "layout-public" (dict "Title" "Huuper / Pagamento" "TopbarTitle" "" "BackHref" "" "Scripts" (list "/assets/js/public/event-payment.js")) }}{{ end }}
