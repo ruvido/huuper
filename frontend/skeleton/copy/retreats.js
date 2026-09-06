@@ -41,7 +41,7 @@ window.appCopy = Object.assign({}, window.appCopy || {}, {
       },
       info: {
         eyebrow: "Practical info",
-        heading: "What to bring, what's included",
+        heading: "What to bring",
         packing: "What to bring",
         included: "Included in the fee",
         notIncluded: "Not included",

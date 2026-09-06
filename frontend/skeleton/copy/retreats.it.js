@@ -35,7 +35,7 @@ window.appCopyI18n.translate("retreats.public", {
   },
   info: {
     eyebrow: "Info pratiche",
-    heading: "Cosa portare, cosa è incluso",
+    heading: "Cosa portare",
     packing: "Da portare",
     included: "Incluso nella quota",
     notIncluded: "Non incluso",
