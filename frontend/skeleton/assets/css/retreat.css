@@ -185,6 +185,7 @@ html:has(.retreat-page) {
   max-width: 620px;
   font: 400 16px/1.65 Archivo, sans-serif;
   color: rgba(244, 241, 232, 0.8);
+  white-space: pre-line;
 }
 
 /* ---------- buttons ---------- */
