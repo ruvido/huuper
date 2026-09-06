@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/yuin/goldmark"
+	goldmarkhtml "github.com/yuin/goldmark/renderer/html"
 )
 
 func RenderMarkdownHTML(raw string) (string, bool) {
@@ -17,11 +18,21 @@ func RenderMarkdownHTML(raw string) (string, bool) {
 	}
 
 	var out bytes.Buffer
-	if err := goldmark.Convert([]byte(clean), &out); err != nil {
+	if err := markdownRenderer.Convert([]byte(clean), &out); err != nil {
 		return "", false
 	}
 	return out.String(), true
 }
+
+// Everything rendered here is typed by a person into a textarea — email
+// bodies, mentoring notes, settings copy — not authored as a Markdown
+// document. Plain Markdown joins consecutive lines into one paragraph, so an
+// address or a list of dates written one per line arrived as a single run-on
+// line. WithHardWraps makes a newline mean a newline, which is what whoever
+// pressed Enter meant.
+var markdownRenderer = goldmark.New(
+	goldmark.WithRendererOptions(goldmarkhtml.WithHardWraps()),
+)
 
 // RenderInlineMarkdown renders a single-line string as inline markdown,
 // stripping the surrounding <p> wrapper that goldmark adds by default.
