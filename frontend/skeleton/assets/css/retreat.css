@@ -567,6 +567,18 @@ html:has(.retreat-page) {
   font: 500 var(--rt-text-xs)/1.4 Archivo, system-ui, sans-serif;
 }
 
+/* app.css paints .meta-text near-white, for the dark page. The signup card is
+   the one block with the accent background: left alone, every message it shows
+   — "posti esauriti", "iscrizione ricevuta", the registration errors — lands
+   white on yellow and cannot be read. */
+.retreat-page .retreat-signup .meta-text {
+  color: var(--rt-accent-ink);
+}
+
+.retreat-page .retreat-signup .meta-text.is-error {
+  color: var(--rt-input-danger);
+}
+
 /* The member/visitor fork. Logging in is the primary path — a member who
    fills in the guest form instead ends up re-entering what we already have. */
 

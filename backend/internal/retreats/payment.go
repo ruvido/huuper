@@ -1,9 +1,11 @@
 package retreats
 
 import (
+	"fmt"
 	"strings"
 
 	backendinternal "members/backend/internal"
+	paymentsinternal "members/backend/internal/payments"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
@@ -67,6 +69,48 @@ func MarkAwaitingPayment(app *pocketbase.PocketBase, record *core.Record, paymen
 	retreat, _ := app.FindRecordById("retreats", record.GetString("retreat"))
 	SendPaymentLinkEmail(app, retreat, record.GetString("email"), paymentURL)
 	return nil
+}
+
+// ResumeCheckout issues a fresh Stripe session for a registration that is
+// still waiting for its deposit, and returns the new checkout URL.
+//
+// Closing the Stripe page is not a mistake and not a withdrawal: the person
+// signed up and simply did not finish paying. Without this they are stuck —
+// the unique index on (retreat, email) refuses a second registration, so they
+// can neither pay nor sign up again.
+//
+// The abandoned session is left alone rather than deleted: its `payments`
+// record is how the webhook recognises a payment, and the visitor may still
+// have that tab open. Stripe expires unused sessions on its own.
+func ResumeCheckout(app *pocketbase.PocketBase, retreat *core.Record, registration *core.Record) (string, error) {
+	depositCents := DepositCentsForRetreat(retreat)
+	if depositCents <= 0 {
+		return "", fmt.Errorf("retreat has no deposit to pay")
+	}
+
+	_, url, err := paymentsinternal.CreateCheckoutSession(app, paymentsinternal.CheckoutInput{
+		PurposeType: "retreat_registration",
+		PurposeID:   registration.Id,
+		Email:       registration.GetString("email"),
+		AmountCents: int64(depositCents),
+		Currency:    "eur",
+		ProductName: strings.TrimSpace(retreat.GetString("title")) + " - deposit",
+		SuccessURL:  PaymentSuccessURL(app, retreat),
+		CancelURL:   PaymentCancelURL(app, retreat),
+	})
+	if err != nil {
+		return "", err
+	}
+
+	// No email here, unlike MarkAwaitingPayment: the visitor asked for this
+	// from the page and is about to be redirected to it.
+	data := backendinternal.ParseJSONMap(registration.Get("data"))
+	data["payment_url"] = url
+	registration.Set("data", data)
+	if err := app.Save(registration); err != nil {
+		return "", err
+	}
+	return url, nil
 }
 
 // ConfirmPayment activates a registration once its deposit has been paid.

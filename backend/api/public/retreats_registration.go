@@ -97,6 +97,22 @@ func RegisterRetreatHandler(app *pocketbase.PocketBase) func(e *core.RequestEven
 
 		existing, err := retreatsinternal.FindRegistrationByEmail(app, retreat.Id, email, false)
 		if err == nil && existing != nil {
+			// Someone who closed the Stripe page has a registration that is
+			// only waiting to be paid. Sending them away with "you already
+			// signed up" leaves them stuck: they cannot pay, and the unique
+			// index refuses a second registration. Hand them a new checkout
+			// link instead — the frontend redirects on checkout_url exactly as
+			// it does for a first registration.
+			if existing.GetString("status") == "awaiting_payment" {
+				checkoutURL, err := retreatsinternal.ResumeCheckout(app, retreat, existing)
+				if err != nil {
+					return apis.NewBadRequestError(errGeneric, err)
+				}
+				return e.JSON(http.StatusOK, map[string]any{
+					"id":           existing.Id,
+					"checkout_url": checkoutURL,
+				})
+			}
 			return apis.NewBadRequestError(errAlreadySubmitted, nil)
 		}
 
