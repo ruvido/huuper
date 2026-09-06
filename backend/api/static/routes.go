@@ -87,6 +87,9 @@ func Register(app *pocketbase.PocketBase, se *core.ServeEvent) {
 	se.Router.GET("/retreat-accept/", func(e *core.RequestEvent) error {
 		return e.FileFS(site, "retreat-accept/index.html")
 	})
+	se.Router.GET("/retreat-registered/", func(e *core.RequestEvent) error {
+		return e.FileFS(site, "retreat-registered/index.html")
+	})
 
 	se.Router.GET("/{path...}", apis.Static(site, false))
 }

@@ -57,8 +57,6 @@ window.appCopyI18n.translate("retreats.public", {
     submitGuest: "Iscriviti",
     notOpen: "Le iscrizioni non sono ancora aperte.",
     full: "Posti esauriti.",
-    successMember: "Iscrizione ricevuta, controlla la tua email.",
-    successGuest: "Pre-iscrizione ricevuta. Ti ricontattiamo noi per confermare il posto.",
     choice: {
       startCta: "Iscriviti",
       question: "Fai parte di un gruppo Realmen?",
@@ -87,6 +85,18 @@ window.appCopyI18n.translate("retreats.public", {
       missingGuestFields: "Compila tutti i campi richiesti.",
       generic: "Iscrizione non riuscita, riprova.",
     },
+  },
+  registered: {
+    guest: {
+      title: "Pre-iscrizione ricevuta",
+      body: "Ti ricontattiamo noi per confermare il posto. I posti sono limitati.",
+    },
+    member: {
+      title: "Iscrizione ricevuta",
+      body: "Controlla la tua email: ti arriva tutto quello che serve.",
+    },
+    backHome: "Torna alla home",
+    backToRetreat: "Torna al raduno",
   },
   payment: {
     success: {

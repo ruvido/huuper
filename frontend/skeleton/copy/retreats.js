@@ -63,8 +63,6 @@ window.appCopy = Object.assign({}, window.appCopy || {}, {
         submitGuest: "Register now",
         notOpen: "Registrations are not open yet for this retreat.",
         full: "This retreat is fully booked.",
-        successMember: "Registration received, check your email.",
-        successGuest: "Pre-registration received. We will contact you to confirm your spot.",
         choice: {
           startCta: "Register",
           question: "Are you part of a Realmen group?",
@@ -93,6 +91,18 @@ window.appCopy = Object.assign({}, window.appCopy || {}, {
           missingGuestFields: "Please fill in all required fields.",
           generic: "Registration failed, please try again.",
         },
+      },
+      registered: {
+        guest: {
+          title: "Pre-registration received",
+          body: "We will contact you to confirm your spot. Places are limited.",
+        },
+        member: {
+          title: "Registration received",
+          body: "Check your email: everything you need is on its way.",
+        },
+        backHome: "Back home",
+        backToRetreat: "Back to the retreat",
       },
       payment: {
         success: {

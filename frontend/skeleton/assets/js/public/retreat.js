@@ -758,7 +758,10 @@
       registrationData = Object.assign(registrationData, guestValues);
     }
 
+    // Registering hits Stripe and the mail server, so the wait is real and
+    // visible. Without this the button just goes dead and people click again.
     submitButton.disabled = true;
+    submitButton.classList.add("is-busy");
     try {
       const payload = await auth.apiFetch("/api/public/retreats/" + encodeURIComponent(slug) + "/register", {
         method: "POST",
@@ -771,9 +774,12 @@
         return;
       }
 
-      form.hidden = true;
-      statusNode.textContent = isMember ? text("signup.successMember") : text("signup.successGuest");
-      statusNode.hidden = false;
+      // Nothing left to pay: land on a page that says so, instead of leaving
+      // the reader in front of the form they just filled in.
+      const outcome = isMember ? "member" : "guest";
+      window.location.href = "/retreat-registered/?status=" + outcome +
+        "&retreat=" + encodeURIComponent(slug);
+      return;
     } catch (error) {
       const code = (error && error.payload && error.payload.message) || "";
       const messages = {
@@ -785,8 +791,11 @@
       };
       statusNode.textContent = messages[code] || text("signup.errors.generic");
       statusNode.hidden = false;
-    } finally {
+      // Only here, not in a `finally`: both success paths navigate away, and
+      // `finally` would run before the browser leaves, flashing the button
+      // back to life on a form the reader is already done with.
       submitButton.disabled = false;
+      submitButton.classList.remove("is-busy");
     }
   });
 })();

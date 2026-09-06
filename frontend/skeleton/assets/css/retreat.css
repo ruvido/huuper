@@ -621,6 +621,33 @@ html:has(.retreat-page) {
 }
 
 /* Lives inside the yellow panel: accent-on-accent made it invisible. */
+/* The submit button while the registration is in flight. The label is hidden
+   rather than replaced so the button keeps its width and nothing jumps. The
+   spinner takes its colour from the button variant it sits on. */
+.retreat-btn.is-busy {
+  position: relative;
+  color: transparent;
+  pointer-events: none;
+}
+
+.retreat-btn.is-busy::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--rt-accent);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: retreat-spin 0.7s linear infinite;
+}
+
+.retreat-btn-outline-dark.is-busy::after {
+  border-color: var(--rt-accent-ink);
+  border-top-color: transparent;
+}
+
 .retreat-spinner {
   width: 26px;
   height: 26px;

@@ -85,15 +85,20 @@ func Register(app *pocketbase.PocketBase, retreat *core.Record, in RegisterInput
 
 	checkoutURL := ""
 	if in.SkipApproval {
-		// Approved members skip approval entirely.
-		checkoutURL, err = resolveActivation(app, retreat, record)
+		// Approved members skip approval entirely. No payment-link email
+		// either: the browser is about to land them on that very page.
+		checkoutURL, err = resolveActivation(app, retreat, record, false)
 		if err != nil {
 			return nil, "", err
 		}
 	}
 
-	SendRegistrationEmail(app, retreat, email)
+	// "We received your request, we'll call you before confirming" is the
+	// guest flow talking. Nobody calls a member back and nothing is pending
+	// review for them, so the only email their registration produces is the
+	// confirmation once the deposit is in.
 	if !in.SkipApproval {
+		SendRegistrationEmail(app, retreat, email)
 		SendAdminNewRegistrationNotification(app, retreat, record, email)
 	}
 
@@ -115,10 +120,16 @@ func Approve(app *pocketbase.PocketBase, registration *core.Record) (string, err
 	if err != nil || retreat == nil {
 		return "", fmt.Errorf("retreat not found")
 	}
-	return resolveActivation(app, retreat, registration)
+	// The guest is not on the site — they are being approved hours or days
+	// after applying — so the payment link has to reach them by email.
+	return resolveActivation(app, retreat, registration, true)
 }
 
-func resolveActivation(app *pocketbase.PocketBase, retreat *core.Record, registration *core.Record) (string, error) {
+// emailPaymentLink tells apart the two ways a registration reaches the
+// deposit: a member clicking through right now (redirected to Stripe, an
+// email would be noise) and a guest approved later (the email is the only
+// way they hear about it).
+func resolveActivation(app *pocketbase.PocketBase, retreat *core.Record, registration *core.Record, emailPaymentLink bool) (string, error) {
 	depositCents := DepositCentsForRetreat(retreat)
 	if depositCents > 0 && registration.GetString("status") != "awaiting_payment" {
 		_, url, err := paymentsinternal.CreateCheckoutSession(app, paymentsinternal.CheckoutInput{
@@ -134,7 +145,7 @@ func resolveActivation(app *pocketbase.PocketBase, retreat *core.Record, registr
 		if err != nil {
 			return "", err
 		}
-		if err := MarkAwaitingPayment(app, registration, url); err != nil {
+		if err := MarkAwaitingPayment(app, registration, url, emailPaymentLink); err != nil {
 			return "", err
 		}
 		return url, nil

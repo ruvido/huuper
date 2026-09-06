@@ -56,15 +56,19 @@ func returnURL(app *pocketbase.PocketBase, retreat *core.Record, page string, st
 	return url
 }
 
-// MarkAwaitingPayment moves a registration to awaiting_payment and emails
-// the registrant the Stripe checkout link.
-func MarkAwaitingPayment(app *pocketbase.PocketBase, record *core.Record, paymentURL string) error {
+// MarkAwaitingPayment moves a registration to awaiting_payment, and emails the
+// registrant the Stripe checkout link when they are not already on their way
+// to it (see resolveActivation).
+func MarkAwaitingPayment(app *pocketbase.PocketBase, record *core.Record, paymentURL string, emailPaymentLink bool) error {
 	record.Set("status", "awaiting_payment")
 	data := backendinternal.ParseJSONMap(record.Get("data"))
 	data["payment_url"] = paymentURL
 	record.Set("data", data)
 	if err := app.Save(record); err != nil {
 		return err
+	}
+	if !emailPaymentLink {
+		return nil
 	}
 	retreat, _ := app.FindRecordById("retreats", record.GetString("retreat"))
 	SendPaymentLinkEmail(app, retreat, record.GetString("email"), paymentURL)

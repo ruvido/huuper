@@ -1,9 +1,13 @@
 (() => {
   const PHONE_MIN_TOTAL_DIGITS = 9;
-  const FIELD_REQUIRED_MESSAGE = "Field cannot be empty.";
-  const FULL_NAME_REQUIRED_MESSAGE = "Both First and Last name are required";
-  const EMAIL_INVALID_MESSAGE = "Enter a valid email address.";
-  const PHONE_INVALID_MESSAGE = "Enter a valid phone number.";
+
+  // Read at call time, never captured in a constant: this file is loaded
+  // before the translation overlay (copy/fields.<lang>.js), so a value taken
+  // at load time would always be the English one.
+  function message(key) {
+    const copy = (window.appCopy && window.appCopy.fields) || {};
+    return typeof copy[key] === "string" ? copy[key] : "";
+  }
 
   function text(value) {
     return String(value || "").trim();
@@ -92,53 +96,53 @@
       if (value instanceof File || value instanceof Blob) {
         return { error: "", normalized: value };
       }
-      return { error: required ? FIELD_REQUIRED_MESSAGE : "", normalized: null };
+      return { error: required ? message("required") : "", normalized: null };
     }
 
     const raw = text(value);
 
     if (key === "full_name") {
       if (!raw) {
-        return { error: FULL_NAME_REQUIRED_MESSAGE, normalized: "" };
+        return { error: message("fullNameRequired"), normalized: "" };
       }
       const normalized = normalizeFullName(raw);
       if (!normalized) {
-        return { error: FULL_NAME_REQUIRED_MESSAGE, normalized: "" };
+        return { error: message("fullNameRequired"), normalized: "" };
       }
       return { error: "", normalized };
     }
 
     if (key === "email" || type === "email") {
       if (!raw) {
-        return { error: required ? FIELD_REQUIRED_MESSAGE : "", normalized: "" };
+        return { error: required ? message("required") : "", normalized: "" };
       }
       const normalized = normalizeEmail(raw);
       if (!normalized) {
-        return { error: EMAIL_INVALID_MESSAGE, normalized: "" };
+        return { error: message("emailInvalid"), normalized: "" };
       }
       return { error: "", normalized };
     }
 
     if (type === "select") {
       if (!raw) {
-        return { error: required ? "Select at least one choice" : "", normalized: value || "" };
+        return { error: required ? message("choiceRequired") : "", normalized: value || "" };
       }
       return { error: "", normalized: value };
     }
 
     if (key === "mobile" || type === "phone") {
       if (!raw) {
-        return { error: required ? FIELD_REQUIRED_MESSAGE : "", normalized: "" };
+        return { error: required ? message("required") : "", normalized: "" };
       }
       const normalized = normalizePhone(raw);
       if (!normalized) {
-        return { error: PHONE_INVALID_MESSAGE, normalized: "" };
+        return { error: message("phoneInvalid"), normalized: "" };
       }
       return { error: "", normalized };
     }
 
     if (!raw && required) {
-      return { error: FIELD_REQUIRED_MESSAGE, normalized: "" };
+      return { error: message("required"), normalized: "" };
     }
 
     return { error: "", normalized: raw };
