@@ -88,8 +88,8 @@ window.appCopyI18n.translate("retreats.public", {
   },
   registered: {
     guest: {
-      title: "Pre-iscrizione ricevuta",
-      body: "Ti ricontattiamo noi per confermare il posto. I posti sono limitati.",
+      title: "Ci siamo",
+      body: "Abbiamo la tua richiesta. Ti chiamiamo nei prossimi giorni per confermare il posto.",
     },
     member: {
       title: "Iscrizione ricevuta",

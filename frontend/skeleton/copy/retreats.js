@@ -94,8 +94,8 @@ window.appCopy = Object.assign({}, window.appCopy || {}, {
       },
       registered: {
         guest: {
-          title: "Pre-registration received",
-          body: "We will contact you to confirm your spot. Places are limited.",
+          title: "We've got it",
+          body: "We have your request. We will call you in the next few days to confirm your spot.",
         },
         member: {
           title: "Registration received",
