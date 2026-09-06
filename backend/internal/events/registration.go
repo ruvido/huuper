@@ -100,7 +100,7 @@ func IsUniqueRegistrationConstraintError(err error) bool {
 }
 
 func sendAdminTemplateMissing(app *pocketbase.PocketBase, event *core.Record, registrantEmail string, kind string) {
-	adminAddresses := findSuperuserEmails(app)
+	adminAddresses := SuperuserAddresses(app)
 	if len(adminAddresses) == 0 {
 		return
 	}
@@ -129,7 +129,10 @@ func sendAdminTemplateMissing(app *pocketbase.PocketBase, event *core.Record, re
 	)
 }
 
-func findSuperuserEmails(app *pocketbase.PocketBase) []mail.Address {
+// SuperuserAddresses is who to fall back on when an admin notification has
+// nowhere else to go. Exported for the retreats module, which reuses this
+// same last-resort recipient.
+func SuperuserAddresses(app *pocketbase.PocketBase) []mail.Address {
 	records, err := app.FindRecordsByFilter("_superusers", "", "", 0, 0)
 	if err != nil {
 		app.Logger().Warn("Failed to load superusers", "error", err)

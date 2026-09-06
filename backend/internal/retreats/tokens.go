@@ -2,11 +2,13 @@ package retreats
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	backendinternal "members/backend/internal"
 
 	"github.com/pocketbase/pocketbase"
+	"github.com/pocketbase/pocketbase/core"
 )
 
 // GenerateAcceptToken mirrors events.GenerateAcceptToken: a random,
@@ -51,4 +53,31 @@ func isTokenUnique(app *pocketbase.PocketBase, token string) (bool, error) {
 		return false, err
 	}
 	return len(records) == 0, nil
+}
+
+// FindByAcceptToken resolves a still-valid accept token to its registration.
+// An expired or unknown token yields no record rather than an error, so the
+// caller can answer with one indistinguishable "invalid link" either way.
+func FindByAcceptToken(app *pocketbase.PocketBase, token string) *core.Record {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return nil
+	}
+	records, err := app.FindRecordsByFilter(
+		"retreat_registrations",
+		"accept_token = {:token}",
+		"",
+		1,
+		0,
+		map[string]any{"token": token},
+	)
+	if err != nil || len(records) == 0 {
+		return nil
+	}
+	record := records[0]
+	expiry := record.GetDateTime("accept_expires_at").Time()
+	if !expiry.IsZero() && time.Now().UTC().After(expiry) {
+		return nil
+	}
+	return record
 }

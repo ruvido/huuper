@@ -10,19 +10,18 @@ import (
 // events.Item it is never gated on `active` before being returned to a
 // caller — the detail endpoint always renders it, active or not.
 type Item struct {
-	ID            string         `json:"id"`
-	Title         string         `json:"title"`
-	Tagline       string         `json:"tagline,omitempty"`
-	Slug          string         `json:"slug"`
-	Location      string         `json:"location,omitempty"`
-	StartDate     string         `json:"start_date"`
-	EndDate       string         `json:"end_date,omitempty"`
-	Active        bool           `json:"active"`
-	TelegramGroup string         `json:"telegram_group,omitempty"`
-	Gallery       []string       `json:"gallery"`
-	Data          map[string]any `json:"data"`
-	Created       string         `json:"created"`
-	Updated       string         `json:"updated"`
+	ID        string         `json:"id"`
+	Title     string         `json:"title"`
+	Tagline   string         `json:"tagline,omitempty"`
+	Slug      string         `json:"slug"`
+	Location  string         `json:"location,omitempty"`
+	StartDate string         `json:"start_date"`
+	EndDate   string         `json:"end_date,omitempty"`
+	Active    bool           `json:"active"`
+	Gallery   []string       `json:"gallery"`
+	Data      map[string]any `json:"data"`
+	Created   string         `json:"created"`
+	Updated   string         `json:"updated"`
 }
 
 func MapItem(record *core.Record) Item {
@@ -34,19 +33,18 @@ func MapItem(record *core.Record) Item {
 		endDate = record.GetDateTime("end_date").String()
 	}
 	return Item{
-		ID:            record.Id,
-		Title:         record.GetString("title"),
-		Tagline:       record.GetString("tagline"),
-		Slug:          record.GetString("slug"),
-		Location:      record.GetString("location"),
-		StartDate:     record.GetDateTime("start_date").String(),
-		EndDate:       endDate,
-		Active:        record.GetBool("active"),
-		TelegramGroup: record.GetString("telegram_group"),
-		Gallery:       record.GetStringSlice("gallery"),
-		Data:          backendinternal.ParseJSONMap(record.Get("data")),
-		Created:       record.GetDateTime("created").String(),
-		Updated:       record.GetDateTime("updated").String(),
+		ID:        record.Id,
+		Title:     record.GetString("title"),
+		Tagline:   record.GetString("tagline"),
+		Slug:      record.GetString("slug"),
+		Location:  record.GetString("location"),
+		StartDate: record.GetDateTime("start_date").String(),
+		EndDate:   endDate,
+		Active:    record.GetBool("active"),
+		Gallery:   record.GetStringSlice("gallery"),
+		Data:      backendinternal.ParseJSONMap(record.Get("data")),
+		Created:   record.GetDateTime("created").String(),
+		Updated:   record.GetDateTime("updated").String(),
 	}
 }
 

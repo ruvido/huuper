@@ -1,8 +1,45 @@
+{{- /*
+  The public origin of the site. Social crawlers (WhatsApp, Telegram,
+  Facebook, LinkedIn) do not run JS and do not resolve relative og:image
+  URLs, so the absolute one has to be written at build time — the build has
+  no access to settings.Meta.AppURL. Keep in sync with DEPLOY_URL in
+  deploy/rsync.sh.
+*/ -}}
+{{ define "site-url" }}https://branco.realmen.it{{ end }}
+
+{{- /*
+  Share card. Rendered only for pages that pass a Description, i.e. the
+  public ones: /me and /admin sit behind a login and have nothing to share.
+  The image is the Branco logo shown on `/`, served as PNG (WhatsApp does
+  not render WebP previews) and deliberately without the ?v= cache buster,
+  so crawlers keep the preview they already scraped across deploys.
+*/ -}}
+{{ define "share-card" }}
+  <meta name="description" content="{{ .Description }}" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Il Branco Realmen" />
+  <meta property="og:locale" content="it_IT" />
+  <meta property="og:title" content="{{ .Title }}" />
+  <meta property="og:description" content="{{ .Description }}" />
+  <meta property="og:image" content="{{ template "site-url" . }}/assets/images/original/logo-il-branco.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1024" />
+  <meta property="og:image:height" content="1024" />
+  <meta property="og:image:alt" content="Il Branco Realmen" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="{{ .Title }}" />
+  <meta name="twitter:description" content="{{ .Description }}" />
+  <meta name="twitter:image" content="{{ template "site-url" . }}/assets/images/original/logo-il-branco.png" />
+{{ end }}
+
 {{ define "head" }}
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{{ .Title }}</title>
+  {{- if .Description }}
+  {{- template "share-card" . }}
+  {{- end }}
   <link rel="icon" type="image/png" href="{{ asset "/assets/favicon/realmen-logo.png" }}" />
   <link rel="shortcut icon" href="{{ asset "/assets/images/favicon/favicon.ico" }}" sizes="any" />
   <link rel="apple-touch-icon" href="{{ asset "/assets/images/favicon/apple-touch-icon.png" }}" />
@@ -89,7 +126,7 @@
 
 {{ define "layout-public" }}
 <!doctype html>
-<html lang="en">
+<html lang="{{ if .Lang }}{{ .Lang }}{{ else }}en{{ end }}">
   {{ template "head" . }}
   <body class="public-page{{- if .BodyClass }} {{ .BodyClass }}{{- end }}"{{- if .BodyData }}{{- range $key, $value := .BodyData }} data-{{ $key }}="{{ $value }}"{{- end }}{{- end }}>
     <main class="app">

@@ -88,6 +88,42 @@ window.appCopyI18n.translate("retreats.public", {
       generic: "Iscrizione non riuscita, riprova.",
     },
   },
+  payment: {
+    success: {
+      title: "Pagamento ricevuto",
+      body: "Grazie! La tua iscrizione è confermata. Ti arriverà a breve un'email con tutte le informazioni pratiche.",
+    },
+    cancelled: {
+      title: "Pagamento non completato",
+      body: "Il pagamento non è andato a buon fine e il posto non è ancora confermato. Puoi riprovare dalla pagina del raduno.",
+    },
+    backHome: "Torna alla home",
+    backToRetreat: "Torna al raduno",
+  },
+  accept: {
+    approved: {
+      title: "Iscrizione approvata",
+      body: "Gli è partita l'email con il link per versare l'acconto. Il posto resta suo finché non paga.",
+    },
+    active: {
+      title: "Iscrizione approvata",
+      body: "Questo raduno non prevede acconto, quindi è già dentro: gli sono arrivate le info pratiche e l'invito al gruppo Telegram.",
+    },
+    already: {
+      title: "Già gestita",
+      body: "Questa iscrizione era già stata approvata. Non è cambiato nulla e non è ripartita nessuna email.",
+    },
+    invalid: {
+      title: "Link non valido",
+      body: "Questo link di approvazione è sconosciuto o scaduto. Approva l'iscrizione dal pannello di amministrazione.",
+    },
+    failed: {
+      title: "Approvazione non riuscita",
+      body: "Qualcosa è andato storto durante l'approvazione. Riprova dal pannello di amministrazione.",
+    },
+    backHome: "Torna alla home",
+    backToRetreat: "Torna al raduno",
+  },
   faq: {
     eyebrow: "FAQ",
     heading: "Domande frequenti",

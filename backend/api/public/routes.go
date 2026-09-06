@@ -5,6 +5,7 @@ import "github.com/pocketbase/pocketbase/core"
 type Handlers struct {
 	Settings           func(e *core.RequestEvent) error
 	EventsAccept       func(e *core.RequestEvent) error
+	RetreatsAccept     func(e *core.RequestEvent) error
 	EventDetails       func(e *core.RequestEvent) error
 	EventsRegister     func(e *core.RequestEvent) error
 	RetreatDetails     func(e *core.RequestEvent) error
@@ -24,6 +25,7 @@ func Register(se *core.ServeEvent, h Handlers) {
 	se.Router.POST("/api/public/events/{slug}/register", h.EventsRegister)
 	se.Router.GET("/api/public/retreats/{slug}", h.RetreatDetails)
 	se.Router.POST("/api/public/retreats/{slug}/register", h.RetreatsRegister)
+	se.Router.GET("/api/public/retreats/accept", h.RetreatsAccept)
 	se.Router.POST("/api/public/requests/email-otp", h.RequestsEmailOTP)
 	se.Router.POST("/api/public/requests/email-otp/verify", h.RequestsOTPVerify)
 	se.Router.POST("/api/public/requests", h.RequestsCreate)

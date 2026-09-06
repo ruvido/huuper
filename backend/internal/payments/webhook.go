@@ -20,7 +20,15 @@ func HandleWebhook(app *pocketbase.PocketBase, payload []byte, signatureHeader s
 		return err
 	}
 
-	event, err := webhook.ConstructEvent(payload, signatureHeader, cfg.WebhookSecret)
+	// ConstructEvent also rejects any event whose API release train differs
+	// from the one this SDK was generated against (v81 = "acacia"), so a
+	// dashboard endpoint on a newer API version would have every delivery
+	// bounce. The signature is still verified; only the version check is
+	// waived, which is safe here because the fields read below (session id,
+	// payment intent) are stable across versions.
+	event, err := webhook.ConstructEventWithOptions(payload, signatureHeader, cfg.WebhookSecret, webhook.ConstructEventOptions{
+		IgnoreAPIVersionMismatch: true,
+	})
 	if err != nil {
 		return fmt.Errorf("invalid webhook signature: %w", err)
 	}

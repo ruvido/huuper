@@ -68,7 +68,10 @@
         <!-- What it costs comes before the button that commits to it: you read
              the price, then you act. The card sits inside the form so that
              order holds on one column and on two. -->
-        <form id="retreat-register-form" class="retreat-form">
+        <!-- novalidate: the guest fields are `required` but hidden on the member
+               path, and the browser silently refuses to submit a form whose
+               invalid control cannot be focused. Validation lives in JS. -->
+          <form id="retreat-register-form" class="retreat-form" novalidate>
           <div id="retreat-fields-loading" class="retreat-fields-loading" hidden><span class="retreat-spinner"></span></div>
           <div id="retreat-guest-fields" class="retreat-guest-fields" hidden>
             <div id="retreat-email-field">
@@ -113,4 +116,10 @@
   </div>
 </div>
 {{ end }}
-{{ define "page" }}{{ template "layout-public" (dict "Title" "Huuper / Retreat" "TopbarTitle" "" "BackHref" "" "ExtraCSS" (list "https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700&family=Inter:wght@400;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" "/assets/css/retreat.css") "Scripts" (list "/assets/js/core/auth.js" "/assets/js/core/public-fields.js" "/assets/js/core/copy-i18n.js" "/copy/retreats.it.js" "/assets/js/public/retreat.js")) }}{{ end }}
+{{- /*
+  Title and Description are what a shared link shows on WhatsApp, Telegram
+  and Facebook: crawlers do not run JS, so they never see the retreat the
+  page fetches at runtime. They stay generic on purpose — one static file
+  serves every retreat under /retreat/{slug}.
+*/ -}}
+{{ define "page" }}{{ template "layout-public" (dict "Lang" "it" "Title" "Raduno — Il Branco Realmen" "Description" "Il raduno nazionale del Branco Realmen. I posti sono limitati." "TopbarTitle" "" "BackHref" "" "ExtraCSS" (list "https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700&family=Inter:wght@400;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" "/assets/css/retreat.css") "Scripts" (list "/assets/js/core/auth.js" "/assets/js/core/public-fields.js" "/assets/js/core/copy-i18n.js" "/copy/retreats.it.js" "/assets/js/public/retreat.js")) }}{{ end }}

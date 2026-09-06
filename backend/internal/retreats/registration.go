@@ -92,9 +92,9 @@ func Register(app *pocketbase.PocketBase, retreat *core.Record, in RegisterInput
 		}
 	}
 
-	SendRegistrationEmail(app, email)
+	SendRegistrationEmail(app, retreat, email)
 	if !in.SkipApproval {
-		SendAdminNewRegistrationNotification(app, retreat, email)
+		SendAdminNewRegistrationNotification(app, retreat, record, email)
 	}
 
 	return record, checkoutURL, nil
@@ -128,8 +128,8 @@ func resolveActivation(app *pocketbase.PocketBase, retreat *core.Record, registr
 			AmountCents: int64(depositCents),
 			Currency:    "eur",
 			ProductName: strings.TrimSpace(retreat.GetString("title")) + " - deposit",
-			SuccessURL:  PaymentSuccessURL(app),
-			CancelURL:   PaymentCancelURL(app),
+			SuccessURL:  PaymentSuccessURL(app, retreat),
+			CancelURL:   PaymentCancelURL(app, retreat),
 		})
 		if err != nil {
 			return "", err
@@ -144,7 +144,7 @@ func resolveActivation(app *pocketbase.PocketBase, retreat *core.Record, registr
 }
 
 // Activate marks a registration active, generates a Telegram invite link
-// (if the retreat has telegram_group set) and emails the confirmation.
+// (if the retreat has data.telegram_invite set) and emails the confirmation.
 func Activate(app *pocketbase.PocketBase, registration *core.Record) error {
 	if registration == nil {
 		return fmt.Errorf("missing registration")
@@ -157,7 +157,7 @@ func Activate(app *pocketbase.PocketBase, registration *core.Record) error {
 	retreat, _ := app.FindRecordById("retreats", registration.GetString("retreat"))
 	inviteLink := InviteLinkForRetreat(app, retreat)
 
-	SendAcceptedEmail(app, registration.GetString("email"), inviteLink)
+	SendAcceptedEmail(app, retreat, registration.GetString("email"), inviteLink)
 	return nil
 }
 

@@ -681,6 +681,17 @@
 
       loadingNode.hidden = true;
       bodyNode.hidden = false;
+
+      // The panel is rendered after the fetch, so the browser has nothing to
+      // scroll to when it first handles the #iscrizione anchor.
+      if (window.location.hash === "#iscrizione") {
+        const target = document.querySelector("#iscrizione");
+        if (target) {
+          window.requestAnimationFrame(() => {
+            target.scrollIntoView({ behavior: "auto", block: "start" });
+          });
+        }
+      }
     })
     .catch(() => {
       showError(text("notFound"));
@@ -710,7 +721,7 @@
     choiceMemberButton.addEventListener("click", () => {
       // Comes back to this page once logged in (see publicReturnPrefixes in
       // core/auth.js), instead of landing on /me/.
-      auth.redirectToLogin(window.location.pathname + window.location.search);
+      auth.redirectToLogin(window.location.pathname + window.location.search + "#iscrizione");
     });
   }
 

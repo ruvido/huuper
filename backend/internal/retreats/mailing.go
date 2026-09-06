@@ -1,9 +1,12 @@
 package retreats
 
 import (
+	"fmt"
 	"net/mail"
 	"strings"
+	"time"
 
+	backendinternal "members/backend/internal"
 	eventinternal "members/backend/internal/events"
 
 	"github.com/pocketbase/pocketbase"
@@ -23,38 +26,122 @@ const (
 	TemplateKindAdminNewRegistration     = "retreats.admin.new_registration"
 )
 
+var italianMonths = [...]string{
+	"gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno",
+	"luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre",
+}
+
+func formatDay(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return fmt.Sprintf("%d %s %d", t.Day(), italianMonths[int(t.Month())-1], t.Year())
+}
+
+// formatDateRange keeps a same-month range compact: "8 – 11 ottobre 2026".
+func formatDateRange(start, end time.Time) string {
+	if start.IsZero() {
+		return ""
+	}
+	if end.IsZero() || start.Equal(end) {
+		return formatDay(start)
+	}
+	if start.Month() == end.Month() && start.Year() == end.Year() {
+		return fmt.Sprintf("%d – %d %s %d", start.Day(), end.Day(), italianMonths[int(start.Month())-1], start.Year())
+	}
+	return formatDay(start) + " – " + formatDay(end)
+}
+
+func formatMoney(cents int) string {
+	if cents <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("%d,%02d €", cents/100, cents%100)
+}
+
+// retreatPlaceholders exposes the retreat's own content to the templates, so
+// an email can carry the dates, the place and how to get there without any of
+// it being written into the code. Every value comes from the record.
+func retreatPlaceholders(retreat *core.Record) []string {
+	if retreat == nil {
+		return nil
+	}
+	data := parseData(retreat)
+	arrival, _ := data["arrival"].(map[string]any)
+	arrivalText := func(key string) string {
+		if arrival == nil {
+			return ""
+		}
+		value, _ := arrival[key].(string)
+		return value
+	}
+
+	price := DataInt(data, "price_cents")
+	deposit := DataInt(data, "deposit_cents")
+	balance := 0
+	if price > deposit {
+		balance = price - deposit
+	}
+
+	dataString := func(key string) string {
+		value, _ := data[key].(string)
+		return value
+	}
+
+	return []string{
+		"[retreat]", strings.TrimSpace(retreat.GetString("title")),
+		"[tagline]", strings.TrimSpace(retreat.GetString("tagline")),
+		"[dates]", formatDateRange(retreat.GetDateTime("start_date").Time(), retreat.GetDateTime("end_date").Time()),
+		"[start_date]", formatDay(retreat.GetDateTime("start_date").Time()),
+		"[end_date]", formatDay(retreat.GetDateTime("end_date").Time()),
+		"[location]", strings.TrimSpace(retreat.GetString("location")),
+		"[place]", dataString("place_name"),
+		"[region]", dataString("region"),
+		"[meeting_time]", dataString("meeting_time_note"),
+		"[arrival_car]", arrivalText("auto"),
+		"[arrival_train]", arrivalText("train"),
+		"[arrival_carpooling]", arrivalText("carpooling"),
+		"[price]", formatMoney(price),
+		"[deposit]", formatMoney(deposit),
+		"[balance]", formatMoney(balance),
+		"[contact_email]", dataString("contact_email"),
+	}
+}
+
 // SendRegistrationEmail notifies the registrant their submission was
 // received (pending review for guests, or "check your email" for members).
-func SendRegistrationEmail(app *pocketbase.PocketBase, recipient string) bool {
-	return sendTemplateEmail(app, TemplateKindUserRegistrationReceived, recipient, nil)
+func SendRegistrationEmail(app *pocketbase.PocketBase, retreat *core.Record, recipient string) bool {
+	return sendTemplateEmail(app, TemplateKindUserRegistrationReceived, recipient, retreatPlaceholders(retreat))
 }
 
 // SendAcceptedEmail notifies the registrant their registration is active,
 // optionally embedding a Telegram invite link via the [invite_link]
 // placeholder.
-func SendAcceptedEmail(app *pocketbase.PocketBase, recipient string, inviteLink string) bool {
-	return sendTemplateEmail(app, TemplateKindUserRegistrationAccepted, recipient, []string{
-		"[invite_link]", inviteLink,
-	})
+func SendAcceptedEmail(app *pocketbase.PocketBase, retreat *core.Record, recipient string, inviteLink string) bool {
+	return sendTemplateEmail(app, TemplateKindUserRegistrationAccepted, recipient,
+		append(retreatPlaceholders(retreat), "[invite_link]", inviteLink))
 }
 
 // SendPaymentLinkEmail notifies the registrant of the Stripe checkout URL
 // for their deposit.
-func SendPaymentLinkEmail(app *pocketbase.PocketBase, recipient string, paymentURL string) bool {
-	return sendTemplateEmail(app, TemplateKindUserPaymentLink, recipient, []string{
-		"[payment_url]", paymentURL,
-	})
+func SendPaymentLinkEmail(app *pocketbase.PocketBase, retreat *core.Record, recipient string, paymentURL string) bool {
+	return sendTemplateEmail(app, TemplateKindUserPaymentLink, recipient,
+		append(retreatPlaceholders(retreat), "[payment_url]", paymentURL))
 }
 
 // SendAdminNewRegistrationNotification notifies admins a new (pending)
 // guest registration needs review.
-func SendAdminNewRegistrationNotification(app *pocketbase.PocketBase, retreat *core.Record, registrantEmail string) {
+func SendAdminNewRegistrationNotification(app *pocketbase.PocketBase, retreat *core.Record, registration *core.Record, registrantEmail string) {
 	template, found, err := eventinternal.LoadTemplateDataByKind(app, "", TemplateKindAdminNewRegistration)
 	if err != nil || !found || strings.TrimSpace(template.Subject) == "" || strings.TrimSpace(template.Body) == "" {
 		return
 	}
 	adminAddress, ok := eventinternal.ParseAddress(template.To)
 	if !ok {
+		// The recipient lives only on the template record, so a missing one
+		// would drop a real person's registration on the floor. Tell whoever
+		// can fix it rather than returning quietly.
+		warnAdminRecipientMissing(app, registrantEmail)
 		return
 	}
 
@@ -62,14 +149,56 @@ func SendAdminNewRegistrationNotification(app *pocketbase.PocketBase, retreat *c
 	if retreat != nil {
 		title = strings.TrimSpace(retreat.GetString("title"))
 	}
-	replacements := []string{
+	// Everything the organiser needs to call this person back, straight from
+	// what they filled in — plus a one-click link that runs the same approval
+	// as the admin API, so it can be done from a phone.
+	registrationData := map[string]any{}
+	acceptURL := ""
+	if registration != nil {
+		registrationData = backendinternal.ParseJSONMap(registration.Get("data"))
+		if token := strings.TrimSpace(registration.GetString("accept_token")); token != "" {
+			base := strings.TrimRight(app.Settings().Meta.AppURL, "/")
+			acceptURL = base + "/api/public/retreats/accept?token=" + token
+		}
+	}
+	field := func(key string) string {
+		value, _ := registrationData[key].(string)
+		return strings.TrimSpace(value)
+	}
+
+	replacements := append(retreatPlaceholders(retreat),
 		"[retreat]", title,
 		"[email]", strings.TrimSpace(registrantEmail),
-	}
+		"[name]", field("full_name"),
+		"[phone]", field("mobile"),
+		"[birth_year]", field("birth_year"),
+		"[provenance]", field("provenance"),
+		"[accept_url]", acceptURL,
+	)
 	subject := replaceAll(template.Subject, replacements)
 	body := replaceAll(template.Body, replacements)
 
 	eventinternal.SendPlainEmailToRecipients(app, []mail.Address{adminAddress}, subject, body)
+}
+
+// warnAdminRecipientMissing emails the superusers when
+// templates."retreats.admin.new_registration" has no usable `to`, naming the
+// registration that could not be announced so it can be picked up by hand.
+func warnAdminRecipientMissing(app *pocketbase.PocketBase, registrantEmail string) {
+	app.Logger().Warn(
+		"retreats: admin notification has no recipient",
+		"kind", TemplateKindAdminNewRegistration,
+		"registrant", registrantEmail,
+	)
+	recipients := eventinternal.SuperuserAddresses(app)
+	if len(recipients) == 0 {
+		return
+	}
+	body := "A retreat registration could not be announced: the template \"" +
+		TemplateKindAdminNewRegistration + "\" has no valid \"to\" address.\n\n" +
+		"Set it in collection \"templates\" on that record, then review the pending " +
+		"registration for: " + strings.TrimSpace(registrantEmail)
+	eventinternal.SendPlainEmailToRecipients(app, recipients, "Retreat registration not announced", body)
 }
 
 // BroadcastEmail sends a one-off email (admin-authored subject/body, not a

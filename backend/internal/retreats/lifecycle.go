@@ -11,17 +11,18 @@ import (
 )
 
 // CreateInput describes a new retreat. Recurrence does not exist here on
-// purpose — retreats are single, rare events (see plan rationale).
+// purpose — retreats are single, rare events (see plan rationale). The
+// Telegram side is a plain invite link pasted into `data.telegram_invite`,
+// not a bot-run group: see InviteLinkForRetreat.
 type CreateInput struct {
-	Title         string         `json:"title"`
-	Tagline       string         `json:"tagline,omitempty"`
-	Slug          string         `json:"slug"`
-	Location      string         `json:"location,omitempty"`
-	StartDate     string         `json:"start_date"`
-	EndDate       string         `json:"end_date,omitempty"`
-	Active        bool           `json:"active"`
-	TelegramGroup string         `json:"telegram_group,omitempty"`
-	Data          map[string]any `json:"data,omitempty"`
+	Title     string         `json:"title"`
+	Tagline   string         `json:"tagline,omitempty"`
+	Slug      string         `json:"slug"`
+	Location  string         `json:"location,omitempty"`
+	StartDate string         `json:"start_date"`
+	EndDate   string         `json:"end_date,omitempty"`
+	Active    bool           `json:"active"`
+	Data      map[string]any `json:"data,omitempty"`
 }
 
 // UpdateInput is a true partial update: every field is a pointer so that
@@ -29,16 +30,15 @@ type CreateInput struct {
 // "explicitly set to empty" (pointer to "" → clear it). Using plain strings
 // here silently wipes any field the caller didn't send.
 type UpdateInput struct {
-	Title         *string        `json:"title"`
-	Tagline       *string        `json:"tagline"`
-	Slug          *string        `json:"slug"`
-	Location      *string        `json:"location"`
-	StartDate     *string        `json:"start_date"`
-	EndDate       *string        `json:"end_date"`
-	Active        *bool          `json:"active"`
-	Capacity      *int           `json:"capacity"`
-	TelegramGroup *string        `json:"telegram_group"`
-	Data          map[string]any `json:"data"`
+	Title     *string        `json:"title"`
+	Tagline   *string        `json:"tagline"`
+	Slug      *string        `json:"slug"`
+	Location  *string        `json:"location"`
+	StartDate *string        `json:"start_date"`
+	EndDate   *string        `json:"end_date"`
+	Active    *bool          `json:"active"`
+	Capacity  *int           `json:"capacity"`
+	Data      map[string]any `json:"data"`
 }
 
 func Create(app *pocketbase.PocketBase, in CreateInput) (*core.Record, error) {
@@ -67,10 +67,6 @@ func Create(app *pocketbase.PocketBase, in CreateInput) (*core.Record, error) {
 		endPtr = &end
 	}
 
-	if err := validateTelegramGroup(app, in.TelegramGroup); err != nil {
-		return nil, err
-	}
-
 	collection, err := app.FindCollectionByNameOrId("retreats")
 	if err != nil {
 		return nil, err
@@ -86,9 +82,6 @@ func Create(app *pocketbase.PocketBase, in CreateInput) (*core.Record, error) {
 		record.Set("end_date", *endPtr)
 	}
 	record.Set("active", in.Active)
-	if strings.TrimSpace(in.TelegramGroup) != "" {
-		record.Set("telegram_group", strings.TrimSpace(in.TelegramGroup))
-	}
 	if in.Data != nil {
 		record.Set("data", in.Data)
 	}
@@ -153,15 +146,6 @@ func Update(app *pocketbase.PocketBase, record *core.Record, in UpdateInput) err
 	}
 	if in.Capacity != nil {
 		record.Set("capacity", *in.Capacity)
-	}
-	if in.TelegramGroup != nil {
-		group := strings.TrimSpace(*in.TelegramGroup)
-		if group != "" {
-			if err := validateTelegramGroup(app, group); err != nil {
-				return err
-			}
-		}
-		record.Set("telegram_group", group)
 	}
 	if in.Data != nil {
 		record.Set("data", in.Data)
@@ -238,17 +222,6 @@ func Cancel(app *pocketbase.PocketBase, record *core.Record) error {
 		}
 	}
 	return app.Delete(record)
-}
-
-func validateTelegramGroup(app *pocketbase.PocketBase, groupID string) error {
-	groupID = strings.TrimSpace(groupID)
-	if groupID == "" {
-		return nil
-	}
-	if _, err := app.FindRecordById("groups", groupID); err != nil {
-		return fmt.Errorf("invalid telegram_group: %w", err)
-	}
-	return nil
 }
 
 func parseDate(raw string) (time.Time, error) {

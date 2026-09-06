@@ -3,8 +3,8 @@
   <h2 id="retreat-payment-title" class="public-request-title"></h2>
   <p id="retreat-payment-message" class="meta-text"></p>
   <div class="action-row">
-    <a href="/" class="primary">Back to home</a>
+    <a id="retreat-payment-back" href="/" class="primary"></a>
   </div>
 </section>
 {{ end }}
-{{ define "page" }}{{ template "layout-public" (dict "Title" "Huuper / Payment" "TopbarTitle" "" "BackHref" "" "Scripts" (list "/assets/js/public/retreat-payment.js")) }}{{ end }}
+{{ define "page" }}{{ template "layout-public" (dict "Lang" "it" "Title" "Il Branco Realmen / Payment" "TopbarTitle" "" "BackHref" "" "Scripts" (list "/assets/js/core/copy-i18n.js" "/copy/retreats.it.js" "/assets/js/public/retreat-payment.js")) }}{{ end }}

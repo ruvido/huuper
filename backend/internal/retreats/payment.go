@@ -21,14 +21,37 @@ func DepositCentsForRetreat(retreat *core.Record) int {
 	return DataInt(data, "deposit_cents")
 }
 
-func PaymentSuccessURL(app *pocketbase.PocketBase) string {
-	base := strings.TrimRight(app.Settings().Meta.AppURL, "/")
-	return base + "/retreat-payment/?status=success"
+// The slug travels in the return URL so the result page can show wording the
+// organiser wrote for this retreat instead of one generic sentence.
+func PaymentSuccessURL(app *pocketbase.PocketBase, retreat *core.Record) string {
+	return paymentReturnURL(app, retreat, "success")
 }
 
-func PaymentCancelURL(app *pocketbase.PocketBase) string {
+func PaymentCancelURL(app *pocketbase.PocketBase, retreat *core.Record) string {
+	return paymentReturnURL(app, retreat, "cancelled")
+}
+
+// AcceptResultURL is where the approve-from-email link lands the organiser.
+// The click has to answer a human on a phone, not a script: it returns a page
+// instead of JSON. Only the outcome and the slug travel in the URL — never the
+// registrant's email, which would end up in browser history and referrers.
+func AcceptResultURL(app *pocketbase.PocketBase, retreat *core.Record, status string) string {
+	return returnURL(app, retreat, "/retreat-accept/", status)
+}
+
+func paymentReturnURL(app *pocketbase.PocketBase, retreat *core.Record, status string) string {
+	return returnURL(app, retreat, "/retreat-payment/", status)
+}
+
+func returnURL(app *pocketbase.PocketBase, retreat *core.Record, page string, status string) string {
 	base := strings.TrimRight(app.Settings().Meta.AppURL, "/")
-	return base + "/retreat-payment/?status=cancelled"
+	url := base + page + "?status=" + status
+	if retreat != nil {
+		if slug := strings.TrimSpace(retreat.GetString("slug")); slug != "" {
+			url += "&retreat=" + slug
+		}
+	}
+	return url
 }
 
 // MarkAwaitingPayment moves a registration to awaiting_payment and emails
@@ -41,7 +64,8 @@ func MarkAwaitingPayment(app *pocketbase.PocketBase, record *core.Record, paymen
 	if err := app.Save(record); err != nil {
 		return err
 	}
-	SendPaymentLinkEmail(app, record.GetString("email"), paymentURL)
+	retreat, _ := app.FindRecordById("retreats", record.GetString("retreat"))
+	SendPaymentLinkEmail(app, retreat, record.GetString("email"), paymentURL)
 	return nil
 }
 

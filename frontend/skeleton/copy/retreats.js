@@ -94,6 +94,42 @@ window.appCopy = Object.assign({}, window.appCopy || {}, {
           generic: "Registration failed, please try again.",
         },
       },
+      payment: {
+        success: {
+          title: "Payment received",
+          body: "Thank you! Your registration is confirmed. You will receive an email with all the practical details.",
+        },
+        cancelled: {
+          title: "Payment not completed",
+          body: "The payment did not go through and your place is not confirmed yet. You can try again from the retreat page.",
+        },
+        backHome: "Back to home",
+        backToRetreat: "Back to the retreat",
+      },
+      accept: {
+        approved: {
+          title: "Registration approved",
+          body: "The registrant has been emailed the link to pay the deposit. Their place is held until they pay.",
+        },
+        active: {
+          title: "Registration approved",
+          body: "This retreat has no deposit, so the registrant is already in: they have been emailed the practical details and the Telegram invite.",
+        },
+        already: {
+          title: "Already handled",
+          body: "This registration had already been approved. Nothing changed and no email was sent again.",
+        },
+        invalid: {
+          title: "Link not valid",
+          body: "This approval link is unknown or expired. Approve the registration from the admin panel instead.",
+        },
+        failed: {
+          title: "Approval failed",
+          body: "Something went wrong while approving this registration. Try again from the admin panel.",
+        },
+        backHome: "Back to home",
+        backToRetreat: "Back to the retreat",
+      },
       faq: {
         eyebrow: "FAQ",
         heading: "Frequently asked questions",

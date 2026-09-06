@@ -12,6 +12,16 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
+// Outcomes of the approve-from-email click. Must stay in sync with the
+// keys under retreats.public.accept in frontend/skeleton/copy/retreats.js.
+const (
+	acceptStatusApproved = "approved"
+	acceptStatusActive   = "active"
+	acceptStatusAlready  = "already"
+	acceptStatusInvalid  = "invalid"
+	acceptStatusFailed   = "failed"
+)
+
 type retreatRegistrationPayload struct {
 	Email string         `json:"email"`
 	Data  map[string]any `json:"data"`
@@ -125,4 +135,39 @@ func hasRequiredGuestFields(data map[string]any) bool {
 		}
 	}
 	return true
+}
+
+// AcceptRetreatRegistrationHandler approves a pending registration from the
+// link in the admin notification email, so it can be done from a phone
+// without the admin panel. Every outcome redirects to /retreat-accept/: the
+// only reader here is a person who just tapped a link in their inbox, and a
+// JSON body would tell them nothing. The token is time limited; an unknown
+// one gets the same answer as an expired one.
+func AcceptRetreatRegistrationHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		result := func(retreat *core.Record, status string) error {
+			return e.Redirect(http.StatusFound, retreatsinternal.AcceptResultURL(app, retreat, status))
+		}
+
+		registration := retreatsinternal.FindByAcceptToken(app, e.Request.URL.Query().Get("token"))
+		if registration == nil {
+			return result(nil, acceptStatusInvalid)
+		}
+		retreat, _ := app.FindRecordById("retreats", registration.GetString("retreat"))
+
+		if registration.GetString("status") != "pending" {
+			return result(retreat, acceptStatusAlready)
+		}
+
+		if _, err := retreatsinternal.Approve(app, registration); err != nil {
+			return result(retreat, acceptStatusFailed)
+		}
+
+		// Approve() updates the record in place: with a deposit configured the
+		// registrant still has to pay, without one they are already in.
+		if registration.GetString("status") == "active" {
+			return result(retreat, acceptStatusActive)
+		}
+		return result(retreat, acceptStatusApproved)
+	}
 }

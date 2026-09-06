@@ -1,0 +1,10 @@
+{{ define "content" }}
+<section class="panel">
+  <h2 id="retreat-accept-title" class="public-request-title"></h2>
+  <p id="retreat-accept-message" class="meta-text"></p>
+  <div class="action-row">
+    <a id="retreat-accept-back" href="/" class="primary"></a>
+  </div>
+</section>
+{{ end }}
+{{ define "page" }}{{ template "layout-public" (dict "Lang" "it" "Title" "Il Branco Realmen / Approval" "TopbarTitle" "" "BackHref" "" "Scripts" (list "/assets/js/core/copy-i18n.js" "/copy/retreats.it.js" "/assets/js/public/retreat-accept.js")) }}{{ end }}
