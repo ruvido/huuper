@@ -33,7 +33,7 @@ Under `$VPS_PATH`:
 
 What it does:
 
-1. Validates `frontend/site`.
+1. Rebuilds `frontend/site` from `frontend/skeleton` (`go run ./backend build-frontend`).
 2. Builds Linux binary locally.
 3. Uploads artifacts to a new release folder on VPS.
 4. Updates `current` symlink atomically.

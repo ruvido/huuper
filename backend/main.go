@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 	"sync"
 	"time"
 
@@ -24,6 +25,20 @@ func init() {
 }
 
 func main() {
+	// Handled before the app exists: PocketBase bootstraps (and creates a data
+	// directory) for every command it recognises, and this one only reads and
+	// writes files. The alternative — `serve --frontend-dev` — also boots the
+	// server and injects the live-reload script into every page, neither of
+	// which belongs in a release. deploy/rsync.sh calls this so a deploy
+	// rebuilds the frontend instead of shipping whatever is on disk.
+	if len(os.Args) > 1 && os.Args[1] == "build-frontend" {
+		if err := buildFrontend(defaultSkeletonDir, defaultPublicDir, false); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("frontend built: %s -> %s", defaultSkeletonDir, defaultPublicDir)
+		return
+	}
+
 	app := pocketbase.New()
 	var watchOnce sync.Once
 	var skeletonDir string

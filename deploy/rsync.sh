@@ -36,14 +36,22 @@ fi
 echo "remote: check docker permissions"
 ssh "$VPS_HOST" "docker info >/dev/null 2>&1 || (echo 'Docker non accessibile senza sudo.' >&2; exit 1)"
 
+cd "$ROOT_DIR"
+
+# frontend/site is a build artifact and is gitignored, so whatever sits on disk
+# is not necessarily what frontend/skeleton says. Rebuilding it here is what
+# makes this script a complete deploy: without it a frontend change silently
+# never ships.
+echo "frontend: build skeleton -> site"
+go run ./backend build-frontend
+
 if [[ ! -d "$ROOT_DIR/frontend/site" ]]; then
-  echo "missing frontend/site in project root" >&2
+  echo "frontend build produced no frontend/site" >&2
   exit 1
 fi
 
 echo "backend: build linux binary"
 mkdir -p "$TMP_RELEASE_DIR/bin" "$TMP_RELEASE_DIR/backend/migrations" "$TMP_RELEASE_DIR/frontend/site"
-cd "$ROOT_DIR"
 CGO_ENABLED=0 GOOS="$TARGET_GOOS" GOARCH="$TARGET_GOARCH" go build -installsuffix cgo -o "$TMP_RELEASE_DIR/bin/$BIN_NAME" ./backend
 
 echo "prepare: copy runtime artifacts"
@@ -99,7 +107,9 @@ for attempt in 1 2 3; do
   ssh "$VPS_HOST" "cd '$VPS_PATH/deploy' && $DOCKER_COMPOSE_CMD -f '$DEPLOY_COMPOSE_FILE' up -d --build --force-recreate $SERVICE_NAME"
 
   echo "verify: container was actually recreated with this release"
-  CONTAINER_CREATED_EPOCH="$(ssh "$VPS_HOST" "docker inspect '$SERVICE_NAME' --format '{{.Created}}'" | xargs -I{} date -d {} +%s)"
+  # Parsed on the VPS: `date -d` is GNU-only and is not available on macOS,
+  # where it aborted the deploy right before the healthcheck.
+  CONTAINER_CREATED_EPOCH="$(ssh "$VPS_HOST" "date -d \"\$(docker inspect '$SERVICE_NAME' --format '{{.Created}}')\" +%s")"
   if [ "$CONTAINER_CREATED_EPOCH" -ge "$DEPLOY_START_EPOCH" ]; then
     break
   fi
