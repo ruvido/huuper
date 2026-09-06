@@ -24,6 +24,8 @@ const (
 	TemplateKindUserRegistrationAccepted = "retreats.user.registration_accepted"
 	TemplateKindUserPaymentLink          = "retreats.user.payment_link"
 	TemplateKindAdminNewRegistration     = "retreats.admin.new_registration"
+	TemplateKindAdminRegistrationDone    = "retreats.admin.registration_completed"
+	TemplateKindAdminDailyStats          = "retreats.admin.daily_stats"
 )
 
 var italianMonths = [...]string{
@@ -136,12 +138,12 @@ func SendAdminNewRegistrationNotification(app *pocketbase.PocketBase, retreat *c
 	if err != nil || !found || strings.TrimSpace(template.Subject) == "" || strings.TrimSpace(template.Body) == "" {
 		return
 	}
-	adminAddress, ok := eventinternal.ParseAddress(template.To)
+	adminAddress, ok := adminRecipient(app, TemplateKindAdminNewRegistration)
 	if !ok {
 		// The recipient lives only on the template record, so a missing one
 		// would drop a real person's registration on the floor. Tell whoever
 		// can fix it rather than returning quietly.
-		warnAdminRecipientMissing(app, registrantEmail)
+		warnAdminRecipientMissing(app, TemplateKindAdminNewRegistration, "registration from "+strings.TrimSpace(registrantEmail))
 		return
 	}
 
@@ -181,24 +183,96 @@ func SendAdminNewRegistrationNotification(app *pocketbase.PocketBase, retreat *c
 	eventinternal.SendPlainEmailToRecipients(app, []mail.Address{adminAddress}, subject, body)
 }
 
-// warnAdminRecipientMissing emails the superusers when
-// templates."retreats.admin.new_registration" has no usable `to`, naming the
-// registration that could not be announced so it can be picked up by hand.
-func warnAdminRecipientMissing(app *pocketbase.PocketBase, registrantEmail string) {
+// adminRecipient resolves where a retreat notification to the organiser goes.
+// The address lives on templates."retreats.admin.new_registration".data.to —
+// one place for the whole module, so adding another organiser-facing email
+// does not mean setting the same address again somewhere else. A template may
+// still carry its own `to` to divert just that one.
+func adminRecipient(app *pocketbase.PocketBase, kind string) (mail.Address, bool) {
+	if template, found, err := eventinternal.LoadTemplateDataByKind(app, "", kind); err == nil && found {
+		if address, ok := eventinternal.ParseAddress(template.To); ok {
+			return address, true
+		}
+	}
+	if kind == TemplateKindAdminNewRegistration {
+		return mail.Address{}, false
+	}
+	template, found, err := eventinternal.LoadTemplateDataByKind(app, "", TemplateKindAdminNewRegistration)
+	if err != nil || !found {
+		return mail.Address{}, false
+	}
+	return eventinternal.ParseAddress(template.To)
+}
+
+// sendAdminTemplateEmail renders one of the organiser-facing templates and
+// sends it to whoever adminRecipient resolves.
+func sendAdminTemplateEmail(app *pocketbase.PocketBase, kind string, replacements []string) bool {
+	template, found, err := eventinternal.LoadTemplateDataByKind(app, "", kind)
+	if err != nil || !found || strings.TrimSpace(template.Subject) == "" || strings.TrimSpace(template.Body) == "" {
+		return false
+	}
+	address, ok := adminRecipient(app, kind)
+	if !ok {
+		warnAdminRecipientMissing(app, kind, "")
+		return false
+	}
+	subject := replaceAll(template.Subject, replacements)
+	body := replaceAll(template.Body, replacements)
+	sent, failed := eventinternal.SendPlainEmailToRecipients(app, []mail.Address{address}, subject, body)
+	return sent == 1 && failed == 0
+}
+
+// SendAdminRegistrationCompletedNotification tells the organiser a place has
+// actually been taken.
+//
+// Nothing used to reach them when a member registered and paid: the only
+// organiser-facing email was the guest pre-registration, so a member could
+// sign up, pay the deposit and turn up in October without anyone being told.
+func SendAdminRegistrationCompletedNotification(app *pocketbase.PocketBase, retreat *core.Record, registration *core.Record) {
+	if registration == nil {
+		return
+	}
+	data := backendinternal.ParseJSONMap(registration.Get("data"))
+	field := func(key string) string {
+		value, _ := data[key].(string)
+		return strings.TrimSpace(value)
+	}
+
+	replacements := append(retreatPlaceholders(retreat),
+		"[email]", strings.TrimSpace(registration.GetString("email")),
+		"[name]", field("full_name"),
+		"[phone]", field("mobile"),
+	)
+	// The running totals travel with it, so the organiser sees where the
+	// retreat stands without opening anything.
+	if stats, err := CountRegistrations(app, retreat); err == nil {
+		replacements = append(replacements, statsPlaceholders(stats)...)
+	}
+
+	sendAdminTemplateEmail(app, TemplateKindAdminRegistrationDone, replacements)
+}
+
+// warnAdminRecipientMissing emails the superusers when an organiser-facing
+// template has no usable `to`, naming what could not be announced so it can be
+// picked up by hand.
+func warnAdminRecipientMissing(app *pocketbase.PocketBase, kind string, detail string) {
 	app.Logger().Warn(
 		"retreats: admin notification has no recipient",
-		"kind", TemplateKindAdminNewRegistration,
-		"registrant", registrantEmail,
+		"kind", kind,
+		"detail", detail,
 	)
 	recipients := eventinternal.SuperuserAddresses(app)
 	if len(recipients) == 0 {
 		return
 	}
-	body := "A retreat registration could not be announced: the template \"" +
-		TemplateKindAdminNewRegistration + "\" has no valid \"to\" address.\n\n" +
-		"Set it in collection \"templates\" on that record, then review the pending " +
-		"registration for: " + strings.TrimSpace(registrantEmail)
-	eventinternal.SendPlainEmailToRecipients(app, recipients, "Retreat registration not announced", body)
+	body := "A retreat notification could not be delivered: the template \"" + kind +
+		"\" has no valid \"to\" address, and neither does \"" +
+		TemplateKindAdminNewRegistration + "\".\n\n" +
+		"Set it in collection \"templates\" on that record."
+	if strings.TrimSpace(detail) != "" {
+		body += "\n\nWhat went unannounced: " + strings.TrimSpace(detail)
+	}
+	eventinternal.SendPlainEmailToRecipients(app, recipients, "Retreat notification not delivered", body)
 }
 
 // BroadcastEmail sends a one-off email (admin-authored subject/body, not a

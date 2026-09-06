@@ -169,6 +169,10 @@ func Activate(app *pocketbase.PocketBase, registration *core.Record) error {
 	inviteLink := InviteLinkForRetreat(app, retreat)
 
 	SendAcceptedEmail(app, retreat, registration.GetString("email"), inviteLink)
+	// Activate is the one place a registration becomes a taken seat, whichever
+	// road it came down: a member who just paid, a guest approved on a retreat
+	// with no deposit, or a guest whose deposit landed.
+	SendAdminRegistrationCompletedNotification(app, retreat, registration)
 	return nil
 }
 

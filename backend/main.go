@@ -13,6 +13,7 @@ import (
 	"members/backend/api"
 	"members/backend/bot"
 	"members/backend/internal/hooks"
+	retreatsinternal "members/backend/internal/retreats"
 	tginternal "members/backend/internal/telegram"
 	_ "members/backend/migrations"
 )
@@ -136,6 +137,11 @@ func main() {
 				return watchErr
 			}
 		}
+
+		// Outside the Telegram block on purpose: the organiser's daily figures
+		// have nothing to do with the bot, and must keep arriving when it is
+		// switched off.
+		retreatsinternal.StartDailyStatsSchedule(app)
 
 		// Start Telegram bot unless explicitly disabled.
 		if !disableTelegramBot {
