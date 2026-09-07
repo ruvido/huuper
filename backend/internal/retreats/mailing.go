@@ -183,6 +183,46 @@ func SendAdminNewRegistrationNotification(app *pocketbase.PocketBase, retreat *c
 	eventinternal.SendPlainEmailToRecipients(app, []mail.Address{adminAddress}, subject, body)
 }
 
+// registrantDetails is who to put in an email to the organiser.
+//
+// A guest typed their name and phone into the registration form, so those win:
+// they are what this person wrote for this retreat. A member never typed
+// anything — we already hold them on their user record, under the same keys —
+// so without this the organiser got a notification with two blank lines where
+// the name and the phone number should be.
+func registrantDetails(app *pocketbase.PocketBase, registration *core.Record) (string, string) {
+	if registration == nil {
+		return "", ""
+	}
+	read := func(source map[string]any) (string, string) {
+		return strings.TrimSpace(backendinternal.AnyToString(source["full_name"])),
+			strings.TrimSpace(backendinternal.AnyToString(source["mobile"]))
+	}
+
+	name, phone := read(backendinternal.ParseJSONMap(registration.Get("data")))
+	if name != "" && phone != "" {
+		return name, phone
+	}
+
+	userID := strings.TrimSpace(registration.GetString("user"))
+	if userID == "" {
+		return name, phone
+	}
+	user, err := app.FindRecordById("users", userID)
+	if err != nil || user == nil {
+		return name, phone
+	}
+
+	userName, userPhone := read(backendinternal.ParseJSONMap(user.Get("data")))
+	if name == "" {
+		name = userName
+	}
+	if phone == "" {
+		phone = userPhone
+	}
+	return name, phone
+}
+
 // adminRecipient resolves where a retreat notification to the organiser goes.
 // The address lives on templates."retreats.admin.new_registration".data.to —
 // one place for the whole module, so adding another organiser-facing email
@@ -232,16 +272,12 @@ func SendAdminRegistrationCompletedNotification(app *pocketbase.PocketBase, retr
 	if registration == nil {
 		return
 	}
-	data := backendinternal.ParseJSONMap(registration.Get("data"))
-	field := func(key string) string {
-		value, _ := data[key].(string)
-		return strings.TrimSpace(value)
-	}
+	name, phone := registrantDetails(app, registration)
 
 	replacements := append(retreatPlaceholders(retreat),
 		"[email]", strings.TrimSpace(registration.GetString("email")),
-		"[name]", field("full_name"),
-		"[phone]", field("mobile"),
+		"[name]", name,
+		"[phone]", phone,
 	)
 	// The running totals travel with it, so the organiser sees where the
 	// retreat stands without opening anything.
