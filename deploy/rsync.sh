@@ -13,6 +13,10 @@ TARGET_GOOS="${TARGET_GOOS:-linux}"
 TARGET_GOARCH="${TARGET_GOARCH:-amd64}"
 FRONTEND_ARCHIVE_DIR="${FRONTEND_ARCHIVE_DIR:-$VPS_PATH/shared/frontend-history}"
 DEPLOY_URL="${DEPLOY_URL:-https://branco.realmen.it}"
+# Every deploy leaves behind a release directory of ~40MB, almost all of it the
+# Go binary. Nothing used to remove them: 147 had piled up into 5.4GB on a disk
+# that was 90% full. Ten is enough history for scripts/ops/rollback.sh.
+KEEP_RELEASES="${KEEP_RELEASES:-10}"
 
 DEPLOY_START_EPOCH="$(date +%s)"
 RELEASE_ID="${RELEASE_ID:-$(date +%Y%m%d-%H%M%S)-$(git -C "$ROOT_DIR" rev-parse --short HEAD)}"
@@ -135,5 +139,25 @@ fi
 
 echo "cleanup: remove local temp release"
 rm -rf "$TMP_RELEASE_DIR"
+
+# Only after the healthcheck: an unhealthy deploy is exactly when the previous
+# releases matter most. Never touches the one `current` points at, whatever the
+# sort says. A failure here is reported but does not fail a deploy that already
+# went out.
+echo "cleanup: prune old releases (keeping $KEEP_RELEASES)"
+if ! ssh "$VPS_HOST" "
+  set -eu
+  current=\$(basename \"\$(readlink -f '$VPS_PATH/current')\")
+  cd '$VPS_PATH/releases'
+  ls -1 | sort -r | tail -n +$((KEEP_RELEASES + 1)) | while read -r old; do
+    [ -z \"\$old\" ] && continue
+    [ \"\$old\" = \"\$current\" ] && continue
+    rm -rf -- \"./\$old\"
+    rm -rf -- '$FRONTEND_ARCHIVE_DIR'/\"\$old\"
+    echo \"  removed \$old\"
+  done
+"; then
+  echo "warning: pruning old releases failed - the deploy itself is fine" >&2
+fi
 
 echo "ok: deploy completed ($RELEASE_ID)"
