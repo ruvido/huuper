@@ -3,6 +3,7 @@ package retreats
 import (
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
@@ -55,8 +56,9 @@ type Person struct {
 	Retries int
 
 	// Who they are, for the call: someone ringing a stranger wants to know the age
-	// and the town before they dial, not after.
-	BirthYear  string
+	// and the town before they dial, not after. The age, not the year they were
+	// born — nobody wants to do the subtraction while the phone rings.
+	Age        string
 	Provenance string
 }
 
@@ -87,7 +89,7 @@ func CountRegistrations(app *pocketbase.PocketBase, retreat *core.Record) (Stats
 			Member:  strings.TrimSpace(record.GetString("user")) != "",
 			Retries: PaymentRetries(record),
 
-			BirthYear:  registrationField(record, "birth_year"),
+			Age:        ageFromBirthYear(registrationField(record, "birth_year")),
 			Provenance: registrationField(record, "provenance"),
 		}
 		switch record.GetString("status") {
@@ -158,6 +160,20 @@ func statsPlaceholders(stats Stats) []string {
 	}
 }
 
+// ageFromBirthYear turns a birth year into "40 anni". A year that is not a year,
+// or one that would give an impossible age, is left out rather than shown wrong.
+func ageFromBirthYear(raw string) string {
+	year, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil {
+		return ""
+	}
+	age := time.Now().Year() - year
+	if age < 0 || age > 120 {
+		return ""
+	}
+	return fmt.Sprintf("%d anni", age)
+}
+
 // registrationField reads one value the registrant typed into the form.
 func registrationField(record *core.Record, key string) string {
 	data := backendinternal.ParseJSONMap(record.Get("data"))
@@ -198,8 +214,8 @@ func personLines(people []Person, showRetries, showOrigin bool) string {
 		line := "- **" + head + "**"
 		if showOrigin {
 			var origin []string
-			if p.BirthYear != "" {
-				origin = append(origin, p.BirthYear)
+			if p.Age != "" {
+				origin = append(origin, p.Age)
 			}
 			if p.Provenance != "" {
 				origin = append(origin, p.Provenance)
