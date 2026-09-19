@@ -208,8 +208,10 @@ func personLines(people []Person, showRetries, showOrigin bool) string {
 				line += "  \n  " + strings.Join(origin, " · ")
 			}
 		}
-		if len(contacts) > 0 {
-			line += "  \n  " + strings.Join(contacts, " · ")
+		// One way of reaching them per line: a number and an address side by side
+		// wrap into each other on a phone and neither can be tapped cleanly.
+		for _, contact := range contacts {
+			line += "  \n  " + contact
 		}
 		lines = append(lines, line)
 	}
