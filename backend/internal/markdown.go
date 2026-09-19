@@ -2,6 +2,8 @@ package internal
 
 import (
 	"bytes"
+	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/yuin/goldmark"
@@ -22,8 +24,38 @@ func RenderMarkdownHTML(raw string) (string, bool) {
 	if err := markdownRenderer.Convert([]byte(clean), &out); err != nil {
 		return "", false
 	}
-	return out.String(), true
+	return styleTables(out.String()), true
 }
+
+// styleTables gives a rendered table the borders and padding an email client
+// will actually honour. Mail clients drop <style> blocks and have no default
+// table styling worth anything, so a table arrives looking like loose text
+// unless every cell carries its own inline style. Goldmark writes the column
+// alignment as a style of its own, so the borders are merged into whatever is
+// already there instead of replacing it.
+func styleTables(html string) string {
+	html = strings.ReplaceAll(html, "<table>",
+		`<table style="border-collapse:collapse;margin:12px 0;font-size:15px">`)
+	html = cellPattern.ReplaceAllStringFunc(html, func(tag string) string {
+		m := cellPattern.FindStringSubmatch(tag)
+		name, existing := m[1], m[2]
+		style := "border:1px solid #ddd;padding:6px 10px"
+		if name == "th" {
+			style += ";background:#f6f6f6"
+		}
+		if existing != "" {
+			style += ";" + existing
+		} else if name == "th" {
+			style += ";text-align:left"
+		}
+		return fmt.Sprintf(`<%s style="%s">`, name, style)
+	})
+	return html
+}
+
+// cellPattern matches a table cell's opening tag, with or without the style
+// goldmark adds for a right-aligned column.
+var cellPattern = regexp.MustCompile(`<(td|th)(?: style="([^"]*)")?>`)
 
 // Everything rendered here is typed by a person into a textarea — email
 // bodies, mentoring notes, settings copy — not authored as a Markdown
