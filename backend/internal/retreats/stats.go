@@ -49,10 +49,8 @@ type Person struct {
 	Phone  string
 	Email  string
 	Member bool
-	// Notices is how many times this person has been told to pay, the first email
-	// included: the organiser wants to know who has been written to twice and is
-	// simply not paying, not how many times a job ran.
-	Notices int
+	// Retries is how many times we went back to them after the first email.
+	Retries int
 }
 
 // CountRegistrations tallies a retreat's registrations by status and kind.
@@ -80,7 +78,7 @@ func CountRegistrations(app *pocketbase.PocketBase, retreat *core.Record) (Stats
 			Phone:   phone,
 			Email:   strings.TrimSpace(record.GetString("email")),
 			Member:  strings.TrimSpace(record.GetString("user")) != "",
-			Notices: PaymentNoticesSent(record),
+			Retries: PaymentRetries(record),
 		}
 		switch record.GetString("status") {
 		case "active":
@@ -167,8 +165,8 @@ func personLines(people []Person) string {
 			phone = "—"
 		}
 		head := name
-		if p.Notices > 0 {
-			head += fmt.Sprintf(" (%d)", p.Notices)
+		if p.Retries > 0 {
+			head += fmt.Sprintf(" (%d retry)", p.Retries)
 		}
 		// Name on its own line, the ways to reach them underneath: on a phone one
 		// long line of name, number and address wraps into unreadable soup.

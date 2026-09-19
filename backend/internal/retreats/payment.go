@@ -90,14 +90,19 @@ func countPaymentNotice(app *pocketbase.PocketBase, record *core.Record) error {
 }
 
 // PaymentNoticesSent is how many times we have asked this person for the
-// deposit. Registrations from before the counter existed are read as the first
-// email plus whatever reminders were recorded then.
+// deposit, the first email included.
 func PaymentNoticesSent(record *core.Record) int {
 	data := backendinternal.ParseJSONMap(record.Get("data"))
 	if n := DataInt(data, "payment_notices_sent"); n > 0 {
 		return n
 	}
 	return 1 + DataInt(data, "payment_reminders_sent")
+}
+
+// PaymentRetries is how many times we went back to them after that first email.
+func PaymentRetries(record *core.Record) int {
+	data := backendinternal.ParseJSONMap(record.Get("data"))
+	return DataInt(data, "payment_reminders_sent")
 }
 
 // ResumeCheckout issues a fresh Stripe session for a registration that is
