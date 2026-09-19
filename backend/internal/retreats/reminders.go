@@ -1,7 +1,6 @@
 package retreats
 
 import (
-	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -128,16 +127,10 @@ func sendPaymentReminder(app *pocketbase.PocketBase, retreat *core.Record, regis
 	}
 }
 
-// StartPaymentRemindersSchedule checks hourly for deposits that have gone quiet.
-// The interval between two reminders to the same person is kept on the
-// registration, so a restart cannot turn into a second email.
+// StartPaymentRemindersSchedule chases deposits once a day, in the same morning
+// slot as the figures: the organiser's day starts with the email and the people
+// who owe money hear from us at a civil hour, not at whatever time the container
+// happened to restart.
 func StartPaymentRemindersSchedule(app *pocketbase.PocketBase) {
-	go func() {
-		ticker := time.NewTicker(time.Hour)
-		defer ticker.Stop()
-		for range ticker.C {
-			log.Printf("[retreats] checking deposit reminders")
-			SendPaymentReminders(app)
-		}
-	}()
+	startMorningSchedule("checking deposit reminders", func() { SendPaymentReminders(app) })
 }

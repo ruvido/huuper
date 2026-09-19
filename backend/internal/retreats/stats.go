@@ -178,25 +178,34 @@ func personLines(people []Person) string {
 // after the mail went out sends it twice, which is noise, not damage. Missing
 // it entirely would be worse.
 func StartDailyStatsSchedule(app *pocketbase.PocketBase) {
-	lastSent := ""
-	if time.Now().Hour() >= dailyStatsHour {
-		// Started after today's slot: wait for tomorrow instead of firing a
-		// late one the moment the container comes up.
-		lastSent = time.Now().Format("2006-01-02")
-	}
+	startMorningSchedule("daily registration stats", func() { sendDailyStatsForOpenRetreats(app) })
+}
 
+// startMorningSchedule runs a job once a day, at dailyStatsHour local time.
+//
+// A coarse ticker that looks at the clock, rather than a cron dependency for a
+// job that runs once a day. Starting after today's slot waits for tomorrow
+// instead of firing a late one the moment the container comes up, and the day
+// already done is remembered in memory only: a restart on the same day sends a
+// second copy, which is noise, not damage — missing the day entirely would be
+// worse.
+func startMorningSchedule(name string, run func()) {
+	lastRun := ""
+	if time.Now().Hour() >= dailyStatsHour {
+		lastRun = time.Now().Format("2006-01-02")
+	}
 	go func() {
 		ticker := time.NewTicker(15 * time.Minute)
 		defer ticker.Stop()
 		for range ticker.C {
 			now := time.Now()
 			today := now.Format("2006-01-02")
-			if now.Hour() < dailyStatsHour || today == lastSent {
+			if now.Hour() < dailyStatsHour || today == lastRun {
 				continue
 			}
-			log.Printf("[retreats] sending daily registration stats")
-			sendDailyStatsForOpenRetreats(app)
-			lastSent = today
+			log.Printf("[retreats] %s", name)
+			run()
+			lastRun = today
 		}
 	}()
 }
