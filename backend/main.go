@@ -158,6 +158,7 @@ func main() {
 		// have nothing to do with the bot, and must keep arriving when it is
 		// switched off.
 		retreatsinternal.StartDailyStatsSchedule(app)
+		retreatsinternal.StartPaymentRemindersSchedule(app)
 
 		// Start Telegram bot unless explicitly disabled.
 		if !disableTelegramBot {
