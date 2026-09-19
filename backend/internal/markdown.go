@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/extension"
 	goldmarkhtml "github.com/yuin/goldmark/renderer/html"
 )
 
@@ -31,6 +32,9 @@ func RenderMarkdownHTML(raw string) (string, bool) {
 // line. WithHardWraps makes a newline mean a newline, which is what whoever
 // pressed Enter meant.
 var markdownRenderer = goldmark.New(
+	// Tables, so an email can lay figures out as a table instead of as a column of
+	// sentences the reader has to add up themselves.
+	goldmark.WithExtensions(extension.Table),
 	goldmark.WithRendererOptions(goldmarkhtml.WithHardWraps()),
 )
 

@@ -30,6 +30,25 @@ type Stats struct {
 	Capacity        int
 	Remaining       int
 	Limited         bool
+
+	// Reserved is what actually costs a seat: the confirmed plus those who still
+	// owe the deposit. A request does NOT take a seat — it is a phone call waiting
+	// to happen — which is why free seats never add up to capacity minus everyone.
+	Reserved int
+
+	// The same people, by name and phone, so the organiser can act on the figure
+	// instead of going to look up who is behind it.
+	Confirmed []Person
+	Awaiting  []Person
+	Requests  []Person
+}
+
+// Person is one registrant as the organiser needs them: who they are, how to
+// call them, and whether they are already one of the members.
+type Person struct {
+	Name   string
+	Phone  string
+	Member bool
 }
 
 // CountRegistrations tallies a retreat's registrations by status and kind.
@@ -51,9 +70,16 @@ func CountRegistrations(app *pocketbase.PocketBase, retreat *core.Record) (Stats
 	}
 
 	for _, record := range records {
+		name, phone := registrantDetails(app, record)
+		person := Person{
+			Name:   name,
+			Phone:  phone,
+			Member: strings.TrimSpace(record.GetString("user")) != "",
+		}
 		switch record.GetString("status") {
 		case "active":
 			stats.Active++
+			stats.Confirmed = append(stats.Confirmed, person)
 			// `user` is set whenever the registrant was recognised as a member,
 			// so its absence is what makes someone an outsider here.
 			if strings.TrimSpace(record.GetString("user")) != "" {
@@ -63,8 +89,10 @@ func CountRegistrations(app *pocketbase.PocketBase, retreat *core.Record) (Stats
 			}
 		case "awaiting_payment":
 			stats.AwaitingPayment++
+			stats.Awaiting = append(stats.Awaiting, person)
 		case "pending":
 			stats.Pending++
+			stats.Requests = append(stats.Requests, person)
 		}
 	}
 
@@ -72,6 +100,7 @@ func CountRegistrations(app *pocketbase.PocketBase, retreat *core.Record) (Stats
 	if err != nil {
 		return stats, err
 	}
+	stats.Reserved = stats.Active + stats.AwaitingPayment
 	stats.Capacity = retreat.GetInt("capacity")
 	stats.Remaining = remaining
 	stats.Limited = limited
@@ -102,6 +131,10 @@ func statsPlaceholders(stats Stats) []string {
 	}
 	return []string{
 		"[active]", fmt.Sprintf("%d", stats.Active),
+		"[reserved]", fmt.Sprintf("%d", stats.Reserved),
+		"[confirmed_list]", personLines(stats.Confirmed),
+		"[awaiting_list]", personLines(stats.Awaiting),
+		"[requests_list]", personLines(stats.Requests),
 		"[members]", fmt.Sprintf("%d", stats.Members),
 		"[guests]", fmt.Sprintf("%d", stats.Guests),
 		"[awaiting_payment]", fmt.Sprintf("%d", stats.AwaitingPayment),
@@ -109,6 +142,27 @@ func statsPlaceholders(stats Stats) []string {
 		"[remaining]", remaining,
 		"[capacity]", capacity,
 	}
+}
+
+// personLines renders one person per line, name and phone, as markdown list
+// items. An empty bucket says so rather than leaving a hole in the email.
+func personLines(people []Person) string {
+	if len(people) == 0 {
+		return "_nessuno_"
+	}
+	lines := make([]string, 0, len(people))
+	for _, p := range people {
+		name := strings.TrimSpace(p.Name)
+		if name == "" {
+			name = "(senza nome)"
+		}
+		phone := strings.TrimSpace(p.Phone)
+		if phone == "" {
+			phone = "—"
+		}
+		lines = append(lines, fmt.Sprintf("- %s · %s", name, phone))
+	}
+	return strings.Join(lines, "\n")
 }
 
 // StartDailyStatsSchedule sends the figures once a day for every retreat that
