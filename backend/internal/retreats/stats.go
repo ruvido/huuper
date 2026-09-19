@@ -31,9 +31,8 @@ type Stats struct {
 	Remaining       int
 	Limited         bool
 
-	// Reserved is what actually costs a seat: the confirmed plus those who still
-	// owe the deposit. A request does NOT take a seat — it is a phone call waiting
-	// to happen — which is why free seats never add up to capacity minus everyone.
+	// Reserved is what actually costs a seat: only the confirmed. Owing the deposit
+	// or waiting for a call back are both waiting, and waiting takes no seat.
 	Reserved int
 
 	// The same people, by name and phone, so the organiser can act on the figure
@@ -102,7 +101,7 @@ func CountRegistrations(app *pocketbase.PocketBase, retreat *core.Record) (Stats
 	if err != nil {
 		return stats, err
 	}
-	stats.Reserved = stats.Active + stats.AwaitingPayment
+	stats.Reserved = stats.Active
 	stats.Capacity = retreat.GetInt("capacity")
 	stats.Remaining = remaining
 	stats.Limited = limited

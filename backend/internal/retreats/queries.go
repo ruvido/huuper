@@ -107,12 +107,14 @@ func FindRegistrationByUser(app *pocketbase.PocketBase, retreatID string, userID
 	)
 }
 
-// CountReservedRegistrations counts registrations that reserve a capacity
-// slot for the retreat (active or awaiting_payment).
+// CountReservedRegistrations counts the registrations that actually hold a seat:
+// the confirmed ones, and only those. Someone who has not paid the deposit is
+// waiting, not registered — counting them as taken kept seats out of sale for
+// people who would have paid, and made the free-seats figure a guess.
 func CountReservedRegistrations(app *pocketbase.PocketBase, retreatID string) (int, error) {
 	records, err := app.FindRecordsByFilter(
 		"retreat_registrations",
-		"retreat = {:retreat} && (status = 'active' || status = 'awaiting_payment')",
+		"retreat = {:retreat} && status = 'active'",
 		"",
 		0, 0,
 		map[string]any{"retreat": retreatID},
