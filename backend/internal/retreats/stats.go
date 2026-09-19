@@ -11,7 +11,7 @@ import (
 )
 
 // dailyStatsHour is when the daily figures go out, local time on the server.
-const dailyStatsHour = 8
+const dailyStatsHour = 7
 
 // Stats is the state of a retreat's registrations in one glance.
 //
@@ -201,6 +201,10 @@ func StartDailyStatsSchedule(app *pocketbase.PocketBase) {
 		}
 	}()
 }
+
+// SendDailyStatsNow sends the figures immediately for every open retreat, so the
+// email can be looked at without waiting for tomorrow morning's slot.
+func SendDailyStatsNow(app *pocketbase.PocketBase) { sendDailyStatsForOpenRetreats(app) }
 
 func sendDailyStatsForOpenRetreats(app *pocketbase.PocketBase) {
 	records, err := app.FindRecordsByFilter("retreats", "active = true", "start_date", 0, 0)

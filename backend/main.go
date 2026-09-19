@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/spf13/cobra"
 	"log"
 	"os"
 	"sync"
@@ -41,6 +42,21 @@ func main() {
 	}
 
 	app := pocketbase.New()
+
+	// `huuper daily-stats` sends the organiser's figures there and then: the same
+	// email the schedule sends every morning, for checking a change to it without
+	// waiting a day.
+	app.RootCmd.AddCommand(&cobra.Command{
+		Use:   "daily-stats",
+		Short: "Send the retreat figures email now",
+		Run: func(cmd *cobra.Command, args []string) {
+			if err := app.Bootstrap(); err != nil {
+				log.Fatal(err)
+			}
+			retreatsinternal.SendDailyStatsNow(app)
+			log.Printf("daily stats sent")
+		},
+	})
 	var watchOnce sync.Once
 	var skeletonDir string
 	var publicDir string
