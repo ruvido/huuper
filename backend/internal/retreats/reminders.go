@@ -137,6 +137,7 @@ func sendPaymentReminder(app *pocketbase.PocketBase, retreat *core.Record, regis
 		return false
 	}
 
+	_ = countPaymentNotice(app, registration)
 	log.Printf("[retreats] %s: reminder %d of %d sent", registration.GetString("email"), sent+1, config.Max)
 	return true
 }

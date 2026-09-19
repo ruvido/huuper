@@ -3,6 +3,7 @@ package retreats
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	backendinternal "members/backend/internal"
 	paymentsinternal "members/backend/internal/payments"
@@ -71,8 +72,32 @@ func MarkAwaitingPayment(app *pocketbase.PocketBase, record *core.Record, paymen
 		return nil
 	}
 	retreat, _ := app.FindRecordById("retreats", record.GetString("retreat"))
-	SendPaymentLinkEmail(app, retreat, record.GetString("email"), paymentURL)
+	if SendPaymentLinkEmail(app, retreat, record.GetString("email"), paymentURL) {
+		_ = countPaymentNotice(app, record)
+	}
 	return nil
+}
+
+// countPaymentNotice records that the deposit has been asked for once more. The
+// figure the organiser needs is how many times this person has been told to
+// pay — the first email included — not how many times the reminder job ran.
+func countPaymentNotice(app *pocketbase.PocketBase, record *core.Record) error {
+	data := backendinternal.ParseJSONMap(record.Get("data"))
+	data["payment_notices_sent"] = PaymentNoticesSent(record) + 1
+	data["payment_notice_at"] = time.Now().UTC().Format(time.RFC3339)
+	record.Set("data", data)
+	return app.Save(record)
+}
+
+// PaymentNoticesSent is how many times we have asked this person for the
+// deposit. Registrations from before the counter existed are read as the first
+// email plus whatever reminders were recorded then.
+func PaymentNoticesSent(record *core.Record) int {
+	data := backendinternal.ParseJSONMap(record.Get("data"))
+	if n := DataInt(data, "payment_notices_sent"); n > 0 {
+		return n
+	}
+	return 1 + DataInt(data, "payment_reminders_sent")
 }
 
 // ResumeCheckout issues a fresh Stripe session for a registration that is

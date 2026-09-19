@@ -8,8 +8,6 @@ import (
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
-
-	backendinternal "members/backend/internal"
 )
 
 // dailyStatsHour is when the daily figures go out, local time on the server.
@@ -51,10 +49,10 @@ type Person struct {
 	Phone  string
 	Email  string
 	Member bool
-	// Reminders is how many times we have already written to them about the
-	// deposit, so the organiser can see who has been chased twice and is simply
-	// not paying, instead of chasing them a third time by hand.
-	Reminders int
+	// Notices is how many times this person has been told to pay, the first email
+	// included: the organiser wants to know who has been written to twice and is
+	// simply not paying, not how many times a job ran.
+	Notices int
 }
 
 // CountRegistrations tallies a retreat's registrations by status and kind.
@@ -78,11 +76,11 @@ func CountRegistrations(app *pocketbase.PocketBase, retreat *core.Record) (Stats
 	for _, record := range records {
 		name, phone := registrantDetails(app, record)
 		person := Person{
-			Name:      name,
-			Phone:     phone,
-			Email:     strings.TrimSpace(record.GetString("email")),
-			Member:    strings.TrimSpace(record.GetString("user")) != "",
-			Reminders: remindersSent(record),
+			Name:    name,
+			Phone:   phone,
+			Email:   strings.TrimSpace(record.GetString("email")),
+			Member:  strings.TrimSpace(record.GetString("user")) != "",
+			Notices: PaymentNoticesSent(record),
 		}
 		switch record.GetString("status") {
 		case "active":
@@ -152,15 +150,6 @@ func statsPlaceholders(stats Stats) []string {
 	}
 }
 
-// remindersSent reads how many deposit reminders this registration has had.
-func remindersSent(record *core.Record) int {
-	data := backendinternal.ParseJSONMap(record.Get("data"))
-	if n := intFrom(data["payment_reminders_sent"]); n > 0 {
-		return n
-	}
-	return 0
-}
-
 // personLines renders one person per line, name and phone, as markdown list
 // items. An empty bucket says so rather than leaving a hole in the email.
 func personLines(people []Person) string {
@@ -177,17 +166,19 @@ func personLines(people []Person) string {
 		if phone == "" {
 			phone = "—"
 		}
-		parts := []string{name, phone}
+		head := name
+		if p.Notices > 0 {
+			head += fmt.Sprintf(" (%d)", p.Notices)
+		}
+		// Name on its own line, the ways to reach them underneath: on a phone one
+		// long line of name, number and address wraps into unreadable soup.
+		contacts := phone
 		if email := strings.TrimSpace(p.Email); email != "" {
-			parts = append(parts, email)
+			contacts += " · " + email
 		}
-		line := "- " + strings.Join(parts, " · ")
-		if p.Reminders > 0 {
-			line += fmt.Sprintf(" (%d)", p.Reminders)
-		}
-		lines = append(lines, line)
+		lines = append(lines, "**"+head+"**  \n"+contacts)
 	}
-	return strings.Join(lines, "\n")
+	return strings.Join(lines, "\n\n")
 }
 
 // StartDailyStatsSchedule sends the figures once a day for every retreat that
