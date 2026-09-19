@@ -136,9 +136,9 @@ func statsPlaceholders(stats Stats) []string {
 	return []string{
 		"[active]", fmt.Sprintf("%d", stats.Active),
 		"[reserved]", fmt.Sprintf("%d", stats.Reserved),
-		"[confirmed_list]", personLines(stats.Confirmed),
-		"[awaiting_list]", personLines(stats.Awaiting),
-		"[requests_list]", personLines(stats.Requests),
+		"[confirmed_list]", personLines(stats.Confirmed, false),
+		"[awaiting_list]", personLines(stats.Awaiting, true),
+		"[requests_list]", personLines(stats.Requests, false),
 		"[members]", fmt.Sprintf("%d", stats.Members),
 		"[guests]", fmt.Sprintf("%d", stats.Guests),
 		"[awaiting_payment]", fmt.Sprintf("%d", stats.AwaitingPayment),
@@ -150,7 +150,7 @@ func statsPlaceholders(stats Stats) []string {
 
 // personLines renders one person per line, name and phone, as markdown list
 // items. An empty bucket says so rather than leaving a hole in the email.
-func personLines(people []Person) string {
+func personLines(people []Person, showRetries bool) string {
 	if len(people) == 0 {
 		return "_nessuno_"
 	}
@@ -165,7 +165,7 @@ func personLines(people []Person) string {
 			phone = "—"
 		}
 		head := name
-		if p.Retries > 0 {
+		if showRetries && p.Retries > 0 {
 			head += fmt.Sprintf(" (%d retry)", p.Retries)
 		}
 		// Name on its own line, the ways to reach them underneath: on a phone one
