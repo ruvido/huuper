@@ -35,7 +35,7 @@ func RenderMarkdownHTML(raw string) (string, bool) {
 // already there instead of replacing it.
 func styleTables(html string) string {
 	html = strings.ReplaceAll(html, "<table>",
-		`<table style="border-collapse:collapse;margin:12px 0;font-size:15px">`)
+		`<table style="border-collapse:collapse;margin:12px 0;font-size:15px;width:100%">`)
 	html = cellPattern.ReplaceAllStringFunc(html, func(tag string) string {
 		m := cellPattern.FindStringSubmatch(tag)
 		name, existing := m[1], m[2]
