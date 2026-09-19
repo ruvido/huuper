@@ -1,6 +1,7 @@
 package retreats
 
 import (
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -80,21 +81,28 @@ func SendPaymentReminders(app *pocketbase.PocketBase) {
 			app.Logger().Warn("retreats: reminder registrations failed", "error", err, "retreat", retreat.Id)
 			continue
 		}
+		sent := 0
 		for _, registration := range registrations {
-			sendPaymentReminder(app, retreat, registration, config)
+			if sendPaymentReminder(app, retreat, registration, config) {
+				sent++
+			}
 		}
+		// Says what was done and to how many: a chase that quietly does nothing is
+		// indistinguishable from one that has nobody to chase.
+		log.Printf("[retreats] %s: %d awaiting payment, %d reminded (after %d days, max %d)",
+			retreat.GetString("slug"), len(registrations), sent, config.AfterDays, config.Max)
 	}
 }
 
 // sendPaymentReminder sends one reminder if this registration is due for one.
-func sendPaymentReminder(app *pocketbase.PocketBase, retreat *core.Record, registration *core.Record, config ReminderConfig) {
+func sendPaymentReminder(app *pocketbase.PocketBase, retreat *core.Record, registration *core.Record, config ReminderConfig) bool {
 	data := backendinternal.ParseJSONMap(registration.Get("data"))
 	sent := intFrom(data["payment_reminders_sent"])
 	if sent < 0 {
 		sent = 0
 	}
 	if sent >= config.Max {
-		return
+		return false
 	}
 	// Silence is measured from the last time we wrote to them — the first email
 	// if none has been sent yet.
@@ -105,16 +113,19 @@ func sendPaymentReminder(app *pocketbase.PocketBase, retreat *core.Record, regis
 		}
 	}
 	if time.Since(last) < time.Duration(config.AfterDays)*24*time.Hour {
-		return
+		log.Printf("[retreats] %s: not due yet (%d days of silence)", registration.GetString("email"), int(time.Since(last).Hours()/24))
+		return false
 	}
 
 	url, err := ResumeCheckout(app, retreat, registration)
 	if err != nil {
 		app.Logger().Warn("retreats: reminder checkout failed", "error", err, "registration", registration.Id)
-		return
+		log.Printf("[retreats] %s: checkout failed: %v", registration.GetString("email"), err)
+		return false
 	}
 	if !SendPaymentLinkEmail(app, retreat, registration.GetString("email"), url) {
-		return
+		log.Printf("[retreats] %s: reminder email not sent (template or sender missing)", registration.GetString("email"))
+		return false
 	}
 
 	// Re-read: ResumeCheckout saved the new link on the record.
@@ -125,6 +136,7 @@ func sendPaymentReminder(app *pocketbase.PocketBase, retreat *core.Record, regis
 	if err := app.Save(registration); err != nil {
 		app.Logger().Warn("retreats: reminder bookkeeping failed", "error", err, "registration", registration.Id)
 	}
+	return true
 }
 
 // StartPaymentRemindersSchedule chases deposits once a day, in the same morning
