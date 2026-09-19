@@ -46,6 +46,20 @@ func main() {
 	// `huuper daily-stats` sends the organiser's figures there and then: the same
 	// email the schedule sends every morning, for checking a change to it without
 	// waiting a day.
+	// `huuper payment-reminders` runs the deposit chase there and then, instead of
+	// waiting for the morning slot.
+	app.RootCmd.AddCommand(&cobra.Command{
+		Use:   "payment-reminders",
+		Short: "Chase the missing deposits now",
+		Run: func(cmd *cobra.Command, args []string) {
+			if err := app.Bootstrap(); err != nil {
+				log.Fatal(err)
+			}
+			retreatsinternal.SendPaymentReminders(app)
+			log.Printf("payment reminders done")
+		},
+	})
+
 	app.RootCmd.AddCommand(&cobra.Command{
 		Use:   "daily-stats",
 		Short: "Send the retreat figures email now",
