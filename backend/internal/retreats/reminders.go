@@ -114,7 +114,7 @@ func sendPaymentReminder(app *pocketbase.PocketBase, retreat *core.Record, regis
 		}
 	}
 	if time.Since(last) < time.Duration(config.AfterDays)*24*time.Hour {
-		log.Printf("[retreats] %s: not due yet (%d days of silence)", registration.GetString("email"), int(time.Since(last).Hours()/24))
+		log.Printf("[retreats] %s: not due yet (%d reminders sent, last contact %s)", registration.GetString("email"), sent, last.Format("2006-01-02 15:04"))
 		return false
 	}
 
