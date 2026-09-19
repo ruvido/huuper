@@ -44,6 +44,8 @@ const (
 	emailTableStyle    = "border-collapse:collapse;margin:14px 0;width:100%;font-size:15px"
 	emailCellStyle     = "border-bottom:1px solid #e6e6e6;padding:7px 0"
 	emailParaStyle     = "margin:6px 0"
+	emailListStyle     = "list-style:none;margin:0;padding:0"
+	emailItemStyle     = "border-bottom:1px solid #e6e6e6;padding:9px 0"
 )
 
 // styleForEmail inlines that scale onto the rendered HTML.
@@ -55,6 +57,9 @@ func styleForEmail(html string) string {
 	html = strings.ReplaceAll(html, "<p>", `<p style="`+emailParaStyle+`">`)
 	html = subtitlePattern.ReplaceAllString(html, `$1<p style="`+emailSubtitleStyle+`">$2</p>`)
 	html = strings.ReplaceAll(html, "<table>", `<table style="`+emailTableStyle+`">`)
+	// People are a list, and one person is ruled off from the next.
+	html = strings.ReplaceAll(html, "<ul>", `<ul style="`+emailListStyle+`">`)
+	html = strings.ReplaceAll(html, "<li>", `<li style="`+emailItemStyle+`">`)
 	html = cellPattern.ReplaceAllStringFunc(html, func(tag string) string {
 		m := cellPattern.FindStringSubmatch(tag)
 		name, existing := m[1], m[2]

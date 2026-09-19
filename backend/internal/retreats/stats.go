@@ -176,13 +176,16 @@ func personLines(people []Person, showRetries bool) string {
 		if email := strings.TrimSpace(p.Email); email != "" {
 			contacts = append(contacts, email)
 		}
-		line := "**" + head + "**"
+		// A list item, so the theme can rule a line between one person and the next
+		// instead of the names running together down the page. The second line is
+		// indented to stay inside the same item.
+		line := "- **" + head + "**"
 		if len(contacts) > 0 {
-			line += "  \n" + strings.Join(contacts, " · ")
+			line += "  \n  " + strings.Join(contacts, " · ")
 		}
 		lines = append(lines, line)
 	}
-	return strings.Join(lines, "\n\n")
+	return strings.Join(lines, "\n")
 }
 
 // StartDailyStatsSchedule sends the figures once a day for every retreat that
