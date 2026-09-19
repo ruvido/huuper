@@ -8,6 +8,8 @@ import (
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
+
+	backendinternal "members/backend/internal"
 )
 
 // dailyStatsHour is when the daily figures go out, local time on the server.
@@ -51,6 +53,11 @@ type Person struct {
 	Member bool
 	// Retries is how many times we went back to them after the first email.
 	Retries int
+
+	// Who they are, for the call: someone ringing a stranger wants to know the age
+	// and the town before they dial, not after.
+	BirthYear  string
+	Provenance string
 }
 
 // CountRegistrations tallies a retreat's registrations by status and kind.
@@ -79,6 +86,9 @@ func CountRegistrations(app *pocketbase.PocketBase, retreat *core.Record) (Stats
 			Email:   strings.TrimSpace(record.GetString("email")),
 			Member:  strings.TrimSpace(record.GetString("user")) != "",
 			Retries: PaymentRetries(record),
+
+			BirthYear:  registrationField(record, "birth_year"),
+			Provenance: registrationField(record, "provenance"),
 		}
 		switch record.GetString("status") {
 		case "active":
@@ -136,9 +146,9 @@ func statsPlaceholders(stats Stats) []string {
 	return []string{
 		"[active]", fmt.Sprintf("%d", stats.Active),
 		"[reserved]", fmt.Sprintf("%d", stats.Reserved),
-		"[confirmed_list]", personLines(stats.Confirmed, false),
-		"[awaiting_list]", personLines(stats.Awaiting, true),
-		"[requests_list]", personLines(stats.Requests, false),
+		"[confirmed_list]", personLines(stats.Confirmed, false, false),
+		"[awaiting_list]", personLines(stats.Awaiting, true, false),
+		"[requests_list]", personLines(stats.Requests, false, true),
 		"[members]", fmt.Sprintf("%d", stats.Members),
 		"[guests]", fmt.Sprintf("%d", stats.Guests),
 		"[awaiting_payment]", fmt.Sprintf("%d", stats.AwaitingPayment),
@@ -148,9 +158,15 @@ func statsPlaceholders(stats Stats) []string {
 	}
 }
 
+// registrationField reads one value the registrant typed into the form.
+func registrationField(record *core.Record, key string) string {
+	data := backendinternal.ParseJSONMap(record.Get("data"))
+	return strings.TrimSpace(backendinternal.AnyToString(data[key]))
+}
+
 // personLines renders one person per line, name and phone, as markdown list
 // items. An empty bucket says so rather than leaving a hole in the email.
-func personLines(people []Person, showRetries bool) string {
+func personLines(people []Person, showRetries, showOrigin bool) string {
 	if len(people) == 0 {
 		return "_nessuno_"
 	}
@@ -180,6 +196,18 @@ func personLines(people []Person, showRetries bool) string {
 		// instead of the names running together down the page. The second line is
 		// indented to stay inside the same item.
 		line := "- **" + head + "**"
+		if showOrigin {
+			var origin []string
+			if p.BirthYear != "" {
+				origin = append(origin, p.BirthYear)
+			}
+			if p.Provenance != "" {
+				origin = append(origin, p.Provenance)
+			}
+			if len(origin) > 0 {
+				line += "  \n  " + strings.Join(origin, " · ")
+			}
+		}
 		if len(contacts) > 0 {
 			line += "  \n  " + strings.Join(contacts, " · ")
 		}
