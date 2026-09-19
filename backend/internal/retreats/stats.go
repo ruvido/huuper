@@ -48,6 +48,7 @@ type Stats struct {
 type Person struct {
 	Name   string
 	Phone  string
+	Email  string
 	Member bool
 }
 
@@ -74,6 +75,7 @@ func CountRegistrations(app *pocketbase.PocketBase, retreat *core.Record) (Stats
 		person := Person{
 			Name:   name,
 			Phone:  phone,
+			Email:  strings.TrimSpace(record.GetString("email")),
 			Member: strings.TrimSpace(record.GetString("user")) != "",
 		}
 		switch record.GetString("status") {
@@ -160,7 +162,11 @@ func personLines(people []Person) string {
 		if phone == "" {
 			phone = "—"
 		}
-		lines = append(lines, fmt.Sprintf("- %s · %s", name, phone))
+		parts := []string{name, phone}
+		if email := strings.TrimSpace(p.Email); email != "" {
+			parts = append(parts, email)
+		}
+		lines = append(lines, "- "+strings.Join(parts, " · "))
 	}
 	return strings.Join(lines, "\n")
 }
