@@ -37,17 +37,23 @@ func RenderMarkdownHTML(raw string) (string, bool) {
 // table is bigger than the text around it, which is what makes a table read as
 // data instead of as a shout.
 const (
-	emailBodyStyle    = "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.5;color:#111"
-	emailHeadingStyle = "margin:22px 0 6px;font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#888"
-	emailTableStyle   = "border-collapse:collapse;margin:14px 0;width:100%;font-size:15px"
-	emailCellStyle    = "border-bottom:1px solid #e6e6e6;padding:7px 0"
-	emailParaStyle    = "margin:6px 0"
+	emailBodyStyle     = "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.5;color:#111"
+	emailTitleStyle    = "margin:0 0 2px;font-size:19px;font-weight:700;line-height:1.25;color:#111"
+	emailHeadingStyle  = "margin:22px 0 6px;font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#888"
+	emailSubtitleStyle = "margin:0 0 4px;color:#777"
+	emailTableStyle    = "border-collapse:collapse;margin:14px 0;width:100%;font-size:15px"
+	emailCellStyle     = "border-bottom:1px solid #e6e6e6;padding:7px 0"
+	emailParaStyle     = "margin:6px 0"
 )
 
 // styleForEmail inlines that scale onto the rendered HTML.
 func styleForEmail(html string) string {
+	// The subject of the email gets a title; everything below it is a section
+	// label. One title, one level of section: an email is not a document.
+	html = titlePattern.ReplaceAllString(html, `<div style="`+emailTitleStyle+`">$1</div>`)
 	html = headingPattern.ReplaceAllString(html, `<div style="`+emailHeadingStyle+`">$2</div>`)
 	html = strings.ReplaceAll(html, "<p>", `<p style="`+emailParaStyle+`">`)
+	html = subtitlePattern.ReplaceAllString(html, `$1<p style="`+emailSubtitleStyle+`">$2</p>`)
 	html = strings.ReplaceAll(html, "<table>", `<table style="`+emailTableStyle+`">`)
 	html = cellPattern.ReplaceAllStringFunc(html, func(tag string) string {
 		m := cellPattern.FindStringSubmatch(tag)
@@ -73,7 +79,14 @@ func styleForEmail(html string) string {
 
 // headingPattern matches any rendered heading, whatever its level: in an email
 // they are all the same thing, a label over a block.
-var headingPattern = regexp.MustCompile(`(?s)<h([1-6])[^>]*>(.*?)</h[1-6]>`)
+var headingPattern = regexp.MustCompile(`(?s)<h([2-6])[^>]*>(.*?)</h[2-6]>`)
+
+// subtitlePattern matches the paragraph that follows the title: the dates, the
+// numbers, whatever sits under the name of the thing — said quietly.
+var subtitlePattern = regexp.MustCompile(`(?s)(<div style="` + regexp.QuoteMeta(emailTitleStyle) + `">.*?</div>\s*)<p[^>]*>(.*?)</p>`)
+
+// titlePattern matches the one heading that is the email's own title.
+var titlePattern = regexp.MustCompile(`(?s)<h1[^>]*>(.*?)</h1>`)
 
 // cellPattern matches a table cell's opening tag, with or without the style
 // goldmark adds for a right-aligned column.

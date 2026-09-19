@@ -161,20 +161,26 @@ func personLines(people []Person, showRetries bool) string {
 			name = "(senza nome)"
 		}
 		phone := strings.TrimSpace(p.Phone)
-		if phone == "" {
-			phone = "—"
-		}
 		head := name
 		if showRetries && p.Retries > 0 {
 			head += fmt.Sprintf(" (%d retry)", p.Retries)
 		}
 		// Name on its own line, the ways to reach them underneath: on a phone one
 		// long line of name, number and address wraps into unreadable soup.
-		contacts := phone
-		if email := strings.TrimSpace(p.Email); email != "" {
-			contacts += " · " + email
+		// Only the ways to reach them that exist: a dash where a phone number
+		// should be is not information, it is noise with a separator attached.
+		var contacts []string
+		if phone != "" {
+			contacts = append(contacts, phone)
 		}
-		lines = append(lines, "**"+head+"**  \n"+contacts)
+		if email := strings.TrimSpace(p.Email); email != "" {
+			contacts = append(contacts, email)
+		}
+		line := "**" + head + "**"
+		if len(contacts) > 0 {
+			line += "  \n" + strings.Join(contacts, " · ")
+		}
+		lines = append(lines, line)
 	}
 	return strings.Join(lines, "\n\n")
 }
