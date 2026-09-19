@@ -24,24 +24,42 @@ func RenderMarkdownHTML(raw string) (string, bool) {
 	if err := markdownRenderer.Convert([]byte(clean), &out); err != nil {
 		return "", false
 	}
-	return styleTables(out.String()), true
+	return styleForEmail(out.String()), true
 }
 
-// styleTables gives a rendered table the borders and padding an email client
-// will actually honour. Mail clients drop <style> blocks and have no default
-// table styling worth anything, so a table arrives looking like loose text
-// unless every cell carries its own inline style. Goldmark writes the column
-// alignment as a style of its own, so the borders are merged into whatever is
-// already there instead of replacing it.
-func styleTables(html string) string {
-	html = strings.ReplaceAll(html, "<table>",
-		`<table style="border-collapse:collapse;margin:12px 0;font-size:15px;width:100%">`)
+// Type scale for emails. Mail clients throw away <style> blocks, so a design
+// system here is a set of inline styles applied to the rendered HTML — one place
+// that decides what a heading, a name and a figure look like, rather than the
+// person writing the template reaching for bold to fake a hierarchy.
+//
+// Three levels and no more: a section label (small, spaced, quiet), the body,
+// and inside a table the label column and the figure column. Nothing inside a
+// table is bigger than the text around it, which is what makes a table read as
+// data instead of as a shout.
+const (
+	emailBodyStyle    = "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.5;color:#111"
+	emailHeadingStyle = "margin:22px 0 6px;font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#888"
+	emailTableStyle   = "border-collapse:collapse;margin:14px 0;width:100%;font-size:15px"
+	emailCellStyle    = "border-bottom:1px solid #e6e6e6;padding:7px 0"
+	emailParaStyle    = "margin:6px 0"
+)
+
+// styleForEmail inlines that scale onto the rendered HTML.
+func styleForEmail(html string) string {
+	html = headingPattern.ReplaceAllString(html, `<div style="`+emailHeadingStyle+`">$2</div>`)
+	html = strings.ReplaceAll(html, "<p>", `<p style="`+emailParaStyle+`">`)
+	html = strings.ReplaceAll(html, "<table>", `<table style="`+emailTableStyle+`">`)
 	html = cellPattern.ReplaceAllStringFunc(html, func(tag string) string {
 		m := cellPattern.FindStringSubmatch(tag)
 		name, existing := m[1], m[2]
-		style := "border:1px solid #ddd;padding:6px 10px"
-		if name == "th" {
-			style += ";background:#f6f6f6"
+		style := emailCellStyle
+		switch {
+		case name == "th":
+			// The header is a label, not a title: same size, quiet colour.
+			style += ";font-weight:600;color:#888;border-bottom:2px solid #ddd"
+		case existing != "":
+			// The aligned column is the figures one.
+			style += ";font-variant-numeric:tabular-nums"
 		}
 		if existing != "" {
 			style += ";" + existing
@@ -50,8 +68,12 @@ func styleTables(html string) string {
 		}
 		return fmt.Sprintf(`<%s style="%s">`, name, style)
 	})
-	return html
+	return `<div style="` + emailBodyStyle + `">` + html + `</div>`
 }
+
+// headingPattern matches any rendered heading, whatever its level: in an email
+// they are all the same thing, a label over a block.
+var headingPattern = regexp.MustCompile(`(?s)<h([1-6])[^>]*>(.*?)</h[1-6]>`)
 
 // cellPattern matches a table cell's opening tag, with or without the style
 // goldmark adds for a right-aligned column.
