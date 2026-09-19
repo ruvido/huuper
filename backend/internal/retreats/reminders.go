@@ -104,9 +104,10 @@ func sendPaymentReminder(app *pocketbase.PocketBase, retreat *core.Record, regis
 	if sent >= config.Max {
 		return false
 	}
-	// Silence is measured from the last time we wrote to them — the first email
-	// if none has been sent yet.
-	last := registration.GetDateTime("updated").Time()
+	// Silence is measured from the last time we WROTE to them, never from the
+	// record's `updated`: regenerating a checkout link saves the record, so using
+	// `updated` made every reminder reset its own clock and nobody was ever due.
+	last := registration.GetDateTime("created").Time()
 	if raw, ok := data["payment_reminder_at"].(string); ok && strings.TrimSpace(raw) != "" {
 		if parsed, err := time.Parse(time.RFC3339, raw); err == nil {
 			last = parsed
@@ -114,6 +115,14 @@ func sendPaymentReminder(app *pocketbase.PocketBase, retreat *core.Record, regis
 	}
 	if time.Since(last) < time.Duration(config.AfterDays)*24*time.Hour {
 		log.Printf("[retreats] %s: not due yet (%d days of silence)", registration.GetString("email"), int(time.Since(last).Hours()/24))
+		return false
+	}
+
+	// The attempt is written down BEFORE the email leaves: if the send fails the
+	// person waits another round instead of being retried every few minutes, and
+	// if the bookkeeping fails afterwards nobody gets a second copy today.
+	if err := markReminderAttempt(app, registration, sent+1); err != nil {
+		app.Logger().Warn("retreats: reminder bookkeeping failed", "error", err, "registration", registration.Id)
 		return false
 	}
 
@@ -128,15 +137,17 @@ func sendPaymentReminder(app *pocketbase.PocketBase, retreat *core.Record, regis
 		return false
 	}
 
-	// Re-read: ResumeCheckout saved the new link on the record.
-	data = backendinternal.ParseJSONMap(registration.Get("data"))
-	data["payment_reminders_sent"] = sent + 1
+	log.Printf("[retreats] %s: reminder %d of %d sent", registration.GetString("email"), sent+1, config.Max)
+	return true
+}
+
+// markReminderAttempt records that we are writing to this person now.
+func markReminderAttempt(app *pocketbase.PocketBase, registration *core.Record, count int) error {
+	data := backendinternal.ParseJSONMap(registration.Get("data"))
+	data["payment_reminders_sent"] = count
 	data["payment_reminder_at"] = time.Now().UTC().Format(time.RFC3339)
 	registration.Set("data", data)
-	if err := app.Save(registration); err != nil {
-		app.Logger().Warn("retreats: reminder bookkeeping failed", "error", err, "registration", registration.Id)
-	}
-	return true
+	return app.Save(registration)
 }
 
 // StartPaymentRemindersSchedule chases deposits once a day, in the same morning
