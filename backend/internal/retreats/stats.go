@@ -60,6 +60,11 @@ type Person struct {
 	// born — nobody wants to do the subtraction while the phone rings.
 	Age        string
 	Provenance string
+
+	// AcceptURL is the review page for a request still waiting on the
+	// organiser: the list of people to call ends each one with the link that
+	// settles them, so the daily email is where the deciding gets done.
+	AcceptURL string
 }
 
 // CountRegistrations tallies a retreat's registrations by status and kind.
@@ -108,6 +113,9 @@ func CountRegistrations(app *pocketbase.PocketBase, retreat *core.Record) (Stats
 			stats.Awaiting = append(stats.Awaiting, person)
 		case "pending":
 			stats.Pending++
+			if token := strings.TrimSpace(record.GetString("accept_token")); token != "" {
+				person.AcceptURL = AcceptPageURL(app, token)
+			}
 			stats.Requests = append(stats.Requests, person)
 		}
 	}
@@ -228,6 +236,11 @@ func personLines(people []Person, showRetries, showOrigin bool) string {
 		// wrap into each other on a phone and neither can be tapped cleanly.
 		for _, contact := range contacts {
 			line += "  \n  " + contact
+		}
+		// Last line of the item: the way to settle this person from the phone
+		// the email is being read on. Only requests still waiting carry one.
+		if p.AcceptURL != "" {
+			line += "  \n  [Conferma](" + p.AcceptURL + ")"
 		}
 		lines = append(lines, line)
 	}

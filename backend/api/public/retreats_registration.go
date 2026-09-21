@@ -153,17 +153,6 @@ func hasRequiredGuestFields(data map[string]any) bool {
 	return true
 }
 
-// AcceptRetreatLinkHandler is where the approval links in emails already sent
-// still point. It used to approve on the spot; now it only forwards to the
-// page that shows the request and asks first. A GET must not change anything:
-// mail clients and link scanners open links on their own, and one of them
-// approving a stranger is not a theoretical risk.
-func AcceptRetreatLinkHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
-	return func(e *core.RequestEvent) error {
-		return e.Redirect(http.StatusFound, retreatsinternal.AcceptPageURL(app, e.Request.URL.Query().Get("token")))
-	}
-}
-
 // AcceptRetreatViewHandler hands the page what the organiser needs to decide:
 // the request as it was filled in, and whether it is still waiting. An unknown
 // token gets the same answer as an expired one.

@@ -24,7 +24,6 @@ func RegisterRoutes(app *pocketbase.PocketBase, se *core.ServeEvent) {
 		EventsRegister:     publicroutes.RegisterEventHandler(app),
 		RetreatDetails:     publicroutes.RetreatDetailsHandler(app),
 		RetreatsRegister:   publicroutes.RegisterRetreatHandler(app),
-		RetreatsAcceptLink: publicroutes.AcceptRetreatLinkHandler(app),
 		RetreatsAcceptView: publicroutes.AcceptRetreatViewHandler(app),
 		RetreatsAccept:     publicroutes.AcceptRetreatRegistrationHandler(app),
 		RequestsEmailOTP:   publicroutes.RequestEmailOTPHandler(app),
