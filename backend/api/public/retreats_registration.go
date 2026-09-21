@@ -18,6 +18,7 @@ const (
 	acceptStatusApproved = "approved"
 	acceptStatusActive   = "active"
 	acceptStatusAlready  = "already"
+	acceptStatusArchived = "archived"
 	acceptStatusInvalid  = "invalid"
 	acceptStatusFailed   = "failed"
 )
@@ -191,6 +192,11 @@ func AcceptRetreatRegistrationHandler(app *pocketbase.PocketBase) func(e *core.R
 		registration := retreatsinternal.FindByAcceptToken(app, payload.Token)
 		if registration == nil {
 			return result(http.StatusNotFound, acceptStatusInvalid)
+		}
+		// A request the organiser put aside stays aside: an old email with its
+		// button still in the inbox must not undo a decision taken since.
+		if retreatsinternal.IsClosedStatus(registration.GetString("status")) {
+			return result(http.StatusOK, acceptStatusArchived)
 		}
 		if registration.GetString("status") != "pending" {
 			return result(http.StatusOK, acceptStatusAlready)

@@ -70,7 +70,7 @@ func Register(app *pocketbase.PocketBase, retreat *core.Record, in RegisterInput
 	// Someone archived earlier and now back: same record, so the organiser
 	// sees they have been here before and the unique index on (retreat, email)
 	// is honoured. The earlier outcome moves into data.history.
-	if previous, _ := FindRegistrationByEmail(app, retreat.Id, email, false); previous != nil && isClosedStatus(previous.GetString("status")) {
+	if previous, _ := FindRegistrationByEmail(app, retreat.Id, email, false); previous != nil && IsClosedStatus(previous.GetString("status")) {
 		record = previous
 		data["history"] = appendHistory(previous)
 	}
@@ -219,9 +219,9 @@ func CancelRegistration(app *pocketbase.PocketBase, registration *core.Record, n
 	return app.Save(registration)
 }
 
-// isClosedStatus is a registration the organiser has put aside: it holds no
+// IsClosedStatus is a registration the organiser has put aside: it holds no
 // seat, and the person may come back and ask again.
-func isClosedStatus(status string) bool {
+func IsClosedStatus(status string) bool {
 	return status == "rejected" || status == "cancelled"
 }
 

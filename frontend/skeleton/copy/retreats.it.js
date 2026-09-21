@@ -120,8 +120,13 @@ window.appCopyI18n.translate("retreats.public", {
       email: "Email",
       receivedOn: "Arrivata il",
       previous: "Richiesta precedente",
+      note: "Nota",
       yes: "Sì, approva",
       no: "No, lascia stare",
+    },
+    archived: {
+      title: "Richiesta archiviata",
+      body: "Questa richiesta è stata archiviata. Non è cambiato nulla e non è partita nessuna email.",
     },
     declined: {
       title: "Lasciata com'era",

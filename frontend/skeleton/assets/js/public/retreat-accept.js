@@ -29,16 +29,23 @@
 
   const params = new URLSearchParams(window.location.search);
   const token = (params.get("token") || "").trim();
-  const known = ["approved", "active", "already", "invalid", "failed", "declined"];
+  const known = ["approved", "active", "already", "archived", "invalid", "failed", "declined"];
 
   // The end state of every path through this page: one sentence on what
-  // happened and a way out. The review and its buttons are gone by then.
-  function showOutcome(status, slug) {
+  // happened and a way out. The review and its buttons are gone by then —
+  // except the organiser's own note on an archived request, which is the
+  // one thing worth keeping on screen.
+  function showOutcome(status, slug, note) {
     const key = known.includes(status) ? status : "invalid";
     titleNode.textContent = text(`accept.${key}.title`);
     messageNode.textContent = text(`accept.${key}.body`);
+    reviewNode.innerHTML = "";
     reviewNode.hidden = true;
     choiceNode.hidden = true;
+    if (note) {
+      addField(text("accept.review.note"), note);
+      reviewNode.hidden = false;
+    }
     if (backNode) {
       if (slug) {
         backNode.href = "/retreat/" + encodeURIComponent(slug);
@@ -118,6 +125,10 @@
     .then(({ ok, body }) => {
       if (!ok) {
         showOutcome(body.status || "invalid");
+        return;
+      }
+      if (body.status === "rejected" || body.status === "cancelled") {
+        showOutcome("archived", (body.retreat || {}).slug, body.note);
         return;
       }
       if (body.status !== "pending") {

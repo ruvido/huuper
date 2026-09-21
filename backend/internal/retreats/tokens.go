@@ -82,8 +82,17 @@ func AcceptRequestView(app *pocketbase.PocketBase, registration *core.Record) ma
 		}
 	}
 
+	// For a request put aside, the note the organiser left: the page shows it
+	// so a tap on an old email explains itself instead of just refusing.
+	status := registration.GetString("status")
+	note := ""
+	if IsClosedStatus(status) {
+		note = field(status)
+	}
+
 	return map[string]any{
-		"status":   registration.GetString("status"),
+		"status":   status,
+		"note":     note,
 		"retreat":  retreatView,
 		"previous": previous,
 		"registration": map[string]any{

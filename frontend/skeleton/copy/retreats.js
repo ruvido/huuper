@@ -126,8 +126,13 @@ window.appCopy = Object.assign({}, window.appCopy || {}, {
           email: "Email",
           receivedOn: "Received on",
           previous: "Applied before",
+          note: "Note",
           yes: "Yes, approve",
           no: "No, leave it",
+        },
+        archived: {
+          title: "Request archived",
+          body: "This request was put aside. Nothing changed and nobody was emailed.",
         },
         declined: {
           title: "Left as it was",
