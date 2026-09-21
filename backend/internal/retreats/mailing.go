@@ -281,7 +281,7 @@ func SendAdminRegistrationCompletedNotification(app *pocketbase.PocketBase, retr
 	// The running totals travel with it, so the organiser sees where the
 	// retreat stands without opening anything.
 	if stats, err := CountRegistrations(app, retreat); err == nil {
-		replacements = append(replacements, statsPlaceholders(stats)...)
+		replacements = append(replacements, statsPlaceholders(stats, templateLabels(app, TemplateKindAdminRegistrationDone))...)
 	}
 
 	sendAdminTemplateEmail(app, TemplateKindAdminRegistrationDone, replacements)

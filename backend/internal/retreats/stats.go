@@ -11,6 +11,7 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 
 	backendinternal "members/backend/internal"
+	eventinternal "members/backend/internal/events"
 )
 
 // dailyStatsHour is when the daily figures go out, local time on the server.
@@ -57,8 +58,9 @@ type Person struct {
 
 	// Who they are, for the call: someone ringing a stranger wants to know the age
 	// and the town before they dial, not after. The age, not the year they were
-	// born — nobody wants to do the subtraction while the phone rings.
-	Age        string
+	// born — nobody wants to do the subtraction while the phone rings. Zero
+	// means unknown.
+	AgeYears   int
 	Provenance string
 
 	// AcceptURL is the review page for a request still waiting on the
@@ -94,7 +96,7 @@ func CountRegistrations(app *pocketbase.PocketBase, retreat *core.Record) (Stats
 			Member:  strings.TrimSpace(record.GetString("user")) != "",
 			Retries: PaymentRetries(record),
 
-			Age:        ageFromBirthYear(registrationField(record, "birth_year")),
+			AgeYears:   ageFromBirthYear(registrationField(record, "birth_year")),
 			Provenance: registrationField(record, "provenance"),
 		}
 		switch record.GetString("status") {
@@ -140,13 +142,55 @@ func SendDailyStats(app *pocketbase.PocketBase, retreat *core.Record) {
 		return
 	}
 	sendAdminTemplateEmail(app, TemplateKindAdminDailyStats, append(
-		retreatPlaceholders(retreat), statsPlaceholders(stats)...,
+		retreatPlaceholders(retreat), statsPlaceholders(stats, templateLabels(app, TemplateKindAdminDailyStats))...,
 	))
+}
+
+// listLabels are the few words the code has to write itself when it turns
+// people into lines: an empty bucket, a missing name, an age, a retry count,
+// the link that approves. They default to English like every other copy
+// source, and the template record overrides them in whatever language the
+// email is written in (`data.labels`, same keys).
+type listLabels struct {
+	Nobody  string
+	NoName  string
+	Age     string // "{n}" is the number of years
+	Retries string // "{n}" is the number of retries
+	Confirm string
+}
+
+func templateLabels(app *pocketbase.PocketBase, kind string) listLabels {
+	labels := listLabels{
+		Nobody:  "_nobody_",
+		NoName:  "(no name)",
+		Age:     "{n} years old",
+		Retries: "{n} retries",
+		Confirm: "Confirm",
+	}
+	template, found, err := eventinternal.LoadTemplateDataByKind(app, "", kind)
+	if err != nil || !found {
+		return labels
+	}
+	pick := func(key string, target *string) {
+		if value := strings.TrimSpace(template.Labels[key]); value != "" {
+			*target = value
+		}
+	}
+	pick("nobody", &labels.Nobody)
+	pick("no_name", &labels.NoName)
+	pick("age", &labels.Age)
+	pick("retries", &labels.Retries)
+	pick("confirm", &labels.Confirm)
+	return labels
+}
+
+func withCount(label string, n int) string {
+	return strings.ReplaceAll(label, "{n}", strconv.Itoa(n))
 }
 
 // statsPlaceholders exposes the figures to the template, so the organiser can
 // reword the email without touching this file.
-func statsPlaceholders(stats Stats) []string {
+func statsPlaceholders(stats Stats, labels listLabels) []string {
 	remaining := "—"
 	capacity := "—"
 	if stats.Limited {
@@ -156,9 +200,9 @@ func statsPlaceholders(stats Stats) []string {
 	return []string{
 		"[active]", fmt.Sprintf("%d", stats.Active),
 		"[reserved]", fmt.Sprintf("%d", stats.Reserved),
-		"[confirmed_list]", personLines(stats.Confirmed, false, false),
-		"[awaiting_list]", personLines(stats.Awaiting, true, false),
-		"[requests_list]", personLines(stats.Requests, false, true),
+		"[confirmed_list]", personLines(stats.Confirmed, false, false, labels),
+		"[awaiting_list]", personLines(stats.Awaiting, true, false, labels),
+		"[requests_list]", personLines(stats.Requests, false, true, labels),
 		"[members]", fmt.Sprintf("%d", stats.Members),
 		"[guests]", fmt.Sprintf("%d", stats.Guests),
 		"[awaiting_payment]", fmt.Sprintf("%d", stats.AwaitingPayment),
@@ -168,18 +212,19 @@ func statsPlaceholders(stats Stats) []string {
 	}
 }
 
-// ageFromBirthYear turns a birth year into "40 anni". A year that is not a year,
-// or one that would give an impossible age, is left out rather than shown wrong.
-func ageFromBirthYear(raw string) string {
+// ageFromBirthYear turns a birth year into an age in years. A year that is
+// not a year, or one that would give an impossible age, comes back as 0 and
+// is left out rather than shown wrong.
+func ageFromBirthYear(raw string) int {
 	year, err := strconv.Atoi(strings.TrimSpace(raw))
 	if err != nil {
-		return ""
+		return 0
 	}
 	age := time.Now().Year() - year
-	if age < 0 || age > 120 {
-		return ""
+	if age <= 0 || age > 120 {
+		return 0
 	}
-	return fmt.Sprintf("%d anni", age)
+	return age
 }
 
 // registrationField reads one value the registrant typed into the form.
@@ -190,20 +235,20 @@ func registrationField(record *core.Record, key string) string {
 
 // personLines renders one person per line, name and phone, as markdown list
 // items. An empty bucket says so rather than leaving a hole in the email.
-func personLines(people []Person, showRetries, showOrigin bool) string {
+func personLines(people []Person, showRetries, showOrigin bool, labels listLabels) string {
 	if len(people) == 0 {
-		return "_nessuno_"
+		return labels.Nobody
 	}
 	lines := make([]string, 0, len(people))
 	for _, p := range people {
 		name := strings.TrimSpace(p.Name)
 		if name == "" {
-			name = "(senza nome)"
+			name = labels.NoName
 		}
 		phone := strings.TrimSpace(p.Phone)
 		head := name
 		if showRetries && p.Retries > 0 {
-			head += fmt.Sprintf(" (%d retry)", p.Retries)
+			head += " (" + withCount(labels.Retries, p.Retries) + ")"
 		}
 		// Name on its own line, the ways to reach them underneath: on a phone one
 		// long line of name, number and address wraps into unreadable soup.
@@ -222,8 +267,8 @@ func personLines(people []Person, showRetries, showOrigin bool) string {
 		line := "- **" + head + "**"
 		if showOrigin {
 			var origin []string
-			if p.Age != "" {
-				origin = append(origin, p.Age)
+			if p.AgeYears > 0 {
+				origin = append(origin, withCount(labels.Age, p.AgeYears))
 			}
 			if p.Provenance != "" {
 				origin = append(origin, p.Provenance)
@@ -240,7 +285,7 @@ func personLines(people []Person, showRetries, showOrigin bool) string {
 		// Last line of the item: the way to settle this person from the phone
 		// the email is being read on. Only requests still waiting carry one.
 		if p.AcceptURL != "" {
-			line += "  \n  [Conferma](" + p.AcceptURL + ")"
+			line += "  \n  [" + labels.Confirm + "](" + p.AcceptURL + ")"
 		}
 		lines = append(lines, line)
 	}

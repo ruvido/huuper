@@ -14,6 +14,10 @@ type TemplateData struct {
 	Body    string `json:"body"`
 	ReplyTo string `json:"reply_to"`
 	To      string `json:"to"`
+	// Labels are the short words a template needs for the parts of the email
+	// the code assembles (list items, empty buckets), so that wording stays
+	// record content next to the body instead of living in Go.
+	Labels map[string]string `json:"labels"`
 }
 
 func SendUserTemplateEmailByKind(
