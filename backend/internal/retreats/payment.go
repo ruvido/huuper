@@ -83,22 +83,16 @@ func MarkAwaitingPayment(app *pocketbase.PocketBase, record *core.Record, paymen
 // countPaymentNotice records that the deposit has been asked for once more. The
 // figure the organiser needs is how many times this person has been told to
 // pay — the first email included — not how many times the reminder job ran.
+//
+// It only ever adds one to what is written down. Deriving a starting point
+// from the reminder counter assumed a first email that, on the very first
+// send, had not happened yet, and recorded 2 for a person written to once.
 func countPaymentNotice(app *pocketbase.PocketBase, record *core.Record) error {
 	data := backendinternal.ParseJSONMap(record.Get("data"))
-	data["payment_notices_sent"] = PaymentNoticesSent(record) + 1
+	data["payment_notices_sent"] = DataInt(data, "payment_notices_sent") + 1
 	data["payment_notice_at"] = time.Now().UTC().Format(time.RFC3339)
 	record.Set("data", data)
 	return app.Save(record)
-}
-
-// PaymentNoticesSent is how many times we have asked this person for the
-// deposit, the first email included.
-func PaymentNoticesSent(record *core.Record) int {
-	data := backendinternal.ParseJSONMap(record.Get("data"))
-	if n := DataInt(data, "payment_notices_sent"); n > 0 {
-		return n
-	}
-	return 1 + DataInt(data, "payment_reminders_sent")
 }
 
 // PaymentRetries is how many times we went back to them after that first email.
