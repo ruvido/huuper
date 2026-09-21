@@ -3,6 +3,16 @@ window.appAvatarCropper = (() => {
   const OUTPUT_TYPE = "image/webp";
   const OUTPUT_QUALITY = 0.85;
   const OUTPUT_EXT = "webp";
+  // A photo taken with a phone comes in at 48 megapixels: 8000x6000 is 192 MB
+  // of decoded pixels, which cropper-image keeps in memory for as long as the
+  // editor is open, before the canvases the crop allocates on top. On an
+  // entry-level phone the system kills the renderer and the tab dies with no
+  // error. For a 512px output twice the side is enough: 1024px is 4 MB and
+  // leaves room for whoever zooms in. The actual resizing is done by the
+  // browser with resizeQuality "high", which filters properly.
+  const MAX_SHORT_SIDE = OUTPUT_SIZE * 2;
+  const SOURCE_TYPE = "image/jpeg";
+  const SOURCE_QUALITY = 0.92;
   const TEMPLATE = [
     '<cropper-canvas background>',
     '<cropper-image rotatable scalable translatable></cropper-image>',
@@ -39,6 +49,66 @@ window.appAvatarCropper = (() => {
         reject(new Error("failed_to_encode_image"));
       }, type, quality);
     });
+  }
+
+  // Returns the file to hand the editor: the original if it is already small
+  // enough, otherwise a reduced copy. If the browser cannot decode the file we
+  // fall back to the original, and the error surfaces where there already is a
+  // message for the user instead of here.
+  async function downscaleSource(file) {
+    if (typeof createImageBitmap !== "function") {
+      return file;
+    }
+
+    let width = 0;
+    let height = 0;
+    try {
+      const probe = await createImageBitmap(file);
+      width = probe.width;
+      height = probe.height;
+      // Without close() the full-resolution decode stays allocated until the GC
+      // gets to it, which is exactly when the memory is needed for the copy.
+      probe.close?.();
+    } catch (error) {
+      return file;
+    }
+
+    const shortSide = Math.min(width, height);
+    if (shortSide <= MAX_SHORT_SIDE) {
+      return file;
+    }
+
+    const scale = MAX_SHORT_SIDE / shortSide;
+    const targetWidth = Math.max(1, Math.round(width * scale));
+    const targetHeight = Math.max(1, Math.round(height * scale));
+
+    let bitmap = null;
+    try {
+      bitmap = await createImageBitmap(file, {
+        resizeWidth: targetWidth,
+        resizeHeight: targetHeight,
+        resizeQuality: "high",
+      });
+    } catch (error) {
+      return file;
+    }
+
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      const context = canvas.getContext("2d");
+      if (!context) {
+        return file;
+      }
+      context.drawImage(bitmap, 0, 0);
+      const blob = await canvasToBlob(canvas, SOURCE_TYPE, SOURCE_QUALITY);
+      return new File([blob], file.name, { type: blob.type || SOURCE_TYPE });
+    } catch (error) {
+      return file;
+    } finally {
+      bitmap.close?.();
+    }
   }
 
   function buildModal() {
@@ -134,8 +204,10 @@ window.appAvatarCropper = (() => {
       destroySession(activeSession);
     }
 
+    const source = await downscaleSource(file);
+
     const modal = buildModal();
-    const objectUrl = URL.createObjectURL(file);
+    const objectUrl = URL.createObjectURL(source);
 
     const session = {
       overlay: modal.overlay,
