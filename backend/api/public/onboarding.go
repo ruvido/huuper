@@ -2,6 +2,7 @@ package public
 
 import (
 	"encoding/json"
+	"errors"
 	"mime/multipart"
 	"net/http"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tools/filesystem"
+	"github.com/pocketbase/pocketbase/tools/router"
 )
 
 var allowedOnboardingFileExts = map[string]bool{
@@ -136,7 +138,9 @@ func OnboardingFinalizeHandler(app *pocketbase.PocketBase) func(e *core.RequestE
 				return err
 			}
 			if missing := backendrequests.MissingOnboardingFields(mergedData, onboarding, txUser); len(missing) > 0 {
-				return apis.NewApiError(http.StatusBadRequest, "missing_onboarding_fields", map[string]any{"missing": missing})
+				return apis.NewApiError(http.StatusBadRequest, "missing_onboarding_fields", map[string]any{
+					"missing": backendinternal.RawErrorValue{Value: missing},
+				})
 			}
 
 			now := time.Now().UTC().Format(time.RFC3339)
@@ -158,6 +162,15 @@ func OnboardingFinalizeHandler(app *pocketbase.PocketBase) func(e *core.RequestE
 		})
 		if txErr != nil {
 			app.Logger().Error("[onboarding.finalize] commit failed", "token", token, "error", txErr)
+			// Errors the transaction builds for the client on purpose
+			// (missing_onboarding_fields with the list of fields, invalid_file_type,
+			// an invalid token) already are the right message: rewriting them into
+			// a generic failed_to_finalize_onboarding left the user with nothing but
+			// "Oh no! There is an error." and no idea what was missing.
+			var apiErr *router.ApiError
+			if errors.As(txErr, &apiErr) {
+				return apiErr
+			}
 			return apis.NewBadRequestError("failed_to_finalize_onboarding", txErr)
 		}
 

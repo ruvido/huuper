@@ -662,9 +662,19 @@
       let missingFields = null;
       try {
         const errorPayload = await response.json();
-        if (errorPayload && errorPayload.message === "missing_onboarding_fields" && errorPayload.data && Array.isArray(errorPayload.data.missing)) {
+        // PocketBase normalises the message before sending it: "missing_onboarding_fields"
+        // comes back as "Missing_onboarding_fields.". Comparing the raw string meant this
+        // branch never fired and the user saw the internal code instead of the list.
+        const payloadMessage = text(errorPayload && errorPayload.message).toLowerCase().replace(/\.$/, "");
+        if (payloadMessage === "missing_onboarding_fields" && errorPayload.data && Array.isArray(errorPayload.data.missing)) {
           missingFields = errorPayload.data.missing;
-          errorMessage = `Missing required fields: ${missingFields.join(", ")}`;
+          // Titles come from the settings, the same ones shown above each step:
+          // "work" on its own does not tell the user which screen to go back to.
+          const labels = missingFields.map((key) => {
+            const field = state.fields.find((item) => item.key === key);
+            return text(field && (field.title || field.label)) || key;
+          });
+          errorMessage = `Missing required fields: ${labels.join(", ")}`;
         } else {
           errorMessage = text(errorPayload && errorPayload.message) || errorMessage;
         }
