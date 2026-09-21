@@ -138,7 +138,7 @@ func RegisterRetreatHandler(app *pocketbase.PocketBase) func(e *core.RequestEven
 
 // requiredGuestFields must stay in sync with GUEST_FIELDS in
 // frontend/skeleton/assets/js/public/retreat.js.
-var requiredGuestFields = []string{"full_name", "birth_year", "provenance", "mobile"}
+var requiredGuestFields = []string{"full_name", "birth_year", "marital_status", "provenance", "mobile"}
 
 func hasRequiredGuestFields(data map[string]any) bool {
 	if data == nil {

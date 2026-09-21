@@ -60,8 +60,9 @@ type Person struct {
 	// and the town before they dial, not after. The age, not the year they were
 	// born — nobody wants to do the subtraction while the phone rings. Zero
 	// means unknown.
-	AgeYears   int
-	Provenance string
+	AgeYears      int
+	Provenance    string
+	MaritalStatus string
 
 	// AcceptURL is the review page for a request still waiting on the
 	// organiser: the list of people to call ends each one with the link that
@@ -96,8 +97,9 @@ func CountRegistrations(app *pocketbase.PocketBase, retreat *core.Record) (Stats
 			Member:  strings.TrimSpace(record.GetString("user")) != "",
 			Retries: PaymentRetries(record),
 
-			AgeYears:   ageFromBirthYear(registrationField(record, "birth_year")),
-			Provenance: registrationField(record, "provenance"),
+			AgeYears:      ageFromBirthYear(registrationField(record, "birth_year")),
+			Provenance:    registrationField(record, "provenance"),
+			MaritalStatus: registrantMaritalStatus(app, record),
 		}
 		switch record.GetString("status") {
 		case "active":
@@ -233,6 +235,25 @@ func registrationField(record *core.Record, key string) string {
 	return strings.TrimSpace(backendinternal.AnyToString(data[key]))
 }
 
+// registrantMaritalStatus is asked on the guest form; a member answered it in
+// their profile instead, under the same key, so it is read from there when
+// the form has nothing.
+func registrantMaritalStatus(app *pocketbase.PocketBase, record *core.Record) string {
+	if value := registrationField(record, "marital_status"); value != "" {
+		return value
+	}
+	userID := strings.TrimSpace(record.GetString("user"))
+	if userID == "" {
+		return ""
+	}
+	user, err := app.FindRecordById("users", userID)
+	if err != nil || user == nil {
+		return ""
+	}
+	data := backendinternal.ParseJSONMap(user.Get("data"))
+	return strings.TrimSpace(backendinternal.AnyToString(data["marital_status"]))
+}
+
 // personLines renders one person per line, name and phone, as markdown list
 // items. An empty bucket says so rather than leaving a hole in the email.
 func personLines(people []Person, showRetries, showOrigin bool, labels listLabels) string {
@@ -272,6 +293,9 @@ func personLines(people []Person, showRetries, showOrigin bool, labels listLabel
 			}
 			if p.Provenance != "" {
 				origin = append(origin, p.Provenance)
+			}
+			if p.MaritalStatus != "" {
+				origin = append(origin, p.MaritalStatus)
 			}
 			if len(origin) > 0 {
 				line += "  \n  " + strings.Join(origin, " · ")

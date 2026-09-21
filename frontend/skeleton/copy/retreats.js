@@ -77,6 +77,8 @@ window.appCopy = Object.assign({}, window.appCopy || {}, {
           birthYear: "Year of birth",
           birthYearPlaceholder: "1985",
           birthYearError: "Invalid year of birth.",
+          maritalStatus: "Marital status",
+          maritalStatusPlaceholder: "Choose…",
           provenance: "Where you come from",
           provenancePlaceholder: "City or province",
           mobile: "Phone",

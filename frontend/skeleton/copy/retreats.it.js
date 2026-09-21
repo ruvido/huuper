@@ -71,6 +71,8 @@ window.appCopyI18n.translate("retreats.public", {
       birthYear: "Anno di nascita",
       birthYearPlaceholder: "1985",
       birthYearError: "Anno di nascita non valido.",
+      maritalStatus: "Stato relazionale",
+      maritalStatusPlaceholder: "Scegli…",
       provenance: "Provenienza",
       provenancePlaceholder: "Città o provincia",
       mobile: "Telefono",

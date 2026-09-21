@@ -370,11 +370,43 @@
   const GUEST_FIELDS = [
     { key: "full_name", type: "text", label: "fullName", placeholder: "fullNamePlaceholder", autocomplete: "name" },
     { key: "birth_year", type: "number", label: "birthYear", placeholder: "birthYearPlaceholder" },
+    { key: "marital_status", type: "select", label: "maritalStatus", placeholder: "maritalStatusPlaceholder", options: "marital_status" },
     { key: "provenance", type: "text", label: "provenance", placeholder: "provenancePlaceholder", autocomplete: "address-level2" },
     { key: "mobile", type: "phone", label: "mobile", placeholder: "mobilePlaceholder", hint: "mobileHint", autocomplete: "tel" },
   ];
 
   const guestControls = {};
+
+  // Choices for select fields come from the profile schema — the same list
+  // the members' own profile uses — so a guest picks from what the organiser
+  // wrote there and the answer reads the same on both kinds of registrant.
+  // They may arrive after the fields are built, so selects are filled in
+  // whenever the schema lands.
+  const guestSelects = [];
+  const profileOptions = fetch("/api/public/settings/profile_schema")
+    .then((response) => (response.ok ? response.json() : {}))
+    .then((schema) => {
+      const options = {};
+      (Array.isArray(schema.fields) ? schema.fields : []).forEach((field) => {
+        if (field && field.key && Array.isArray(field.options)) options[field.key] = field.options;
+      });
+      return options;
+    })
+    .catch(() => ({}));
+
+  function fillGuestSelects() {
+    profileOptions.then((options) => {
+      guestSelects.forEach(({ select, key }) => {
+        if (select.options.length > 1) return;
+        (options[key] || []).forEach((value) => {
+          const option = document.createElement("option");
+          option.value = value;
+          option.textContent = value;
+          select.appendChild(option);
+        });
+      });
+    });
+  }
 
   function guestText(key) {
     return text("signup.guestFields." + key);
@@ -400,16 +432,24 @@
 
     GUEST_FIELDS.forEach((field) => {
       const controlId = "retreat-" + field.key.replace(/_/g, "-");
-      const input = document.createElement("input");
+      const input = document.createElement(field.type === "select" ? "select" : "input");
       input.id = controlId;
       input.name = field.key;
-      input.type = field.type === "phone" ? "tel" : (field.type === "number" ? "text" : "text");
-      if (field.type === "number") {
-        input.inputMode = "numeric";
-      }
-      input.placeholder = guestText(field.placeholder);
       input.required = true;
-      if (field.autocomplete) input.autocomplete = field.autocomplete;
+      if (field.type === "select") {
+        const empty = document.createElement("option");
+        empty.value = "";
+        empty.textContent = guestText(field.placeholder);
+        input.appendChild(empty);
+        guestSelects.push({ select: input, key: field.options });
+      } else {
+        input.type = field.type === "phone" ? "tel" : "text";
+        if (field.type === "number") {
+          input.inputMode = "numeric";
+        }
+        input.placeholder = guestText(field.placeholder);
+        if (field.autocomplete) input.autocomplete = field.autocomplete;
+      }
 
       const component = publicFields.createFieldComponent({
         label: guestText(field.label),
@@ -443,6 +483,8 @@
         }
       });
     });
+
+    fillGuestSelects();
   }
 
   // Returns the collected values, or null if any field is invalid (errors are

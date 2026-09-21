@@ -78,12 +78,13 @@ func AcceptRequestView(app *pocketbase.PocketBase, registration *core.Record) ma
 		"status":  registration.GetString("status"),
 		"retreat": retreatView,
 		"registration": map[string]any{
-			"email":       strings.TrimSpace(registration.GetString("email")),
-			"full_name":   field("full_name"),
-			"mobile":      field("mobile"),
-			"birth_year":  field("birth_year"),
-			"provenance":  field("provenance"),
-			"received_on": formatDay(registration.GetDateTime("created").Time()),
+			"email":          strings.TrimSpace(registration.GetString("email")),
+			"full_name":      field("full_name"),
+			"mobile":         field("mobile"),
+			"birth_year":     field("birth_year"),
+			"marital_status": field("marital_status"),
+			"provenance":     field("provenance"),
+			"received_on":    formatDay(registration.GetDateTime("created").Time()),
 		},
 	}
 }

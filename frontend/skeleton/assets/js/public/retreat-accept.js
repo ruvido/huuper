@@ -75,6 +75,7 @@
     addField(text("accept.review.email"), registration.email);
     addField(text("signup.guestFields.mobile"), registration.mobile);
     addField(text("signup.guestFields.birthYear"), registration.birth_year);
+    addField(text("signup.guestFields.maritalStatus"), registration.marital_status);
     addField(text("signup.guestFields.provenance"), registration.provenance);
     addField(text("accept.review.receivedOn"), registration.received_on);
     if (retreat.dates) {
