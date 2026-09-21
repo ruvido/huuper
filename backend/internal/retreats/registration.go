@@ -184,18 +184,15 @@ func Activate(app *pocketbase.PocketBase, registration *core.Record) error {
 	return nil
 }
 
-// Reject marks a pending guest registration rejected with an admin-supplied
-// note.
+// Reject puts a pending guest registration aside, with whatever note the
+// organiser left. Whether a note is required is the caller's rule: the admin
+// panel insists on one, the review page tapped from an email does not.
 func Reject(app *pocketbase.PocketBase, registration *core.Record, note string) error {
 	if registration == nil {
 		return fmt.Errorf("missing registration")
 	}
-	note = strings.TrimSpace(note)
-	if note == "" {
-		return fmt.Errorf("missing note")
-	}
 	data := backendinternal.ParseJSONMap(registration.Get("data"))
-	data["rejected"] = note
+	data["rejected"] = strings.TrimSpace(note)
 	registration.Set("data", data)
 	registration.Set("status", "rejected")
 	return app.Save(registration)

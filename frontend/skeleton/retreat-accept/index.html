@@ -7,8 +7,19 @@
        guest actually wrote and not on a name in a subject line. -->
   <div id="retreat-accept-review" class="accept-review" hidden></div>
 
+  <!-- Only when archiving: the note the organiser leaves for their future
+       self, shown again if this person ever asks a second time. -->
+  <div id="retreat-accept-note-field" class="form-field" hidden>
+    <label class="form-field-label" for="retreat-accept-note">
+      <span id="retreat-accept-note-label"></span>
+      <textarea id="retreat-accept-note" rows="3"></textarea>
+    </label>
+  </div>
+
   <div id="retreat-accept-choice" class="action-row" hidden>
     <button id="retreat-accept-yes" class="primary" type="button"></button>
+    <button id="retreat-accept-archive-yes" class="primary" type="button" hidden></button>
+    <button id="retreat-accept-archive" type="button"></button>
     <button id="retreat-accept-no" type="button"></button>
   </div>
 

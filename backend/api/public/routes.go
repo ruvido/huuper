@@ -7,6 +7,7 @@ type Handlers struct {
 	EventsAccept       func(e *core.RequestEvent) error
 	RetreatsAcceptView func(e *core.RequestEvent) error
 	RetreatsAccept     func(e *core.RequestEvent) error
+	RetreatsArchive    func(e *core.RequestEvent) error
 	EventDetails       func(e *core.RequestEvent) error
 	EventsRegister     func(e *core.RequestEvent) error
 	RetreatDetails     func(e *core.RequestEvent) error
@@ -28,6 +29,7 @@ func Register(se *core.ServeEvent, h Handlers) {
 	se.Router.POST("/api/public/retreats/{slug}/register", h.RetreatsRegister)
 	se.Router.GET("/api/public/retreats/accept/request", h.RetreatsAcceptView)
 	se.Router.POST("/api/public/retreats/accept", h.RetreatsAccept)
+	se.Router.POST("/api/public/retreats/archive", h.RetreatsArchive)
 	se.Router.POST("/api/public/requests/email-otp", h.RequestsEmailOTP)
 	se.Router.POST("/api/public/requests/email-otp/verify", h.RequestsOTPVerify)
 	se.Router.POST("/api/public/requests", h.RequestsCreate)

@@ -128,7 +128,14 @@ window.appCopy = Object.assign({}, window.appCopy || {}, {
           previous: "Applied before",
           note: "Note",
           yes: "Yes, approve",
+          archive: "Archive",
           no: "No, leave it",
+        },
+        archive: {
+          title: "Archive this request?",
+          body: "Request for {retreat}. It is put aside, keeps no seat, and the person can ask again later — you will be told they did.",
+          notePlaceholder: "A word for your future self (optional)",
+          yes: "Yes, archive",
         },
         archived: {
           title: "Request archived",

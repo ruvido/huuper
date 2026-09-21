@@ -44,6 +44,13 @@ func AcceptPageURL(app *pocketbase.PocketBase, token string) string {
 	return base + "/retreat-accept/?token=" + strings.TrimSpace(token)
 }
 
+// ArchivePageURL opens the same review page ready to put the request aside:
+// the organiser who has already decided on the phone should not have to go
+// through "confirm?" to reach "archive".
+func ArchivePageURL(app *pocketbase.PocketBase, token string) string {
+	return AcceptPageURL(app, token) + "&action=archive"
+}
+
 func paymentReturnURL(app *pocketbase.PocketBase, retreat *core.Record, status string) string {
 	return returnURL(app, retreat, "/retreat-payment/", status)
 }

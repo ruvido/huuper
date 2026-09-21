@@ -70,10 +70,12 @@ type Person struct {
 	PreviousAt   time.Time
 	PreviousNote string
 
-	// AcceptURL is the review page for a request still waiting on the
-	// organiser: the list of people to call ends each one with the link that
-	// settles them, so the daily email is where the deciding gets done.
-	AcceptURL string
+	// AcceptURL and ArchiveURL are the review page for a request still waiting
+	// on the organiser, opened on one decision or the other: the list of
+	// people to call ends each one with both, so the daily email is where the
+	// deciding gets done.
+	AcceptURL  string
+	ArchiveURL string
 }
 
 // CountRegistrations tallies a retreat's registrations by status and kind.
@@ -126,6 +128,7 @@ func CountRegistrations(app *pocketbase.PocketBase, retreat *core.Record) (Stats
 			stats.Pending++
 			if token := strings.TrimSpace(record.GetString("accept_token")); token != "" {
 				person.AcceptURL = AcceptPageURL(app, token)
+				person.ArchiveURL = ArchivePageURL(app, token)
 			}
 			stats.Requests = append(stats.Requests, person)
 		}
@@ -166,6 +169,7 @@ type listLabels struct {
 	Age     string // "{n}" is the number of years
 	Retries string // "{n}" is the number of retries
 	Confirm string
+	Archive string
 	// Returning is said of someone whose earlier request was archived;
 	// "{date}" is when that was decided.
 	Returning string
@@ -178,6 +182,7 @@ func templateLabels(app *pocketbase.PocketBase, kind string) listLabels {
 		Age:       "{n} years old",
 		Retries:   "{n} retries",
 		Confirm:   "Confirm",
+		Archive:   "Archive",
 		Returning: "applied before, archived on {date}",
 	}
 	template, found, err := eventinternal.LoadTemplateDataByKind(app, "", kind)
@@ -194,6 +199,7 @@ func templateLabels(app *pocketbase.PocketBase, kind string) listLabels {
 	pick("age", &labels.Age)
 	pick("retries", &labels.Retries)
 	pick("confirm", &labels.Confirm)
+	pick("archive", &labels.Archive)
 	pick("returning", &labels.Returning)
 	return labels
 }
@@ -339,6 +345,9 @@ func personLines(people []Person, showRetries, showOrigin bool, labels listLabel
 		// the email is being read on. Only requests still waiting carry one.
 		if p.AcceptURL != "" {
 			line += "  \n  [" + labels.Confirm + "](" + p.AcceptURL + ")"
+			if p.ArchiveURL != "" {
+				line += " · [" + labels.Archive + "](" + p.ArchiveURL + ")"
+			}
 		}
 		lines = append(lines, line)
 	}

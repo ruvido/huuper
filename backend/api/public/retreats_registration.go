@@ -173,6 +173,39 @@ func AcceptRetreatViewHandler(app *pocketbase.PocketBase) func(e *core.RequestEv
 
 type acceptRetreatPayload struct {
 	Token string `json:"token"`
+	Note  string `json:"note"`
+}
+
+// ArchiveRetreatRegistrationHandler is the "archive" of the review page: the
+// request is put aside with whatever note the organiser typed, the seat stays
+// free, and the person can ask again later and be recognised.
+func ArchiveRetreatRegistrationHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		result := func(code int, status string) error {
+			return e.JSON(code, map[string]any{"status": status})
+		}
+
+		var payload acceptRetreatPayload
+		if err := e.BindBody(&payload); err != nil {
+			return result(http.StatusBadRequest, acceptStatusInvalid)
+		}
+
+		registration := retreatsinternal.FindByAcceptToken(app, payload.Token)
+		if registration == nil {
+			return result(http.StatusNotFound, acceptStatusInvalid)
+		}
+		if retreatsinternal.IsClosedStatus(registration.GetString("status")) {
+			return result(http.StatusOK, acceptStatusArchived)
+		}
+		if registration.GetString("status") != "pending" {
+			return result(http.StatusOK, acceptStatusAlready)
+		}
+
+		if err := retreatsinternal.Reject(app, registration, payload.Note); err != nil {
+			return result(http.StatusBadRequest, acceptStatusFailed)
+		}
+		return result(http.StatusOK, acceptStatusArchived)
+	}
 }
 
 // AcceptRetreatRegistrationHandler approves a pending registration. It is the

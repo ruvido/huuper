@@ -122,7 +122,14 @@ window.appCopyI18n.translate("retreats.public", {
       previous: "Richiesta precedente",
       note: "Nota",
       yes: "Sì, approva",
+      archive: "Archivia",
       no: "No, lascia stare",
+    },
+    archive: {
+      title: "Archiviare questa richiesta?",
+      body: "Richiesta per {retreat}. Viene messa da parte, non occupa un posto, e la persona potrà riscriversi più avanti — ti verrà segnalato.",
+      notePlaceholder: "Due parole per ricordartene (facoltativo)",
+      yes: "Sì, archivia",
     },
     archived: {
       title: "Richiesta archiviata",

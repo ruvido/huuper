@@ -174,6 +174,9 @@ func RetreatRegistrationRejectHandler(app *pocketbase.PocketBase) func(e *core.R
 		if err := e.BindBody(&payload); err != nil {
 			return apis.NewBadRequestError("invalid_payload", err)
 		}
+		if strings.TrimSpace(payload.Note) == "" {
+			return apis.NewBadRequestError("missing_note", nil)
+		}
 		if err := retreatsinternal.Reject(app, registration, payload.Note); err != nil {
 			return apis.NewBadRequestError("failed_reject", err)
 		}

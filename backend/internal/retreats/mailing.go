@@ -155,11 +155,12 @@ func SendAdminNewRegistrationNotification(app *pocketbase.PocketBase, retreat *c
 	// what they filled in — plus a one-click link that runs the same approval
 	// as the admin API, so it can be done from a phone.
 	registrationData := map[string]any{}
-	acceptURL := ""
+	acceptURL, archiveURL := "", ""
 	if registration != nil {
 		registrationData = backendinternal.ParseJSONMap(registration.Get("data"))
 		if token := strings.TrimSpace(registration.GetString("accept_token")); token != "" {
 			acceptURL = AcceptPageURL(app, token)
+			archiveURL = ArchivePageURL(app, token)
 		}
 	}
 	field := func(key string) string {
@@ -181,6 +182,7 @@ func SendAdminNewRegistrationNotification(app *pocketbase.PocketBase, retreat *c
 		"[provenance]", field("provenance"),
 		"[returning]", returningText(previousAt, previousNote, templateLabels(app, TemplateKindAdminNewRegistration)),
 		"[accept_url]", acceptURL,
+		"[archive_url]", archiveURL,
 	)
 	subject := replaceAll(template.Subject, replacements)
 	body := replaceAll(template.Body, replacements)
