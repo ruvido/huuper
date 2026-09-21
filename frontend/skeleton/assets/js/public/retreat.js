@@ -385,7 +385,9 @@
   const guestSelects = [];
   const profileOptions = fetch("/api/public/settings/profile_schema")
     .then((response) => (response.ok ? response.json() : {}))
-    .then((schema) => {
+    .then((payload) => {
+      // The settings endpoint wraps the record: { name, data: { fields } }.
+      const schema = (payload && payload.data) || payload || {};
       const options = {};
       (Array.isArray(schema.fields) ? schema.fields : []).forEach((field) => {
         if (field && field.key && Array.isArray(field.options)) options[field.key] = field.options;
