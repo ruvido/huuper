@@ -78,6 +78,7 @@
     addField(text("signup.guestFields.maritalStatus"), registration.marital_status);
     addField(text("signup.guestFields.provenance"), registration.provenance);
     addField(text("accept.review.receivedOn"), registration.received_on);
+    addField(text("accept.review.previous"), view.previous);
     if (retreat.dates) {
       addField(text("stats.when"), retreat.dates);
     }

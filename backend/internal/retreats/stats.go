@@ -64,6 +64,12 @@ type Person struct {
 	Provenance    string
 	MaritalStatus string
 
+	// An earlier request from the same person that the organiser put aside,
+	// with the note left on it: the "write again when you are ready" case,
+	// which is the one to approve on sight.
+	PreviousAt   time.Time
+	PreviousNote string
+
 	// AcceptURL is the review page for a request still waiting on the
 	// organiser: the list of people to call ends each one with the link that
 	// settles them, so the daily email is where the deciding gets done.
@@ -101,6 +107,7 @@ func CountRegistrations(app *pocketbase.PocketBase, retreat *core.Record) (Stats
 			Provenance:    registrationField(record, "provenance"),
 			MaritalStatus: registrantMaritalStatus(app, record),
 		}
+		person.PreviousAt, person.PreviousNote = PreviousRequest(record)
 		switch record.GetString("status") {
 		case "active":
 			stats.Active++
@@ -159,15 +166,19 @@ type listLabels struct {
 	Age     string // "{n}" is the number of years
 	Retries string // "{n}" is the number of retries
 	Confirm string
+	// Returning is said of someone whose earlier request was archived;
+	// "{date}" is when that was decided.
+	Returning string
 }
 
 func templateLabels(app *pocketbase.PocketBase, kind string) listLabels {
 	labels := listLabels{
-		Nobody:  "_nobody_",
-		NoName:  "(no name)",
-		Age:     "{n} years old",
-		Retries: "{n} retries",
-		Confirm: "Confirm",
+		Nobody:    "_nobody_",
+		NoName:    "(no name)",
+		Age:       "{n} years old",
+		Retries:   "{n} retries",
+		Confirm:   "Confirm",
+		Returning: "applied before, archived on {date}",
 	}
 	template, found, err := eventinternal.LoadTemplateDataByKind(app, "", kind)
 	if err != nil || !found {
@@ -183,11 +194,26 @@ func templateLabels(app *pocketbase.PocketBase, kind string) listLabels {
 	pick("age", &labels.Age)
 	pick("retries", &labels.Retries)
 	pick("confirm", &labels.Confirm)
+	pick("returning", &labels.Returning)
 	return labels
 }
 
 func withCount(label string, n int) string {
 	return strings.ReplaceAll(label, "{n}", strconv.Itoa(n))
+}
+
+// returningText is the line that marks someone who has asked before: when
+// the earlier request was archived and what the organiser wrote then. Empty
+// for a first request.
+func returningText(at time.Time, note string, labels listLabels) string {
+	if at.IsZero() {
+		return ""
+	}
+	line := strings.ReplaceAll(labels.Returning, "{date}", formatDay(at))
+	if note != "" {
+		line += " · " + note
+	}
+	return line
 }
 
 // statsPlaceholders exposes the figures to the template, so the organiser can
@@ -305,6 +331,9 @@ func personLines(people []Person, showRetries, showOrigin bool, labels listLabel
 		// wrap into each other on a phone and neither can be tapped cleanly.
 		for _, contact := range contacts {
 			line += "  \n  " + contact
+		}
+		if returning := returningText(p.PreviousAt, p.PreviousNote, labels); returning != "" {
+			line += "  \n  " + returning
 		}
 		// Last line of the item: the way to settle this person from the phone
 		// the email is being read on. Only requests still waiting carry one.

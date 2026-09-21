@@ -167,13 +167,19 @@ func SendAdminNewRegistrationNotification(app *pocketbase.PocketBase, retreat *c
 		return strings.TrimSpace(value)
 	}
 
+	previousAt, previousNote := time.Time{}, ""
+	if registration != nil {
+		previousAt, previousNote = PreviousRequest(registration)
+	}
 	replacements := append(retreatPlaceholders(retreat),
 		"[retreat]", title,
 		"[email]", strings.TrimSpace(registrantEmail),
 		"[name]", field("full_name"),
 		"[phone]", field("mobile"),
 		"[birth_year]", field("birth_year"),
+		"[marital_status]", field("marital_status"),
 		"[provenance]", field("provenance"),
+		"[returning]", returningText(previousAt, previousNote, templateLabels(app, TemplateKindAdminNewRegistration)),
 		"[accept_url]", acceptURL,
 	)
 	subject := replaceAll(template.Subject, replacements)

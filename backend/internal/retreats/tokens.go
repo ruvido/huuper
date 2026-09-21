@@ -74,9 +74,18 @@ func AcceptRequestView(app *pocketbase.PocketBase, registration *core.Record) ma
 		}
 	}
 
+	previous := ""
+	if at, note := PreviousRequest(registration); !at.IsZero() {
+		previous = formatDay(at)
+		if note != "" {
+			previous += " · " + note
+		}
+	}
+
 	return map[string]any{
-		"status":  registration.GetString("status"),
-		"retreat": retreatView,
+		"status":   registration.GetString("status"),
+		"retreat":  retreatView,
+		"previous": previous,
 		"registration": map[string]any{
 			"email":          strings.TrimSpace(registration.GetString("email")),
 			"full_name":      field("full_name"),

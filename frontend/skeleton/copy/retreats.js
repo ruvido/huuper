@@ -125,6 +125,7 @@ window.appCopy = Object.assign({}, window.appCopy || {}, {
           body: "Request for {retreat}. Nothing happens until you say yes.",
           email: "Email",
           receivedOn: "Received on",
+          previous: "Applied before",
           yes: "Yes, approve",
           no: "No, leave it",
         },

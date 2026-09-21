@@ -119,6 +119,7 @@ window.appCopyI18n.translate("retreats.public", {
       body: "Richiesta per {retreat}. Finché non dici sì non succede niente.",
       email: "Email",
       receivedOn: "Arrivata il",
+      previous: "Richiesta precedente",
       yes: "Sì, approva",
       no: "No, lascia stare",
     },

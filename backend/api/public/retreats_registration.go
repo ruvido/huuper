@@ -113,7 +113,11 @@ func RegisterRetreatHandler(app *pocketbase.PocketBase) func(e *core.RequestEven
 					"checkout_url": checkoutURL,
 				})
 			}
-			return apis.NewBadRequestError(errAlreadySubmitted, nil)
+			// Archived earlier (rejected or cancelled) and asking again: let
+			// them through — Register reuses the record and keeps the history.
+			if status := existing.GetString("status"); status != "rejected" && status != "cancelled" {
+				return apis.NewBadRequestError(errAlreadySubmitted, nil)
+			}
 		}
 
 		record, checkoutURL, err := retreatsinternal.Register(app, retreat, retreatsinternal.RegisterInput{

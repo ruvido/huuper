@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	backendinternal "members/backend/internal"
 	paymentsinternal "members/backend/internal/payments"
@@ -66,6 +67,13 @@ func Register(app *pocketbase.PocketBase, retreat *core.Record, in RegisterInput
 	}
 
 	record := core.NewRecord(collection)
+	// Someone archived earlier and now back: same record, so the organiser
+	// sees they have been here before and the unique index on (retreat, email)
+	// is honoured. The earlier outcome moves into data.history.
+	if previous, _ := FindRegistrationByEmail(app, retreat.Id, email, false); previous != nil && isClosedStatus(previous.GetString("status")) {
+		record = previous
+		data["history"] = appendHistory(previous)
+	}
 	record.Set("retreat", retreat.Id)
 	record.Set("email", email)
 	if in.User != nil {
@@ -209,6 +217,42 @@ func CancelRegistration(app *pocketbase.PocketBase, registration *core.Record, n
 	registration.Set("data", data)
 	registration.Set("status", "cancelled")
 	return app.Save(registration)
+}
+
+// isClosedStatus is a registration the organiser has put aside: it holds no
+// seat, and the person may come back and ask again.
+func isClosedStatus(status string) bool {
+	return status == "rejected" || status == "cancelled"
+}
+
+// appendHistory adds the request being replaced to the record's history: its
+// outcome, the note the organiser left, and when it was decided. Reject and
+// CancelRegistration keep the note under the status name.
+func appendHistory(previous *core.Record) []any {
+	data := backendinternal.ParseJSONMap(previous.Get("data"))
+	history, _ := data["history"].([]any)
+	status := previous.GetString("status")
+	note, _ := data[status].(string)
+	return append(history, map[string]any{
+		"status": status,
+		"note":   strings.TrimSpace(note),
+		"at":     previous.GetDateTime("updated").Time().UTC().Format(time.RFC3339),
+	})
+}
+
+// PreviousRequest says when this person's last archived request was decided
+// and what the organiser wrote on it — a zero time when this is their first.
+// It is what lets the organiser recognise someone who was told "write again
+// when you are ready" and approve them on the spot.
+func PreviousRequest(record *core.Record) (time.Time, string) {
+	data := backendinternal.ParseJSONMap(record.Get("data"))
+	history, _ := data["history"].([]any)
+	if len(history) == 0 {
+		return time.Time{}, ""
+	}
+	last, _ := history[len(history)-1].(map[string]any)
+	at, _ := time.Parse(time.RFC3339, backendinternal.AnyToString(last["at"]))
+	return at, strings.TrimSpace(backendinternal.AnyToString(last["note"]))
 }
 
 func isRegistrationDataSizeOK(data map[string]any) bool {
