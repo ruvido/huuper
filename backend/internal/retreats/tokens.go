@@ -55,6 +55,39 @@ func isTokenUnique(app *pocketbase.PocketBase, token string) (bool, error) {
 	return len(records) == 0, nil
 }
 
+// AcceptRequestView is what the organiser sees before deciding: the request
+// as the guest filled it in, plus which retreat it is for. Built here, next to
+// the token that unlocks it, so the public handler carries no knowledge of
+// where these fields live.
+func AcceptRequestView(app *pocketbase.PocketBase, registration *core.Record) map[string]any {
+	data := backendinternal.ParseJSONMap(registration.Get("data"))
+	field := func(key string) string {
+		return strings.TrimSpace(backendinternal.AnyToString(data[key]))
+	}
+
+	retreatView := map[string]any{}
+	if retreat, err := app.FindRecordById("retreats", registration.GetString("retreat")); err == nil && retreat != nil {
+		retreatView = map[string]any{
+			"title": strings.TrimSpace(retreat.GetString("title")),
+			"slug":  strings.TrimSpace(retreat.GetString("slug")),
+			"dates": formatDateRange(retreat.GetDateTime("start_date").Time(), retreat.GetDateTime("end_date").Time()),
+		}
+	}
+
+	return map[string]any{
+		"status":  registration.GetString("status"),
+		"retreat": retreatView,
+		"registration": map[string]any{
+			"email":       strings.TrimSpace(registration.GetString("email")),
+			"full_name":   field("full_name"),
+			"mobile":      field("mobile"),
+			"birth_year":  field("birth_year"),
+			"provenance":  field("provenance"),
+			"received_on": formatDay(registration.GetDateTime("created").Time()),
+		},
+	}
+}
+
 // FindByAcceptToken resolves a still-valid accept token to its registration.
 // An expired or unknown token yields no record rather than an error, so the
 // caller can answer with one indistinguishable "invalid link" either way.

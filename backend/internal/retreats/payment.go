@@ -34,12 +34,14 @@ func PaymentCancelURL(app *pocketbase.PocketBase, retreat *core.Record) string {
 	return paymentReturnURL(app, retreat, "cancelled")
 }
 
-// AcceptResultURL is where the approve-from-email link lands the organiser.
-// The click has to answer a human on a phone, not a script: it returns a page
-// instead of JSON. Only the outcome and the slug travel in the URL — never the
-// registrant's email, which would end up in browser history and referrers.
-func AcceptResultURL(app *pocketbase.PocketBase, retreat *core.Record, status string) string {
-	return returnURL(app, retreat, "/retreat-accept/", status)
+// AcceptPageURL is the link in the organiser's email: a page that shows the
+// request and asks before approving. Only the token travels in the URL — never
+// the registrant's details, which would end up in browser history and
+// referrers — and opening it changes nothing, so a mail client that prefetches
+// links cannot approve anyone by itself.
+func AcceptPageURL(app *pocketbase.PocketBase, token string) string {
+	base := strings.TrimRight(app.Settings().Meta.AppURL, "/")
+	return base + "/retreat-accept/?token=" + strings.TrimSpace(token)
 }
 
 func paymentReturnURL(app *pocketbase.PocketBase, retreat *core.Record, status string) string {

@@ -2293,6 +2293,12 @@ body.action-sheet-lock {
   text-transform: uppercase;
 }
 
+/* A stack of data-blocks read as one record (the retreat approval review). */
+.accept-review {
+  display: grid;
+  gap: var(--space-3);
+}
+
 .data-value {
   font-size: var(--font-ui-base);
   font-weight: 700;

@@ -2,7 +2,17 @@
 <section class="panel">
   <h2 id="retreat-accept-title" class="public-request-title"></h2>
   <p id="retreat-accept-message" class="meta-text"></p>
-  <div class="action-row">
+
+  <!-- The request, field by field, so the organiser decides on what the
+       guest actually wrote and not on a name in a subject line. -->
+  <div id="retreat-accept-review" class="accept-review" hidden></div>
+
+  <div id="retreat-accept-choice" class="action-row" hidden>
+    <button id="retreat-accept-yes" class="primary" type="button"></button>
+    <button id="retreat-accept-no" type="button"></button>
+  </div>
+
+  <div id="retreat-accept-actions" class="action-row" hidden>
     <a id="retreat-accept-back" href="/" class="primary"></a>
   </div>
 </section>

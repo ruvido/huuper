@@ -153,37 +153,65 @@ func hasRequiredGuestFields(data map[string]any) bool {
 	return true
 }
 
-// AcceptRetreatRegistrationHandler approves a pending registration from the
-// link in the admin notification email, so it can be done from a phone
-// without the admin panel. Every outcome redirects to /retreat-accept/: the
-// only reader here is a person who just tapped a link in their inbox, and a
-// JSON body would tell them nothing. The token is time limited; an unknown
-// one gets the same answer as an expired one.
-func AcceptRetreatRegistrationHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+// AcceptRetreatLinkHandler is where the approval links in emails already sent
+// still point. It used to approve on the spot; now it only forwards to the
+// page that shows the request and asks first. A GET must not change anything:
+// mail clients and link scanners open links on their own, and one of them
+// approving a stranger is not a theoretical risk.
+func AcceptRetreatLinkHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		result := func(retreat *core.Record, status string) error {
-			return e.Redirect(http.StatusFound, retreatsinternal.AcceptResultURL(app, retreat, status))
-		}
+		return e.Redirect(http.StatusFound, retreatsinternal.AcceptPageURL(app, e.Request.URL.Query().Get("token")))
+	}
+}
 
+// AcceptRetreatViewHandler hands the page what the organiser needs to decide:
+// the request as it was filled in, and whether it is still waiting. An unknown
+// token gets the same answer as an expired one.
+func AcceptRetreatViewHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
 		registration := retreatsinternal.FindByAcceptToken(app, e.Request.URL.Query().Get("token"))
 		if registration == nil {
-			return result(nil, acceptStatusInvalid)
+			return e.JSON(http.StatusNotFound, map[string]any{"status": acceptStatusInvalid})
 		}
-		retreat, _ := app.FindRecordById("retreats", registration.GetString("retreat"))
+		return e.JSON(http.StatusOK, retreatsinternal.AcceptRequestView(app, registration))
+	}
+}
 
+type acceptRetreatPayload struct {
+	Token string `json:"token"`
+}
+
+// AcceptRetreatRegistrationHandler approves a pending registration. It is the
+// "yes" of the review page — the only thing on that page that changes state,
+// which is why it is a POST and the token travels in the body.
+func AcceptRetreatRegistrationHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		result := func(code int, status string) error {
+			return e.JSON(code, map[string]any{"status": status})
+		}
+
+		var payload acceptRetreatPayload
+		if err := e.BindBody(&payload); err != nil {
+			return result(http.StatusBadRequest, acceptStatusInvalid)
+		}
+
+		registration := retreatsinternal.FindByAcceptToken(app, payload.Token)
+		if registration == nil {
+			return result(http.StatusNotFound, acceptStatusInvalid)
+		}
 		if registration.GetString("status") != "pending" {
-			return result(retreat, acceptStatusAlready)
+			return result(http.StatusOK, acceptStatusAlready)
 		}
 
 		if _, err := retreatsinternal.Approve(app, registration); err != nil {
-			return result(retreat, acceptStatusFailed)
+			return result(http.StatusBadRequest, acceptStatusFailed)
 		}
 
 		// Approve() updates the record in place: with a deposit configured the
 		// registrant still has to pay, without one they are already in.
 		if registration.GetString("status") == "active" {
-			return result(retreat, acceptStatusActive)
+			return result(http.StatusOK, acceptStatusActive)
 		}
-		return result(retreat, acceptStatusApproved)
+		return result(http.StatusOK, acceptStatusApproved)
 	}
 }

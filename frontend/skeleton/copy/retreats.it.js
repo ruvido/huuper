@@ -111,6 +111,19 @@ window.appCopyI18n.translate("retreats.public", {
     backToRetreat: "Torna al raduno",
   },
   accept: {
+    loading: "Carico la richiesta…",
+    review: {
+      title: "Confermi questa iscrizione?",
+      body: "Richiesta per {retreat}. Finché non dici sì non succede niente.",
+      email: "Email",
+      receivedOn: "Arrivata il",
+      yes: "Sì, approva",
+      no: "No, lascia stare",
+    },
+    declined: {
+      title: "Lasciata com'era",
+      body: "Non è partito niente e la richiesta resta in attesa. Puoi tornare su questo link quando vuoi.",
+    },
     approved: {
       title: "Iscrizione approvata",
       body: "Gli è partita l'email con il link per versare l'acconto. Il posto resta suo finché non paga.",

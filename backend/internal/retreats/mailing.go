@@ -159,8 +159,7 @@ func SendAdminNewRegistrationNotification(app *pocketbase.PocketBase, retreat *c
 	if registration != nil {
 		registrationData = backendinternal.ParseJSONMap(registration.Get("data"))
 		if token := strings.TrimSpace(registration.GetString("accept_token")); token != "" {
-			base := strings.TrimRight(app.Settings().Meta.AppURL, "/")
-			acceptURL = base + "/api/public/retreats/accept?token=" + token
+			acceptURL = AcceptPageURL(app, token)
 		}
 	}
 	field := func(key string) string {

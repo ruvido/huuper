@@ -117,6 +117,19 @@ window.appCopy = Object.assign({}, window.appCopy || {}, {
         backToRetreat: "Back to the retreat",
       },
       accept: {
+        loading: "Loading the request…",
+        review: {
+          title: "Confirm this registration?",
+          body: "Request for {retreat}. Nothing happens until you say yes.",
+          email: "Email",
+          receivedOn: "Received on",
+          yes: "Yes, approve",
+          no: "No, leave it",
+        },
+        declined: {
+          title: "Left as it was",
+          body: "Nothing was sent and the request is still waiting. You can come back to this link any time.",
+        },
         approved: {
           title: "Registration approved",
           body: "The registrant has been emailed the link to pay the deposit. Their place is held until they pay.",
